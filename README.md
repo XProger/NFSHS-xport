@@ -26,11 +26,11 @@ as-is and never external in a real PsyQ build.
 ## Layout
 
 ```
-recon/eaclib/       EA cross-platform + PSX library
-recon/frontend/     Front-end menus and screens
-recon/game/         Gameplay, physics, cars, HUD and track code
-recon/lib/          Shared cross-module declarations
-recon/platform/win/ PsyQ compatibility layer, Windows runtime and Visual Studio project
+src/eaclib/         EA cross-platform + PSX library
+src/frontend/       Front-end menus and screens
+src/game/           Gameplay, physics, cars, HUD and track code
+src/lib/            Shared cross-module declarations
+src/platform/win/   PsyQ compatibility layer, Windows runtime and Visual Studio project
 tools/              Reconstruction and verification tools
 tmp/                Historical and temporary reconstruction artifacts
 _build/             Compiler and linker intermediate files
@@ -39,7 +39,7 @@ bin/                NFSHS.exe and local game data
 
 ## Windows build
 
-Open `recon/platform/win/NFSHS.sln` in Visual Studio 2022 and build the
+Open `src/platform/win/NFSHS.sln` in Visual Studio 2022 and build the
 `Release|Win32` configuration. The executable is written to `bin/NFSHS.exe` and
 all intermediate files are written below `_build`.
 
@@ -47,10 +47,10 @@ The native port is built exclusively with the Visual Studio 2022 Win32 toolchain
 The same build can be invoked from the repository root:
 
 ```powershell
-& "C:\Program Files\Microsoft Visual Studio\2022\Community\MSBuild\Current\Bin\MSBuild.exe" recon/platform/win/NFSHS.sln /m /p:Configuration=Release /p:Platform=Win32
+& "C:\Program Files\Microsoft Visual Studio\2022\Community\MSBuild\Current\Bin\MSBuild.exe" src/platform/win/NFSHS.sln /m /p:Configuration=Release /p:Platform=Win32
 ```
 
-The public PsyQ compatibility surface is contained in `recon/platform/win/psx.c` and `psx.h`.
+The public PsyQ compatibility surface is contained in `src/platform/win/psx.c` and `psx.h`.
 
 Extracted game data is local-only and is not distributed. Place it in
 `bin/DATA` before running the port.
@@ -71,7 +71,7 @@ unresolved absolute VAs in code, and every materialized item carries a `/* @0xVA
 ## Verifying self-containment
 
 The native Visual Studio project directly includes every C and C++ translation unit
-under `recon/game`, `recon/frontend`, and `recon/eaclib`, plus the reconstruction and
+under `src/game`, `src/frontend`, and `src/eaclib`, plus the reconstruction and
 Windows-platform translation units listed in `NFSHS.vcxproj`. A clean Debug and Release
 build therefore verifies the complete supported source tree without Python or MinGW.
 

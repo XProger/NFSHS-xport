@@ -9,6 +9,7 @@ _link_obj/
 build/
 _build/
 tmp/
+tools/
 bin/DATA/
 *.log
 __pycache__/
