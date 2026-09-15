@@ -1,29 +1,15 @@
 /* game/common/aistate.cpp -- RECONSTRUCTED (AI state-machine hierarchy; C++ TU)
  *   52 fns across 11 classes (AIState_Base + Normal/NonActive/Idle/Chase/Offroad/Purgatory/
  *   RovingTraffic/Donuts/GotoSlice/Cruise) + 3 free AIState_StartUp/Restart/CleanUp.
- *   Real non-polymorphic C++ inheritance (SS3.23/3.23c conversion, 2026-07-06 -- was
- *   composition-modeled); manual _vf vtable dispatch (8-byte __vtbl_ptr_type entries);
- *   deleting dtors. Each ctor/dtor installs AIState_<C>_vtable.
+ *   Composition-modeled inheritance (_base_ members); manual _vf vtable dispatch (8-byte
+ *   __vtbl_ptr_type entries); deleting dtors. Each ctor/dtor installs AIState_<C>_vtable.
  *   Faithful C++ (option A). NOT original source; SYM-faithful, recompilable. vs disasm-v2.
  */
-#include "../../lib/nfs4_new.h"
-#include "aistate_types.h"
+#include "../../nfs4_types.h"
 #include "aistate_externs.h"
 
-#define AISTATE_SLICE_BYTE(slice, offset) \
-    (*(u_char *)(AIState_BWorldSmSlices + (slice) * 0x20 + (offset)))
-
 /* ---- aistate.obj-owned globals (.bss zero) ---- */
-static int   AIState_Purgatory_numTrafficCarsInPurgatory;   /* @0x8013dd7c  (bss(zero); SYM STAT) */
-
-
-/* w60 link-debt fix (W60-A8 finding, user-unblocked): the canonical
- * Execute__17AIState_NonActive / ___17AIState_NonActive pair (@0x8005F624/62C)
- * was over-emitted by THREE objects.  aih_btccop.cpp owns those VAs (its own
- * banners + SLD adjacency); this TU keeps only its VA-suffixed vague-linkage
- * instances (Execute__17AIState_NonActive_80072750 etc., see the tail block).
- * The canonical definitions that lived here were removed; the file's old tail
- * comment ("the canonicals live in THIS TU") is superseded by this note. */
+int          AIState_Purgatory_numTrafficCarsInPurgatory;   /* @0x8013dd7c  (bss(zero)) */
 
 
 /* ---- AIState_StartUp__Fv  AIState_StartUp  [AISTATE.CPP:25-26] SLD-VERIFIED ---- */
@@ -105,11 +91,11 @@ void AIState_Base::StateExecute()
 
      ((pCVar1->N).deadTimer == 0)) {
 
-    AIScript_ProcessActionsAndReactions(&pCVar1->script,AI_elapsedTime);
+    AIScript_ProcessActionsAndReactions(&pCVar1->script,0);
 
   }
 
-  (*(*this->_vf)[1].pfn)((int)&this->carObj_ + (int)(*this->_vf)[1].delta);
+  NFS4_VCALL_AUTO((*this->_vf)[1].pfn, (int)&this->carObj_ + (int)(*this->_vf)[1].delta);
 
   return;
 
@@ -130,7 +116,7 @@ AIState_Base::AIState_Base(Car_tObj *carObj)
 
 {
 
-  this->_vf = (__vtbl_ptr_type (*) [4])AIState_Base_vtable;
+  this->_vf = (__vtbl_ptr_type (*) [4])((char *)AIState_Base_vtable + 8);
 
   this->carObj_ = carObj;
 
@@ -153,13 +139,13 @@ void AIState_Normal::Execute()
 
 {
 
-  AISpeeds_CalcDesiredSpeed(this->carObj_);
+  AISpeeds_CalcDesiredSpeed((this->_base_AIState_Base).carObj_);
 
-  AI_GenericBeginCycle(this->carObj_);
+  AI_GenericBeginCycle((this->_base_AIState_Base).carObj_);
 
-  AI_GenericCycle(this->carObj_);
+  AI_GenericCycle((this->_base_AIState_Base).carObj_);
 
-  AI_GenericEndCycle(this->carObj_);
+  AI_GenericEndCycle((this->_base_AIState_Base).carObj_);
 
   return;
 
@@ -175,7 +161,7 @@ void AIState_Normal::Execute()
 /* ---- __14AIState_NormalP8Car_tObj  AIState_Normal::ctor  [AISTATE.CPP:105-110] SLD-VERIFIED ---- */
 
 AIState_Normal::AIState_Normal(Car_tObj *carObj)
-  : AIState_Base(carObj)
+  : _base_AIState_Base(carObj)
 {
 
   Car_tObj *pCVar1;
@@ -183,9 +169,9 @@ AIState_Normal::AIState_Normal(Car_tObj *carObj)
   
 
 
-  pCVar1 = this->carObj_;
+  pCVar1 = (this->_base_AIState_Base).carObj_;
 
-  this->_vf = (__vtbl_ptr_type (*) [4])AIState_Normal_vtable;
+  (this->_base_AIState_Base)._vf = (__vtbl_ptr_type (*) [4])AIState_Normal_vtable;
 
   (pCVar1->targetPos).z = 0;
 
@@ -193,9 +179,9 @@ AIState_Normal::AIState_Normal(Car_tObj *carObj)
 
   (pCVar1->targetPos).x = 0;
 
-  (this->carObj_)->targetLatPos = 0;
+  ((this->_base_AIState_Base).carObj_)->targetLatPos = 0;
 
-  ((this->carObj_)->N).active = '\x01';
+  (((this->_base_AIState_Base).carObj_)->N).active = '\x01';
 
   return;
 
@@ -221,19 +207,11 @@ void AIState_Idle::Execute()
 
   Car_tObj *pCVar2;
 
+  
 
+  if (this->idleInPlaceFlag_ == 0) {
 
-  if (this->idleInPlaceFlag_ != 0) {
-
-    (this->carObj_)->desiredSpeed = 0;
-
-    (this->carObj_)->desiredLatPos = (this->carObj_)->roadPosition;
-
-  }
-
-  else {
-
-    pCVar2 = this->carObj_;
+    pCVar2 = (this->_base_AIState_Base).carObj_;
 
     if ((pCVar2->roadPosition - this->roadPosition_) + 0xffffU < 0x1ffff) {
 
@@ -245,7 +223,9 @@ void AIState_Idle::Execute()
 
       AISpeeds_CalcDesiredSpeed(pCVar2);
 
-      iVar1 = (this->carObj_)->desiredSpeed;
+      pCVar2 = (this->_base_AIState_Base).carObj_;
+
+      iVar1 = pCVar2->desiredSpeed;
 
       if (iVar1 < 0) {
 
@@ -253,11 +233,21 @@ void AIState_Idle::Execute()
 
       }
 
-      (this->carObj_)->desiredSpeed = iVar1 >> 2;
+      pCVar2->desiredSpeed = iVar1 >> 2;
 
     }
 
-    (this->carObj_)->desiredLatPos = this->roadPosition_;
+    ((this->_base_AIState_Base).carObj_)->desiredLatPos = this->roadPosition_;
+
+  }
+
+  else {
+
+    ((this->_base_AIState_Base).carObj_)->desiredSpeed = 0;
+
+    pCVar2 = (this->_base_AIState_Base).carObj_;
+
+    pCVar2->desiredLatPos = pCVar2->roadPosition;
 
   }
 
@@ -296,71 +286,27 @@ void AIState_Idle::SetIdlePosition(int roadPosition)
 
 
 /* ---- __13AIState_ChaseP8Car_tObjT1P8coorddefiiiii  AIState_Chase::ctor  [AISTATE.CPP:180-201] SLD-VERIFIED ---- */
-/* W62-A9: SEALED 11 -> PASS 66/66 (psyqproof REAL=0 RELOP=0).  The standing
-   "pure coloring floor" verdict below was WRONG.  TWO levers, each inert alone:
-   (1) THE -G-THRESHOLD GATE-GLOBAL LEVER (new, generalises).  A 4-byte `extern int`
-       is at-or-under the -G4 small-data threshold, so cc1plus emits the single
-       UNSCHEDULABLE assembler macro `lw $2,D_8011321C`; the retail oracle has the
-       SPLIT `lui %hi` (hoisted into the store block) + `lw %lo` pair, which only a
-       symbol ABOVE the threshold produces.  Declaring it `extern int D_8011321C[]`
-       (3.12 #5 unsized array => unknown size => never small-data) restores the split,
-       kills the load-delay `nop` (67 -> 66, count-exact) and lets the `lui` hoist.
-       SYMPTOM TO GREP FOR: ours `lw rD,SYM` plus a nop where retail has `lui`..`lw`.
-       Alone: 13 diffs (WORSE than the 11 baseline -- it must be paired).
-   (2) The both-arms-assign TERNARY for the reverseDirCheck select -- exactly the
-       shape the ai.cpp sibling AI_HandleTrafficHonking already uses.  It frees $v0
-       (the gate value dies at the branch) so the nor/xori land in $v0 like retail
-       instead of $a0.  Alone: 16 diffs.  Together: PASS.
-   Also PASSing (equivalent, not landed): the if/else both-arms form; the ternary
-   with the gate read into a named `rev` first; an in-place `(int)this->carObj_`
-   receiver cast; a read-only fence on `rev`.  FALSIFIED at 11-20 (pre-landing
-   basin, listed so nobody re-fights them): gate-read-first alone, inverted default,
-   per-arm field re-read, identity launder on `direction`, read-only fence on
-   `direction`, named receiver pointer, block-local reverseDirCheck (13A block
-   anchor -- INERT here), and the unsized array WITHOUT the ternary. */
-/* HISTORICAL, superseded by the receipt above:
-   WALL (register-coloring near-miss, insn count now EXACT 66/66; was 8 SHORT before the
-   reverseDirCheck fix below): two independent saved-reg swaps remain vs the oracle --
-   (carObj<->delayTime) and (relPosition<->nitrousTicks) -- both are short/long-lived params
-   that gcc-2.x's global allocator ties differently than the oracle build; every statement
-   placement/caching variant tried leaves the same two swaps. Pure §A coloring floor,
-   documented near-miss. */
-
-/* D_8011321C == GameSetup_gData.reverseTrack -- standalone-symbol form, same precedent as
- * ai.cpp AI_HandleTrafficHonking / aiinit.cpp AIInit_RestartAICar / hud.cpp Hud_NextPlayer. */
-/* W62-A9: declared an UNSIZED ARRAY on purpose -- see the ctor receipt below.
-   A 4-byte `extern int` is at-or-under the -G4 small-data threshold, so cc1plus
-   emits the single UNSCHEDULABLE assembler macro `lw $2,D_8011321C`; retail's
-   split `lui %hi` + `lw %lo` pair proves this object saw the symbol as ABOVE the
-   threshold.  The unsized `[]` restores that (unknown size => never small-data). */
-extern int D_8011321C[];
 
 AIState_Chase::AIState_Chase(Car_tObj *carObj,Car_tObj *targetCar,coorddef *relPosition,
 
           int nitrousTicks,int nitrousMinForeDistance,int nitrousMinAftDistance,int aggressionLevel,
 
           int delayTime)
-  : AIState_Base(carObj)
+  : _base_AIState_Base(carObj), delayCar_(carObj,targetCar,delayTime)
 {
 
-  int reverseDirCheck;
 
-  this->_vf = (__vtbl_ptr_type (*) [4])AIState_Chase_vtable;
+  (this->_base_AIState_Base)._vf = (__vtbl_ptr_type (*) [4])AIState_Chase_vtable;
 
-  /* MATCH: delayCar_ constructed via placement-new IN THE BODY (after the _vf store) --
-     the oracle schedules the _vf store into the AIDelayCar ctor's arg setup, which is
-     only reachable when the member ctor call FOLLOWS the store (init-list form calls it
-     before any body stmt). AIDelayCar() default ctor is empty inline -> no extra code. */
-
-  new ((AIDelayCar *)&this->delayCar_) AIDelayCar(carObj,targetCar,delayTime);
+  /* delayCar_ AIDelayCar(carObj,targetCar,delayTime) constructed in member-init list above (was flat __10AIDelayCarP8Car_tObjT1i) */
 
   this->nitrousTicks_ = nitrousTicks;
 
   this->SetTarget(targetCar,relPosition);
 
-  (this->carObj_)->accNitrous = 0x10000;
+  ((this->_base_AIState_Base).carObj_)->accNitrous = 0x10000;
 
-  (this->carObj_)->speedNitrous = 0x10000;
+  ((this->_base_AIState_Base).carObj_)->speedNitrous = 0x10000;
 
   this->nitrousMinForeDistance_ = nitrousMinForeDistance;
 
@@ -370,34 +316,7 @@ AIState_Chase::AIState_Chase(Car_tObj *carObj,Car_tObj *targetCar,coorddef *relP
 
   this->slowDownEndTime_ = 0;
 
-  /* tail-merged identical arms (catalog SSD): oracle computes the honk-check idiom (exact same
-     shape as AI_HandleTrafficHonking, recon/game/common/ai.cpp:1208-1211) purely as a branch
-     CONDITION whose two arms both reset noTurnAroundEndTime_ to 0 -- gcc2.8's cross-jump pass
-     merges the byte-identical arm bodies into ONE shared store, but the branch test (and the
-     nor/xori computing it) survives because branch removal is a separate optimization gcc
-     doesn't perform here.
-     FLOOR (w30-a2, 11 diffs/67 vs 66 insns): shape CONFIRMED -- the oracle loads
-     carObj_->direction into ONE register and reuses it for BOTH the nor(~direction) and the
-     xori(direction^1), which is why this block caches it in a local `direction` instead of
-     re-reading `(this->carObj_)->direction` twice (that re-read version was the pre-w30-a2
-     shape and produced the SAME diff count with an extra dead load); the residual now is
-     purely which physical register (v0/v1 vs the oracle's v1/v0, with the D_8011321C address
-     lui interleaved differently) the allocator/scheduler picks -- a coin-flip already covered
-     by the "declaration-scope/order noise" class, not a missing/wrong construct. */
-  {
-    int direction = (this->carObj_)->direction;
-    reverseDirCheck = (D_8011321C[0] == 0) ? (direction ^ 1) : ~direction;
-  }
-
-  if (reverseDirCheck) {
-
-    this->noTurnAroundEndTime_ = 0;
-
-  } else {
-
-    this->noTurnAroundEndTime_ = 0;
-
-  }
+  this->noTurnAroundEndTime_ = 0;
 
   this->barrierTicks32_ = 0;
 
@@ -413,13 +332,8 @@ AIState_Chase::AIState_Chase(Car_tObj *carObj,Car_tObj *targetCar,coorddef *relP
 
 
 /* ---- _._13AIState_Chase  AIState_Chase::dtor  [AISTATE.CPP:205-212] SLD-VERIFIED ---- */
-/* reconstructed as extern "C" ___13AIState_Chase(AIState_Chase*,int) free fn (SaveSurface/
-   ObjectFinishedSignAnim pattern): the oracle is a REAL per-class deleting dtor (__in_chrg +
-   andi&1 + __builtin_delete), not a base-forward; a real C++ member dtor for this non-
-   polymorphic single-inheritance shape always compiles to gcc's default simple base-forward
-   (proven empirically), so the ABI-shape is hand-written. */
 
-extern "C" void ___13AIState_Chase(AIState_Chase *pThis,int __in_chrg)
+AIState_Chase::~AIState_Chase()
 
 
 
@@ -428,11 +342,11 @@ extern "C" void ___13AIState_Chase(AIState_Chase *pThis,int __in_chrg)
   Car_tObj *pCVar1;
 
 
+  
 
+  pCVar1 = (this->_base_AIState_Base).carObj_;
 
-  pCVar1 = pThis->carObj_;
-
-  pThis->_vf = (__vtbl_ptr_type (*) [4])AIState_Chase_vtable;
+  (this->_base_AIState_Base)._vf = (__vtbl_ptr_type (*) [4])AIState_Chase_vtable;
 
   (pCVar1->targetPos).z = 0;
 
@@ -440,21 +354,18 @@ extern "C" void ___13AIState_Chase(AIState_Chase *pThis,int __in_chrg)
 
   (pCVar1->targetPos).x = 0;
 
-  (pThis->carObj_)->targetLatPos = 0;
+  ((this->_base_AIState_Base).carObj_)->targetLatPos = 0;
 
-  (pThis->carObj_)->preferredLateralPosition = 0;
+  ((this->_base_AIState_Base).carObj_)->preferredLateralPosition = 0;
 
-  (pThis->carObj_)->preferredLateralPositionPower = 0;
+  ((this->_base_AIState_Base).carObj_)->preferredLateralPositionPower = 0;
 
-  (pThis->carObj_)->accNitrous = 0x10000;
+  ((this->_base_AIState_Base).carObj_)->accNitrous = 0x10000;
 
-  (pThis->carObj_)->speedNitrous = 0x10000;
+  ((this->_base_AIState_Base).carObj_)->speedNitrous = 0x10000;
 
-  pThis->_vf = (__vtbl_ptr_type (*) [4])AIState_Base_vtable;
+  (this->_base_AIState_Base)._vf = (__vtbl_ptr_type (*) [4])((char *)AIState_Chase_vtable + 8);
 
-  if ((__in_chrg & 1U) != 0) {
-    __builtin_delete(pThis);
-  }
 
   return;
 
@@ -477,9 +388,11 @@ void AIState_Chase::SetTarget(Car_tObj *targetCar,coorddef *relPosition)
 
   int iVar1;
 
+  int iVar2;
+
   int iVar3;
 
-
+  
 
   if (this->targetCar_ != targetCar) {
 
@@ -491,41 +404,41 @@ void AIState_Chase::SetTarget(Car_tObj *targetCar,coorddef *relPosition)
 
   this->targetCar_ = targetCar;
 
-  this->relPosition_ = *relPosition;
+  iVar2 = relPosition->y;
+
+  iVar3 = relPosition->z;
+
+  (this->relPosition_).x = relPosition->x;
+
+  (this->relPosition_).y = iVar2;
+
+  (this->relPosition_).z = iVar3;
 
   this->longTargetRegion_ = 0;
 
   this->latTargetRegion_ = 0;
 
-  iVar1 = ((*(Car_tObj *volatile *)&this->targetCar_)->N).dimension.x;
+  iVar1 = (this->targetCar_->N).dimension.x;
 
-  iVar3 = *(volatile int *)&(this->relPosition_).x;
+  iVar3 = (this->relPosition_).x;
 
-  if (iVar3 < -iVar1) {
+  iVar2 = -1;
 
-    this->latTargetRegion_ = -1;
+  if ((iVar3 < -iVar1) || (iVar2 = 1, iVar1 < iVar3)) {
 
-  }
-
-  else if (iVar1 < iVar3) {
-
-    this->latTargetRegion_ = 1;
+    this->latTargetRegion_ = iVar2;
 
   }
 
-  iVar1 = ((*(Car_tObj *volatile *)&this->targetCar_)->N).dimension.z;
+  iVar1 = (this->targetCar_->N).dimension.z;
 
-  iVar3 = *(volatile int *)&(this->relPosition_).z;
+  iVar3 = (this->relPosition_).z;
 
-  if (iVar3 < -iVar1) {
+  iVar2 = -1;
 
-    this->longTargetRegion_ = -1;
+  if ((iVar3 < -iVar1) || (iVar2 = 1, iVar1 < iVar3)) {
 
-  }
-
-  else if (iVar1 < iVar3) {
-
-    this->longTargetRegion_ = 1;
+    this->longTargetRegion_ = iVar2;
 
   }
 
@@ -560,7 +473,7 @@ void AIState_Chase::SetMurderMode(int murderMode,int murderTicks)
 
     this->murderMode_ = murderMode;
 
-    this->murderEndTime_ = AIState_SimGlobalWords[1] + murderTicks;
+    this->murderEndTime_ = simGlobal.gameTicks + murderTicks;
 
   }
 
@@ -586,25 +499,17 @@ void AIState_Chase::SetUp()
 
   Car_tObj *pCVar1;
 
-  Car_tObj *pCVar2;
-
   int iVar2;
 
-  AIDelayCar *dc;
+  coorddef local_20;
 
+  
 
-
-  /* MATCH (w13-a5): &delayCar_ held in a SAVED reg across the Update() call (lever #16),
-     then SELECTIVE caching -- currentSpeed_/roadPosition_/slice_ read via dc (s1), but the
-     position_ struct copy reads via this (s0 + 40) exactly as the oracle does. */
-
-  dc = &this->delayCar_;
-
-  dc->Update();
+  (&this->delayCar_)->Update();
 
   iVar2 = -1;
 
-  if (-1 < (this->carObj_)->currentSpeed) {
+  if (-1 < ((this->_base_AIState_Base).carObj_)->currentSpeed) {
 
     iVar2 = 1;
 
@@ -614,33 +519,39 @@ void AIState_Chase::SetUp()
 
   iVar2 = -1;
 
-  if (-1 < dc->currentSpeed_) {
+  if (-1 < (this->delayCar_).currentSpeed_) {
 
     iVar2 = 1;
 
   }
 
+  pCVar1 = (this->_base_AIState_Base).carObj_;
+
   this->targetDir_ = iVar2;
 
-  this->latMetersBetween_ = (this->carObj_)->roadPosition - dc->roadPosition_;
+  this->latMetersBetween_ = pCVar1->roadPosition - (this->delayCar_).roadPosition_;
 
-  targetCarPosition = (this->delayCar_).position_;
+  local_20.x = (this->delayCar_).position_.x;
 
-  iVar2 = AIWorld_SplineDistance(this->carObj_,dc->slice_,&targetCarPosition);
+  local_20.y = (this->delayCar_).position_.y;
 
-  pCVar2 = this->carObj_;
+  local_20.z = (this->delayCar_).position_.z;
+
+  iVar2 = AIWorld_SplineDistance((this->_base_AIState_Base).carObj_,(this->delayCar_).slice_,&local_20);
+
+  pCVar1 = (this->_base_AIState_Base).carObj_;
 
   this->longMetersBetween_ = iVar2;
 
-  (pCVar2->targetPos).z = 0;
+  (pCVar1->targetPos).z = 0;
 
-  (pCVar2->targetPos).y = 0;
+  (pCVar1->targetPos).y = 0;
 
-  (pCVar2->targetPos).x = 0;
+  (pCVar1->targetPos).x = 0;
 
-  (this->carObj_)->targetLatPos = 0;
+  ((this->_base_AIState_Base).carObj_)->targetLatPos = 0;
 
-  if ((this->murderMode_ != 0) && (!(AIState_SimGlobalWords[1] < this->murderEndTime_))) {
+  if ((this->murderMode_ != 0) && (this->murderEndTime_ <= simGlobal.gameTicks)) {
 
     this->murderMode_ = 0;
 
@@ -648,19 +559,19 @@ void AIState_Chase::SetUp()
 
   }
 
-  if ((this->carObj_)->accNitrous != 0x10000) {
+  if (((this->_base_AIState_Base).carObj_)->accNitrous != 0x10000) {
 
     this->nitrousTicks_ = this->nitrousTicks_ - AI_elapsedTime;
 
   }
 
-  (this->carObj_)->accNitrous = 0x10000;
+  ((this->_base_AIState_Base).carObj_)->accNitrous = 0x10000;
 
-  (this->carObj_)->speedNitrous = 0x10000;
+  ((this->_base_AIState_Base).carObj_)->speedNitrous = 0x10000;
 
-  (this->carObj_)->preferredLateralPosition = 0;
+  ((this->_base_AIState_Base).carObj_)->preferredLateralPosition = 0;
 
-  (this->carObj_)->preferredLateralPositionPower = 0;
+  ((this->_base_AIState_Base).carObj_)->preferredLateralPositionPower = 0;
 
   return;
 
@@ -681,9 +592,9 @@ void AIState_Chase::DoSlowNitrous()
 
 {
 
-  (this->carObj_)->accNitrous = 0x8000;
+  ((this->_base_AIState_Base).carObj_)->accNitrous = 0x8000;
 
-  (this->carObj_)->speedNitrous = 0xc000;
+  ((this->_base_AIState_Base).carObj_)->speedNitrous = 0xc000;
 
   return;
 
@@ -706,55 +617,49 @@ void AIState_Chase::DoNitrous(int checkForHumans)
   int humanLoop;
   int distanceMeters;
 
+  int iVar1;
+
   Car_tObj *pCVar2;
 
+  Car_tObj **ppCVar3;
 
+  int iVar4;
 
-  if ((0 < this->nitrousTicks_) && (AIState_SimGlobalWords[1] >= this->slowDownEndTime_)) {
+  
 
-    (this->carObj_)->accNitrous = 0x30000;
+  if ((0 < this->nitrousTicks_) && (this->slowDownEndTime_ <= simGlobal.gameTicks)) {
 
-    (this->carObj_)->speedNitrous = 0x28000;
+    ((this->_base_AIState_Base).carObj_)->accNitrous = 0x30000;
 
-    humanLoop = 0;
+    ppCVar3 = Cars_gHumanRaceCarList;
 
-    while (true) {
+    ((this->_base_AIState_Base).carObj_)->speedNitrous = 0x28000;
 
-      if (checkForHumans == 0) {
+    for (iVar4 = 0; (checkForHumans != 0 && (iVar4 < Cars_gNumHumanRaceCars)); iVar4 = iVar4 + 1) {
 
-        break;
+      iVar1 = AIWorld_ApxSplineDistance((this->_base_AIState_Base).carObj_,*ppCVar3);
 
-      }
+      pCVar2 = (this->_base_AIState_Base).carObj_;
 
-      if (Cars_gNumHumanRaceCars <= humanLoop) {
+      iVar1 = iVar1 * pCVar2->direction;
 
-        break;
-
-      }
-
-      distanceMeters = AIWorld_ApxSplineDistance(this->carObj_,Cars_gHumanRaceCarList[humanLoop]);
-
-      pCVar2 = this->carObj_;
-
-      distanceMeters = distanceMeters * pCVar2->direction;
-
-      if ((0 < distanceMeters) && (distanceMeters < this->nitrousMinForeDistance_)) {
+      if ((0 < iVar1) && (iVar1 < this->nitrousMinForeDistance_)) {
 
         pCVar2->accNitrous = 0x10000;
 
-        (this->carObj_)->speedNitrous = 0x10000;
+        ((this->_base_AIState_Base).carObj_)->speedNitrous = 0x10000;
 
       }
 
-      if ((distanceMeters < 0) && (-this->nitrousMinAftDistance_ < distanceMeters)) {
+      if ((iVar1 < 0) && (-this->nitrousMinAftDistance_ < iVar1)) {
 
-        (this->carObj_)->accNitrous = 0x10000;
+        ((this->_base_AIState_Base).carObj_)->accNitrous = 0x10000;
 
-        (this->carObj_)->speedNitrous = 0x10000;
+        ((this->_base_AIState_Base).carObj_)->speedNitrous = 0x10000;
 
       }
 
-      humanLoop = humanLoop + 1;
+      ppCVar3 = ppCVar3 + 1;
 
     }
 
@@ -781,50 +686,61 @@ void AIState_Chase::Execute()
   int far;
   int velocityToHitInTime;
   int deltaVelocity;
-  int targetCarVerySlow;  /* SYM $a0: holds target speed first, then the slow-car boolean */
+  int targetCarVerySlow;
+
+  bool bVar1;
+
+  int iVar2;
+
+  int iVar3;
+
+  int iVar4;
 
   
 
   this->SetUp();
 
-  velocityToHitInTime = fixedmult(this->longMetersBetween_,0x666);
+  iVar2 = fixedmult(this->longMetersBetween_,0x666);
 
-  velocityToHitInTime = __builtin_abs(velocityToHitInTime);
+  iVar3 = this->targetCar_->currentSpeed;
 
-  deltaVelocity =
-    this->carObj_->currentSpeed - this->targetCar_->currentSpeed;
+  if (iVar2 < 0) {
 
-  deltaVelocity = __builtin_abs(deltaVelocity);
-
-  far = 0;
-
-  if (deltaVelocity < velocityToHitInTime) {
-
-    int lmAbs;
-
-    lmAbs = this->longMetersBetween_;
-
-    lmAbs = __builtin_abs(lmAbs);
-
-    far = 0x8c0000 < lmAbs;
+    iVar2 = -iVar2;
 
   }
 
-  targetCarVerySlow = __builtin_abs(this->targetCar_->currentSpeed);
+  iVar4 = ((this->_base_AIState_Base).carObj_)->currentSpeed - iVar3;
 
-  targetCarVerySlow = !(0x6aaa9 < targetCarVerySlow);
+  if (iVar4 < 0) {
 
-  if (far != 0) goto LAB_80070244;
-
-  if ((this->carDir_ * this->targetDir_ == 1) && (targetCarVerySlow == 0)) {
-
-    this->CloseTargeting();
-
-    goto LAB_800702a0;
+    iVar4 = -iVar4;
 
   }
 
-  if ((-1 < this->carDir_ * this->longMetersBetween_) && (targetCarVerySlow == 0)) {
+  bVar1 = false;
+
+  if (iVar4 < iVar2) {
+
+    iVar2 = this->longMetersBetween_;
+
+    if (iVar2 < 0) {
+
+      iVar2 = -iVar2;
+
+    }
+
+    bVar1 = 0x8c0000 < iVar2;
+
+  }
+
+  if (iVar3 < 0) {
+
+    iVar3 = -iVar3;
+
+  }
+
+  if (bVar1) {
 
 LAB_80070244:
 
@@ -834,24 +750,50 @@ LAB_80070244:
 
   }
 
-  if ((0x1aaaaa < deltaVelocity) || (far != 0) ||
-      (0x500000 < __builtin_abs(this->longMetersBetween_))) {
-    this->ApproachTargeting(0);
+  if ((this->carDir_ * this->targetDir_ == 1) && (0x6aaa9 < iVar3)) {
+
+    this->CloseTargeting();
+
+    goto LAB_800702a0;
+
   }
+
+  if ((-1 < this->carDir_ * this->longMetersBetween_) && (0x6aaa9 < iVar3)) goto LAB_80070244;
+
+  if (iVar4 < 0x1aaaab) {
+
+    iVar2 = this->longMetersBetween_;
+
+    if (iVar2 < 0) {
+
+      iVar2 = -iVar2;
+
+    }
+
+    iVar3 = 1;
+
+    if (0x500000 < iVar2) goto LAB_80070290;
+
+  }
+
   else {
-    this->ApproachTargeting(1);
+
+LAB_80070290:
+
+    iVar3 = 0;
+
   }
+
+  this->ApproachTargeting(iVar3);
 
 LAB_800702a0:
 
-  if (AIState_SimGlobalWords[1] < this->slowDownEndTime_) {
+  if (simGlobal.gameTicks < this->slowDownEndTime_) {
 
     this->DoSlowNitrous();
 
   }
 
-  /* Remaining 4 diffs are one uncoalesced retail load: currentSpeed enters $v1
-     before the subtraction result is assigned to deltaVelocity in $a1. */
   return;
 
 }
@@ -873,17 +815,17 @@ void AIState_Chase::FarTargeting()
 
   this->inTargetRegion_ = 0;
 
-  if (AIState_SimGlobalWords[1] > this->noTurnAroundEndTime_) {
+  if (this->noTurnAroundEndTime_ < simGlobal.gameTicks) {
 
-    if (0 < this->longMetersBetween_) {
+    if (this->longMetersBetween_ < 1) {
 
-      (this->carObj_)->desiredDirection = -1;
+      ((this->_base_AIState_Base).carObj_)->desiredDirection = 1;
 
     }
 
     else {
 
-      (this->carObj_)->desiredDirection = 1;
+      ((this->_base_AIState_Base).carObj_)->desiredDirection = -1;
 
     }
 
@@ -891,15 +833,15 @@ void AIState_Chase::FarTargeting()
 
   this->DoNitrous(1);
 
-  AISpeeds_CalcDesiredSpeed(this->carObj_);
+  AISpeeds_CalcDesiredSpeed((this->_base_AIState_Base).carObj_);
 
-  AI_GenericBeginCycle(this->carObj_);
+  AI_GenericBeginCycle((this->_base_AIState_Base).carObj_);
 
   this->CheckForBarriersAndTargetAroundThem();
 
-  AI_GenericCycle(this->carObj_);
+  AI_GenericCycle((this->_base_AIState_Base).carObj_);
 
-  AI_GenericEndCycle(this->carObj_);
+  AI_GenericEndCycle((this->_base_AIState_Base).carObj_);
 
   return;
 
@@ -919,46 +861,50 @@ int AIState_Chase::CalculateCloseTargettingAheadSlowDownFactor()
 
 
 {
-  int slowDown;
   int absLongMetersBetween;
+  int slowDown;
 
+  int iVar1;
 
+  int iVar2;
 
-  absLongMetersBetween = __builtin_abs(this->longMetersBetween_);
+  
 
-  slowDown = 0x9999;
+  iVar1 = this->longMetersBetween_;
 
-  if (absLongMetersBetween < 0x1e0000) {
+  if (iVar1 < 0) {
 
-    slowDown = 0xf333;
-
-  }
-
-  else if (absLongMetersBetween < 0x320000) {
-
-    slowDown = 0xcccc;
+    iVar1 = -iVar1;
 
   }
 
-  else if (absLongMetersBetween < 0x640000) {
+  iVar2 = 0x9999;
 
-    slowDown = 0xcccc;
+  if (iVar1 < 0x1e0000) {
 
-  }
-
-  else if (absLongMetersBetween < 0x960000) {
-
-    slowDown = 0xc000;
+    iVar2 = 0xf333;
 
   }
 
-  else if (absLongMetersBetween < 0xc80000) {
+  else if ((iVar1 < 0x320000) || (iVar1 < 0x640000)) {
 
-    slowDown = 0xb333;
+    iVar2 = 0xcccc;
 
   }
 
-  return slowDown;
+  else if (iVar1 < 0x960000) {
+
+    iVar2 = 0xc000;
+
+  }
+
+  else if (iVar1 < 0xc80000) {
+
+    iVar2 = 0xb333;
+
+  }
+
+  return iVar2;
 
 }
 
@@ -972,6 +918,9 @@ int AIState_Chase::CalculateCloseTargettingAheadSlowDownFactor()
 /* ---- CloseTargeting__13AIState_Chase  AIState_Chase::CloseTargeting  [AISTATE.CPP:462-632] SLD-VERIFIED ---- */
 
 void AIState_Chase::CloseTargeting()
+
+
+
 {
   int latPos;
   int longPos;
@@ -983,247 +932,310 @@ void AIState_Chase::CloseTargeting()
   int desiredSpeed;
   int latTarget;
   int longTarget;
-  latPos = 0;
-  longPos = 0;
-  dir = (this->carObj_)->direction;
+  int superSlowDown;
+  int targettingStrength;
+  int targetLanePosition;
+
+  bool bVar1;
+
+  Car_tObj *pCVar2;
+
+  int iVar3;
+
+  int iVar4;
+
+  int iVar5;
+
+  int iVar6;
+
+  int iVar7;
+
+  int iVar8;
+
+  int iVar9;
+
+  int iVar10;
+
+  
+
+  iVar7 = 0;
+
+  iVar8 = 0;
+
+  iVar10 = ((this->_base_AIState_Base).carObj_)->direction;
 
   this->DoNitrous(1);
 
-  bigLongPos = 0;
-  if (this->murderMode_ != 0) {
-    longTarget = 0;
-    latTarget = 0;
+  iVar4 = 0;
+
+  if (this->murderMode_ == 0) {
+
+    iVar6 = this->latTargetRegion_;
+
+    iVar5 = this->longTargetRegion_;
+
+  }
+
+  else {
+
+    iVar5 = 0;
+
+    iVar6 = 0;
+
     this->DoNitrous(0);
-  }
-  else {
-    latTarget = this->latTargetRegion_;
-    longTarget = this->longTargetRegion_;
+
   }
 
-  {
-    int t = this->latMetersBetween_ * dir;
-    int x = (this->targetCar_->N).dimension.x;
-    if (t < -x) {
-      latPos = -1;
-    }
-    else if (x < t) {
-      latPos = 1;
-    }
+  iVar9 = this->latMetersBetween_ * iVar10;
+
+  iVar3 = (this->targetCar_->N).dimension.x;
+
+  if (iVar9 < -iVar3) {
+
+    iVar7 = -1;
+
   }
 
-  {
-    int t = this->longMetersBetween_ * dir;
-    int z = (this->targetCar_->N).dimension.z;
-    if (t < 0x20000 - z) {
-      longPos = -1;
-    }
-    else if (z + 0x20000 < t) {
-      longPos = 1;
-    }
+  else if (iVar3 < iVar9) {
+
+    iVar7 = 1;
+
   }
 
-  {
-    int t = this->longMetersBetween_ * dir;
-    int z = (this->targetCar_->N).dimension.z + 0x20000;
-    if (t < -z) {
-      bigLongPos = -1;
-    }
-    else if (z < t) {
-      bigLongPos = 1;
-    }
+  iVar9 = this->longMetersBetween_ * iVar10;
+
+  iVar3 = (this->targetCar_->N).dimension.z;
+
+  if (iVar9 < 0x20000 - iVar3) {
+
+    iVar8 = -1;
+
   }
 
-  if ((latPos == latTarget) && (longPos == longTarget)) {
+  else if (iVar3 + 0x20000 < iVar9) {
+
+    iVar8 = 1;
+
+  }
+
+  iVar9 = this->longMetersBetween_ * iVar10;
+
+  iVar3 = (this->targetCar_->N).dimension.z + 0x20000;
+
+  if (iVar9 < -iVar3) {
+
+    iVar4 = -1;
+
+  }
+
+  else if (iVar3 < iVar9) {
+
+    iVar4 = 1;
+
+  }
+
+  if ((iVar7 == iVar6) && (iVar8 == iVar5)) {
+
     this->inTargetRegion_ = this->inTargetRegion_ + AI_elapsedTime;
+
   }
+
   else {
+
     this->inTargetRegion_ = 0;
+
   }
 
-  forceLongAction = 0;
-  forceLatAction = 0;
-  doLatAction = 1;
+  iVar3 = 0;
 
-  if (bigLongPos * longTarget == -1) {
-    forceLatAction = latTarget;
-    if (latTarget == 0) {
-      forceLatAction = -1;
+  iVar9 = 0;
+
+  bVar1 = true;
+
+  if (iVar4 * iVar5 == -1) {
+
+    iVar9 = iVar6;
+
+    if (iVar6 == 0) {
+
+      iVar9 = -1;
+
     }
+
   }
-  else if ((latPos * latTarget == -1) && (bigLongPos == 0)) {
-    forceLongAction = -1;
-    doLatAction = 0;
+
+  else if ((iVar7 * iVar6 == -1) && (iVar4 == 0)) {
+
+    iVar3 = -1;
+
+    bVar1 = false;
+
   }
-  else if ((latTarget == 0) && ((bigLongPos == 0 && (this->murderMode_ == 0)))) {
-    doLatAction = 0;
+
+  else if ((iVar6 == 0) && ((iVar4 == 0 && (this->murderMode_ == 0)))) {
+
+    bVar1 = false;
+
   }
-  else if ((longTarget == 1) && (((bigLongPos == 1 && (latPos == 0)) && (this->longMetersBetween_ < 0x140000)))
+
+  else if ((iVar5 == 1) && (((iVar4 == 1 && (iVar7 == 0)) && (this->longMetersBetween_ < 0x140000)))
+
           ) {
-    forceLongAction = -2;
+
+    iVar3 = -2;
+
   }
 
-  desiredSpeed = (this->delayCar_).currentSpeed_;
-  if (desiredSpeed < 1) {
-    desiredSpeed = -desiredSpeed;
+  iVar4 = (this->delayCar_).currentSpeed_;
+
+  if (iVar4 < 1) {
+
+    iVar4 = -iVar4;
+
   }
 
-  if ((longPos < longTarget) || (forceLongAction == 1)) {
-    desiredSpeed = fixedmult(desiredSpeed,0x16666);
+  if ((iVar8 < iVar5) || (iVar3 == 1)) {
+
+    iVar7 = 0x16666;
+
   }
-  else if (((longTarget < longPos) || (forceLongAction == -1)) ||
+
+  else if (((iVar5 < iVar8) || (iVar3 == -1)) ||
+
           ((0x140000 < this->longMetersBetween_ &&
-           (((0x9ffff < this->longMetersBetween_ || (latPos != 0)) || (latTarget == 0)))))) {
-    desiredSpeed = fixedmult(desiredSpeed,this->CalculateCloseTargettingAheadSlowDownFactor());
+
+           (((0x9ffff < this->longMetersBetween_ || (iVar7 != 0)) || (iVar6 == 0)))))) {
+
+    iVar7 = this->CalculateCloseTargettingAheadSlowDownFactor();
+
   }
+
   else {
-    if (forceLongAction != -2) goto LAB_80070704;
-    {
-      int superSlowDown;
-      if (this->aggressionLevel_ != 0) {
-        superSlowDown = 0xa666;
-        if (this->aggressionLevel_ == 1) {
-          superSlowDown = 0xbae1;
-        }
-      }
-      else {
-        superSlowDown = 0xca3d;
-      }
-      desiredSpeed = fixedmult(desiredSpeed,superSlowDown);
+
+    if (iVar3 != -2) goto LAB_80070704;
+
+    if (this->aggressionLevel_ == 0) {
+
+      iVar7 = 0xca3d;
+
     }
+
+    else {
+
+      iVar7 = 0xa666;
+
+      if (this->aggressionLevel_ == 1) {
+
+        iVar7 = 0xbae1;
+
+      }
+
+    }
+
   }
+
+  iVar4 = fixedmult(iVar4,iVar7);
 
 LAB_80070704:
-  AISpeeds_CalcDesiredSpeed(this->carObj_);
 
-  (this->carObj_)->desiredSpeed = __builtin_abs((this->carObj_)->desiredSpeed);
+  AISpeeds_CalcDesiredSpeed((this->_base_AIState_Base).carObj_);
 
-  {
-    int t = (this->carObj_)->desiredSpeed;
-    if (desiredSpeed < t) {
-      t = desiredSpeed;
-    }
-    desiredSpeed = t;
-    t = 0x50000;
-    if (0x4ffff < desiredSpeed) {
-      t = desiredSpeed;
-    }
-    desiredSpeed = t * dir;
-    (this->carObj_)->desiredSpeed = desiredSpeed;
+  pCVar2 = (this->_base_AIState_Base).carObj_;
+
+  iVar7 = pCVar2->desiredSpeed;
+
+  if (iVar7 < 0) {
+
+    iVar7 = -iVar7;
+
   }
 
-  AI_GenericBeginCycle(this->carObj_);
+  pCVar2->desiredSpeed = iVar7;
 
-  if (doLatAction) {
-    int targettingStrength;
-    int targetLanePosition;
-    /* NEAR-MISS 78 diffs, count-exact 300/300 (W59-A3 re-gated).  SYM 8c block
-     * @0x8007078c (retail line 603) declares EXACTLY these two locals:
-     * targettingStrength = REG $8 = t0 and targetLanePosition = REG $4 = a0 -- the two
-     * registers the tail diff wants (ours parks them in a3 / v1).  latOffset and
-     * slicePtr are Ghidra-invented (06A).  The residual is one uniform saved/caller band
-     * rotation running from the first mflo (t0 vs t1) to the two preferredLateralPosition
-     * stores.  W59-A3 FALSIFIED: rewriting BOTH clamps in the 09A/5.0c both-arms-assign
-     * ternary form (targetLanePosition = (latOffset < targetLanePosition) ?
-     * targetLanePosition : latOffset; and the MIN twin) -- which is what the oracle's
-     * two extra `addu a0,<tmp>,zero` copies and the SLD 623/624 one-line-per-clamp
-     * grouping suggest -- ADDS 3 insns (303/300) and goes 78 -> 89.  The override form
-     * is the count-exact one; next lens = the SYM-ordered priority fence (08D) on
-     * targetLanePosition/targettingStrength, or qtytrace.
-     * W59-A3 also FALSIFIED against the W59-A11 mobile twin (sub_51F8B4): (a) the EA
-     * MIN/MAX-macro shape (fresh block temp, if/else, both arms assigning, per-arm
-     * args) on both clamps -> 80 diffs / 304 insns; (b) the mobile ladder shape for
-     * longPos/bigLongPos (`>= low` guard with a nested no-else inner if and the -1 in
-     * the else, dir*longMetersBetween_ and dimension.z recomputed at every use, no
-     * hoisted t/z temps) -> 94 diffs.  The PSX oracle keeps our if/else-if ladder and
-     * the in-place clamp override; the mobile port diverged here.
-     * W61-A12 READ THE RESIDUAL (78 diffs, count-exact 300/300, no probe spent):
-     * it is NOT a spill-slot permutation (zero sp-offset diffs, so the W61-A1
-     * declaration-order/frame law does not apply here) and NOT one uniform swap.
-     * The band rotation starts at the FIRST mflo of the function (ours t0, retail
-     * t1) -- i.e. retail already has one more t-register committed there -- and the
-     * only STRUCTURAL divergence is in `targetLanePosition = delayCar_.roadPosition_
-     * + latOffset * dir`: retail completes the sum EAGERLY (`lw v0,76(s1); mult;
-     * lw v0,56(s1); mflo t1; addu a0,v0,t1`, oracle 239-244) while ours defers the
-     * mflo and the add past the whole slicePtr limit block (ours 240-258).  Land the
-     * eager-sum shape first (a named temp for the product, or the sum split so the
-     * roadPosition_ load sits between the mult and the mflo) and re-read the band;
-     * the t0/t1 base of the rotation is downstream of who owns the first multiply. */
+  pCVar2 = (this->_base_AIState_Base).carObj_;
 
-    targettingStrength = 0xf0000;
-    if (this->murderMode_ != 0) {
-      targettingStrength = 0x1e0000;
-      targetLanePosition = (this->delayCar_).roadPosition_;
-    }
-    else {
-      int latOffset;
-      int slicePtr;
+  iVar7 = pCVar2->desiredSpeed;
 
-      /* W63-A12 SEAL (15 -> PASS 300/300, psyqproof REAL=0).  Retail fills the
-       * `beqz $s6` (forceLatAction) delay slot with `lui $v1,0x60000` -- i.e. the
-       * bias constant is materialized as its OWN insn in the same basic block, just
-       * before the branch, where reorg's simple fill can take it.  Written inline as
-       * `dimension.x + 0x60000` cc1 folds the lui into the arm and emits it AFTER the
-       * targetCar_ load, leaving the slot to a nop (the whole 15-diff residual, 301 vs
-       * 300).  The cure is the DoRearEnder pair: an ASSIGNED local (never
-       * decl-with-init -- that is const-propagated straight back) plus a zero-insn
-       * OPACITY/IDENTITY fence `__asm__("" : "=r"(x) : "0"(x))` to stop cse folding it.
-       * 🔴 PLACEMENT IS THE WHOLE LEVER: with the fence BETWEEN the assignment and the
-       * branch it lands 15 -> 3 but the slot STAYS a nop -- an asm is a reorg backward-
-       * scan barrier (catalog 06B HARD BOUNDARY), so it walls the lui off from its own
-       * delay slot.  Moving the fence BELOW the if/else keeps the pseudo real (cse
-       * still cannot fold across it) while leaving the lui as the last insn before the
-       * branch => reorg fills the slot => PASS.  General rule: when an opacity fence is
-       * used to mint a constant for a DELAY SLOT, the fence must sit AFTER the consumer,
-       * never between the def and the branch. */
-      int latBias;
-      latBias = 0x60000;
-      if (forceLatAction != 0) {
-        latOffset = (this->targetCar_->N).dimension.x + latBias;
+  if (iVar4 < iVar7) {
+
+    iVar7 = iVar4;
+
+  }
+
+  iVar4 = 0x50000;
+
+  if (0x4ffff < iVar7) {
+
+    iVar4 = iVar7;
+
+  }
+
+  pCVar2->desiredSpeed = iVar4 * iVar10;
+
+  AI_GenericBeginCycle((this->_base_AIState_Base).carObj_);
+
+  if (bVar1) {
+
+    iVar4 = 0xf0000;
+
+    if (this->murderMode_ == 0) {
+
+      if (iVar9 == 0) {
+
+        iVar7 = (this->relPosition_).x;
+
       }
+
       else {
-        latOffset = (this->relPosition_).x;
-      }
-      __asm__("" : "=r"(latBias) : "0"(latBias));
-      targetLanePosition = (this->delayCar_).roadPosition_ + latOffset * dir;
-      /* W62-A9 EAGER-SUM BARRIER: retail completes this sum inside the mult
-       * latency (`lw v0,76; mult; lw v0,56; mflo t1; addu a0,v0,t1`); without
-       * the barrier sched1 hoists the whole slicePtr chain into that window and
-       * defers the mflo/add past it, which rotated the entire t/caller band
-       * (targettingStrength a3 instead of t0).  78 -> 59 on its own. */
-      __asm__("" : : "i"(0));
 
-      slicePtr = ((this->carObj_)->N).simRoadInfo.slice * 0x20 + (int)AIState_BWorldSmSlices;
+        iVar7 = (this->targetCar_->N).dimension.x + 0x60000;
 
-      /* W62-A9 CLAMP FUNNEL (SYM 8c: retail declares ONLY targettingStrength ($8=t0)
-       * and targetLanePosition ($4=a0) -- latOffset/slicePtr are Ghidra-invented, so
-       * each clamp used a FRESH block temp and copied BACK into targetLanePosition.
-       * That is what mints retail's two `addu a0,<tmp>,zero` funnel copies.  The
-       * `<< 0xf` spelling (not `* 0x8000`) keeps the shift on the FIRST factor --
-       * with `* 0x8000` gcc reassociates it onto the other operand and swaps the
-       * mult's operand registers.  59 -> 27 (funnel) -> 15 (shift form). */
-      {
-        int limit = -(((u_int)*(u_char *)(slicePtr + 0x1e) << 0xf) * (u_int)(*(u_char *)(slicePtr + 0x1d) >> 4));
-        if (limit < targetLanePosition) {
-          limit = targetLanePosition;
-        }
-        targetLanePosition = limit;
       }
-      {
-        int limit = ((u_int)*(u_char *)(slicePtr + 0x1f) << 0xf) * (u_int)(*(u_char *)(slicePtr + 0x1d) & 0xf);
-        if (targetLanePosition < limit) {
-          limit = targetLanePosition;
-        }
-        targetLanePosition = limit;
+
+      iVar8 = (this->delayCar_).roadPosition_ + iVar7 * iVar10;
+
+      iVar10 = (((this->_base_AIState_Base).carObj_)->N).simRoadInfo.slice * 0x20 + (int)BWorldSm_slices;
+
+      iVar7 = -((u_int)*(u_char *)(iVar10 + 0x1e) * 0x8000 * (u_int)(*(u_char *)(iVar10 + 0x1d) >> 4));
+
+      if (iVar7 < iVar8) {
+
+        iVar7 = iVar8;
+
       }
+
+      iVar8 = (u_int)*(u_char *)(iVar10 + 0x1f) * 0x8000 * (*(u_char *)(iVar10 + 0x1d) & 0xf);
+
+      if (iVar7 < iVar8) {
+
+        iVar8 = iVar7;
+
+      }
+
     }
 
-    (this->carObj_)->preferredLateralPosition = targetLanePosition;
-    (this->carObj_)->preferredLateralPositionPower = targettingStrength;
+    else {
+
+      iVar4 = 0x1e0000;
+
+      iVar8 = (this->delayCar_).roadPosition_;
+
+    }
+
+    ((this->_base_AIState_Base).carObj_)->preferredLateralPosition = iVar8;
+
+    ((this->_base_AIState_Base).carObj_)->preferredLateralPositionPower = iVar4;
+
   }
 
   this->CheckForBarriersAndTargetAroundThem();
-  AI_GenericCycle(this->carObj_);
-  AI_GenericEndCycle(this->carObj_);
+
+  AI_GenericCycle((this->_base_AIState_Base).carObj_);
+
+  AI_GenericEndCycle((this->_base_AIState_Base).carObj_);
+
+  return;
+
 }
 
 
@@ -1245,177 +1257,189 @@ void AIState_Chase::ApproachTargeting(int intercept)
   int distance;
   int minSpeed;
 
-  int iVar5;
+  bool bVar1;
+
+  int iVar2;
+
+  Car_tObj *pCVar3;
+
   Car_tObj *pCVar4;
+
+  int iVar5;
+
+  int iVar6;
 
   
 
-  xDistance = (this->carObj_->N).position.x - (this->targetCar_->N).position.x;
+  pCVar4 = (this->_base_AIState_Base).carObj_;
 
-  xDistance = __builtin_abs(xDistance);
+  iVar6 = (pCVar4->N).position.x - (this->targetCar_->N).position.x;
 
-  zDistance = (this->carObj_->N).position.z - (this->targetCar_->N).position.z;
+  if (iVar6 < 0) {
 
-  zDistance = __builtin_abs(zDistance);
+    iVar6 = -iVar6;
 
-  if (zDistance < xDistance) {
+  }
 
-    distance = xDistance + (zDistance >> 2);
+  iVar2 = (pCVar4->N).position.z - (this->targetCar_->N).position.z;
+
+  if (iVar2 < 0) {
+
+    iVar2 = -iVar2;
+
+  }
+
+  if (iVar2 < iVar6) {
+
+    iVar6 = iVar6 + (iVar2 >> 2);
 
   }
 
   else {
 
-    distance = zDistance + (xDistance >> 2);
+    iVar6 = iVar2 + (iVar6 >> 2);
 
   }
 
   this->inTargetRegion_ = 0;
 
-  iVar5 = AIState_SimGlobalWords[1];
+  if (this->noTurnAroundEndTime_ < simGlobal.gameTicks) {
 
-  if (this->noTurnAroundEndTime_ < iVar5) {
+    if (this->longMetersBetween_ < 1) {
 
-    if (0 < this->longMetersBetween_) {
-
-      (this->carObj_)->desiredDirection = -1;
+      ((this->_base_AIState_Base).carObj_)->desiredDirection = 1;
 
     }
 
     else {
 
-      (this->carObj_)->desiredDirection = 1;
+      ((this->_base_AIState_Base).carObj_)->desiredDirection = -1;
 
     }
 
   }
 
-  AISpeeds_CalcDesiredSpeed(this->carObj_);
+  AISpeeds_CalcDesiredSpeed((this->_base_AIState_Base).carObj_);
 
-  /* MATCH (w13-a5): flat descending guard-chains, per-arm minSpeed assignment + goto ADC
-     (assignments land in the bnez delay slots); block order = oracle VA order
-     (C0 @.L9B8, C1 @.LA10, shared 0x60000 tail @.LA60, C2 @.LA78). */
+  iVar2 = this->aggressionLevel_;
 
-  iVar5 = this->aggressionLevel_;
+  if (iVar2 == 1) {
 
-  if (iVar5 == 1) goto LAB_CHAIN1;
+    iVar5 = 0x3c0000;
 
-  if (!(iVar5 < 2)) goto LAB_GE2;
+    if ((((0x960000 < iVar6) || (iVar5 = 0x320000, 0x640000 < iVar6)) ||
 
-  if (iVar5 == 0) goto LAB_CHAIN0;
+        (iVar5 = 0x280000, 0x320000 < iVar6)) || (iVar5 = 0x230000, 0x190000 < iVar6))
 
-  minSpeed = 0x190000;
+    goto LAB_80070adc;
 
-  goto LAB_80070adc;
+    iVar5 = 0xa0000;
 
-LAB_GE2:
+  }
 
-  if (iVar5 == 2) goto LAB_CHAIN2;
+  else {
 
-  minSpeed = 0x190000;
+    if (1 < iVar2) {
 
-  goto LAB_80070adc;
+      iVar5 = 0x190000;
 
-LAB_CHAIN0:
+      if ((((iVar2 == 2) && (iVar5 = 0x500000, iVar6 < 0x960001)) &&
 
-  if (0x960000 < distance) { minSpeed = 0x3c0000; goto LAB_80070adc; }
+          ((iVar5 = 0x460000, iVar6 < 0x640001 &&
 
-  if (0x640000 < distance) { minSpeed = 0x320000; goto LAB_80070adc; }
+           ((iVar5 = 0x320000, iVar6 < 0x320001 && (iVar5 = 0x280000, iVar6 < 0x190001)))))) &&
 
-  if (0x320000 < distance) { minSpeed = 0x280000; goto LAB_80070adc; }
+         ((iVar5 = 0xe0000, iVar6 < 0xa0001 && (iVar5 = 0, 0x60000 < iVar6)))) {
 
-  if (0x190000 < distance) { minSpeed = 0x230000; goto LAB_80070adc; }
+        iVar5 = 0x60000;
 
-  if (!(0xa0000 < distance)) goto LAB_A60;
+      }
 
-  minSpeed = 0x140000;
+      goto LAB_80070adc;
 
-  goto LAB_80070adc;
+    }
 
-LAB_CHAIN1:
+    iVar5 = 0x190000;
 
-  if (0x960000 < distance) { minSpeed = 0x3c0000; goto LAB_80070adc; }
+    if ((((iVar2 != 0) || (iVar5 = 0x3c0000, 0x960000 < iVar6)) ||
 
-  if (0x640000 < distance) { minSpeed = 0x320000; goto LAB_80070adc; }
+        (iVar5 = 0x320000, 0x640000 < iVar6)) ||
 
-  if (0x320000 < distance) { minSpeed = 0x280000; goto LAB_80070adc; }
+       ((iVar5 = 0x280000, 0x320000 < iVar6 || (iVar5 = 0x230000, 0x190000 < iVar6))))
 
-  if (0x190000 < distance) { minSpeed = 0x230000; goto LAB_80070adc; }
+    goto LAB_80070adc;
 
-  /* Keep the equal-valued threshold and result in separate blocks: retail
-     materializes 0xA0000 independently in v0 and a0. */
-  if (0xa0000 < distance) goto LAB_MIN_A;
+    iVar5 = 0x140000;
 
-LAB_A60:
+  }
 
-  minSpeed = 0;
+  if ((iVar6 < 0xa0001) && (iVar5 = 0, 0x60000 < iVar6)) {
 
-  if (!(0x60000 < distance)) goto LAB_80070adc;
+    iVar5 = 0x30000;
 
-  minSpeed = 0x30000;
-
-  goto LAB_80070adc;
-
-LAB_CHAIN2:
-
-  if (0x960000 < distance) { minSpeed = 0x500000; goto LAB_80070adc; }
-
-  if (0x640000 < distance) { minSpeed = 0x460000; goto LAB_80070adc; }
-
-  if (0x320000 < distance) { minSpeed = 0x320000; goto LAB_80070adc; }
-
-  if (0x190000 < distance) { minSpeed = 0x280000; goto LAB_80070adc; }
-
-  if (0xa0000 < distance) { minSpeed = 0xe0000; goto LAB_80070adc; }
-
-  minSpeed = 0;
-
-  if (!(0x60000 < distance)) goto LAB_80070adc;
-
-  minSpeed = 0x60000;
-
-  goto LAB_80070adc;
-
-LAB_MIN_A:
-
-  minSpeed = 0xa0000;
-
-  goto LAB_80070adc;
+  }
 
 LAB_80070adc:
 
-  pCVar4 = this->carObj_;
+  pCVar4 = (this->_base_AIState_Base).carObj_;
+
+  iVar6 = -iVar5;
 
   if (pCVar4->direction == 1) {
-    iVar5 = minSpeed;
-    if (pCVar4->desiredSpeed < iVar5) {
-      iVar5 = pCVar4->desiredSpeed;
-    }
-  } else {
-    iVar5 = -minSpeed;
-    if (iVar5 < pCVar4->desiredSpeed) {
-      iVar5 = pCVar4->desiredSpeed;
-    }
-  }
-  pCVar4->desiredSpeed = iVar5;
 
-  AI_GenericBeginCycle(this->carObj_);
+    iVar2 = pCVar4->desiredSpeed;
+
+    bVar1 = iVar2 < iVar5;
+
+    iVar6 = iVar5;
+
+  }
+
+  else {
+
+    iVar2 = pCVar4->desiredSpeed;
+
+    bVar1 = iVar6 < iVar2;
+
+  }
+
+  if (bVar1) {
+
+    iVar6 = iVar2;
+
+  }
+
+  pCVar4->desiredSpeed = iVar6;
+
+  AI_GenericBeginCycle((this->_base_AIState_Base).carObj_);
 
   this->CheckForBarriersAndTargetAroundThem();
 
-  AI_GenericCycle(this->carObj_);
+  AI_GenericCycle((this->_base_AIState_Base).carObj_);
 
-  AI_GenericEndCycle(this->carObj_);
+  AI_GenericEndCycle((this->_base_AIState_Base).carObj_);
 
   if (intercept != 0) {
 
-    (this->carObj_)->targetPos = (this->targetCar_->N).position;
+    pCVar3 = (this->_base_AIState_Base).carObj_;
 
-    (this->carObj_)->targetLatPos = this->targetCar_->roadPosition;
+    pCVar4 = this->targetCar_;
 
-    (this->carObj_)->preferredLateralPosition = this->targetCar_->roadPosition;
+    iVar6 = (pCVar4->N).position.y;
 
-    (this->carObj_)->preferredLateralPositionPower = 0xf0000;
+    iVar2 = (pCVar4->N).position.z;
+
+    (pCVar3->targetPos).x = (pCVar4->N).position.x;
+
+    (pCVar3->targetPos).y = iVar6;
+
+    (pCVar3->targetPos).z = iVar2;
+
+    ((this->_base_AIState_Base).carObj_)->targetLatPos = this->targetCar_->roadPosition;
+
+    ((this->_base_AIState_Base).carObj_)->preferredLateralPosition = this->targetCar_->roadPosition;
+
+    ((this->_base_AIState_Base).carObj_)->preferredLateralPositionPower = 0xf0000;
 
   }
 
@@ -1444,74 +1468,85 @@ void AIState_Chase::CheckForBarriersAndTargetAroundThem()
   int myLane;
   int targetLane;
 
-  int lm;
-
   u_char bVar1;
 
-  u_char bVar2;
+  int iVar2;
 
   Car_tObj *pCVar3;
 
+  int iVar4;
+
+  int lane0;
+
+  int slice;
+
   
 
-  lm = this->longMetersBetween_;
+  iVar2 = this->longMetersBetween_;
 
-  lm = __builtin_abs(lm);
+  if (iVar2 < 0) {
 
-  if (0x1f40000 < lm) return;
+    iVar2 = -iVar2;
 
-  pCVar3 = this->carObj_;
+  }
 
-  mySlice = (pCVar3->N).simRoadInfo.slice;
+  if (iVar2 < 0x1f40001) {
 
-  myLane = pCVar3->laneIndex;
+    pCVar3 = (this->_base_AIState_Base).carObj_;
 
-  bVar1 = *(u_char *)(mySlice * 0x20 + (int)AIState_BWorldSmSlices + 0x1d);
+    slice = (int)(pCVar3->N).simRoadInfo.slice;
 
-  targetSlice = (this->targetCar_->N).simRoadInfo.slice;
+    iVar4 = pCVar3->laneIndex;
 
-  targetLane = this->targetCar_->laneIndex;
+    bVar1 = *(u_char *)(slice * 0x20 + (int)BWorldSm_slices + 0x1d);
 
-  if (myLane < 6 - (bVar1 >> 4)) return;
+    iVar2 = (int)(this->targetCar_->N).simRoadInfo.slice;
 
-  if ((bVar1 & 0xf) + 7 < myLane) return;
+    lane0 = this->targetCar_->laneIndex;
 
-  bVar2 = *(u_char *)(targetSlice * 0x20 + (int)AIState_BWorldSmSlices + 0x1d);
+    if (((((int)(6 - (u_int)(bVar1 >> 4)) <= iVar4) && (iVar4 <= (int)((bVar1 & 0xf) + 7))) &&
 
-  if (targetLane < 6 - (bVar2 >> 4)) return;
+        (bVar1 = *(u_char *)(iVar2 * 0x20 + (int)BWorldSm_slices + 0x1d),
 
-  if ((bVar2 & 0xf) + 7 < targetLane) return;
+        (int)(6 - (u_int)(bVar1 >> 4)) <= lane0)) && (lane0 <= (int)((bVar1 & 0xf) + 7))) {
 
-  barrierBesideTarget = AIWorld_CheckForBarrierBetweenLanes(targetSlice,targetLane,myLane);
+      iVar2 = AIWorld_CheckForBarrierBetweenLanes(iVar2,lane0,iVar4)
 
-  barrierBesideMe = AIWorld_CheckForBarrierBetweenLanes(mySlice,targetLane,myLane);
+      ;
 
-  if (barrierBesideTarget == 0) goto LAB_TICKS0;
+      iVar4 = AIWorld_CheckForBarrierBetweenLanes(slice,lane0,iVar4)
 
-  if (barrierBesideMe != 0) goto LAB_ELAPSED;
+      ;
 
-  this->barrierTicks32_ = 0;
+      if (iVar2 == 0) {
 
-  AI_TargetLane(this->carObj_,targetLane);
+        this->barrierTicks32_ = 0;
 
-  AI_TargetLane(this->carObj_,targetLane);
+      }
 
-  AI_TargetLane(this->carObj_,targetLane);
+      else if (iVar4 == 0) {
 
-  return;
+        pCVar3 = (this->_base_AIState_Base).carObj_;
 
-LAB_ELAPSED:
+        this->barrierTicks32_ = 0;
 
-  /* CORRECTNESS (w13-a5): oracle's middle arm is barrierTicks32_ += AI_elapsedTime
-     (@.L80070CD8) -- recon previously had a self-assignment placeholder. */
+        AI_TargetLane(pCVar3,lane0);
 
-  this->barrierTicks32_ = this->barrierTicks32_ + AI_elapsedTime;
+        AI_TargetLane((this->_base_AIState_Base).carObj_,lane0);
 
-  return;
+        AI_TargetLane((this->_base_AIState_Base).carObj_,lane0);
 
-LAB_TICKS0:
+      }
 
-  this->barrierTicks32_ = 0;
+      else {
+
+        this->barrierTicks32_ = this->barrierTicks32_ + AI_elapsedTime;
+
+      }
+
+    }
+
+  }
 
   return;
 
@@ -1525,10 +1560,6 @@ LAB_TICKS0:
 
 
 /* ---- FindBarrierEndSlice__13AIState_Chase  AIState_Chase::FindBarrierEndSlice  [AISTATE.CPP:764-866] SLD-VERIFIED ---- */
-/* MATCH: IDA/SYM register allocation and the raw SLD line trace recover both
-   mirrored scan scopes. Keeping gNumSlices-6 as an explicit branch-local
-   temporary and spelling the non-wrapping return arm first preserves retail's
-   v0 result web and branch layout. */
 
 int AIState_Chase::FindBarrierEndSlice()
 
@@ -1546,219 +1577,228 @@ int AIState_Chase::FindBarrierEndSlice()
   int forwardBarrierDistance;
   int backwardsBarrierEndSlice;
   int backwardsBarrierDistance;
+  int sliceLoop;
+  int sliceCheck;
+  int temp;
+  int leftBarrier;
+  int hereBarrier;
+  int rightBarrier;
 
-  myLane = this->carObj_->laneIndex;
-  targetLane = this->targetCar_->laneIndex;
-  mySlice = (int)this->carObj_->N.simRoadInfo.slice;
+  u_char bVar1;
 
-  if (targetLane < myLane) {
+  u_int uVar2;
 
-    leftLane = targetLane;
-    rightLane = myLane;
+  Car_tObj *pCVar3;
+
+  int iVar4;
+
+  int iVar5;
+
+  int iVar6;
+
+  int iVar7;
+
+  int slice;
+
+  int iVar8;
+
+  int iVar9;
+
+  int iVar10;
+
+  int slice_00;
+
+  int local_30;
+
+  int local_2c;
+
+  
+
+  pCVar3 = (this->_base_AIState_Base).carObj_;
+
+  iVar7 = pCVar3->laneIndex;
+
+  iVar5 = this->targetCar_->laneIndex;
+
+  slice_00 = (int)(pCVar3->N).simRoadInfo.slice;
+
+  iVar4 = iVar7;
+
+  if (iVar5 < iVar7) {
+
+    iVar4 = iVar5;
+
+    iVar5 = iVar7;
+
+  }
+
+  while ((iVar4 < iVar5 &&
+
+         (iVar7 = AIWorld_CheckForBarrierBetweenLanes(slice_00,iVar4,iVar4), iVar7 == 0))) {
+
+    iVar4 = iVar4 + 1;
+
+  }
+
+  iVar5 = slice_00 + 0x53;
+
+  local_2c = 0x53;
+
+  local_30 = 0x53;
+
+  if (gNumSlices <= iVar5) {
+
+    iVar5 = iVar5 - gNumSlices;
+
+  }
+
+  iVar7 = slice_00 + -0x53;
+
+  if (iVar7 < 0) {
+
+    iVar7 = iVar7 + gNumSlices;
+
+  }
+
+  iVar8 = iVar4;
+
+  for (iVar10 = 0; slice = iVar5, iVar9 = local_30, iVar10 < 0x53; iVar10 = iVar10 + 4) {
+
+    slice = slice_00 + iVar10;
+
+    if (iVar10 < 0) {
+
+      iVar9 = gNumSlices;
+
+      if (slice < 0) goto LAB_80070e34;
+
+    }
+
+    else if (gNumSlices <= slice) {
+
+      iVar9 = -gNumSlices;
+
+LAB_80070e34:
+
+      slice = slice + iVar9;
+
+    }
+
+    iVar9 = iVar8 + -1;
+
+    uVar2 = AIWorld_CheckForBarrierBetweenLanes(slice,iVar8 + 1,iVar9);
+
+    iVar6 = iVar8;
+
+    if (((uVar2 & 2) == 0) &&
+
+       ((((uVar2 & 4) == 0 ||
+
+         (bVar1 = *(u_char *)(slice * 0x20 + (int)BWorldSm_slices + 0x1d),
+
+         iVar9 < (int)(6 - (u_int)(bVar1 >> 4)))) ||
+
+        (iVar6 = iVar9, (int)((bVar1 & 0xf) + 7) < iVar9)))) {
+
+      iVar9 = iVar10;
+
+      if ((uVar2 & 1) == 0) break;
+
+      bVar1 = *(u_char *)(slice * 0x20 + (int)BWorldSm_slices + 0x1d);
+
+      iVar6 = iVar8 + 1;
+
+      if ((iVar6 < (int)(6 - (u_int)(bVar1 >> 4))) || ((int)((bVar1 & 0xf) + 7) < iVar6)) break;
+
+    }
+
+    iVar8 = iVar6;
+
+  }
+
+  local_30 = iVar9;
+
+  for (iVar5 = 0; iVar8 = iVar7, iVar10 = local_2c, iVar5 < 0x53; iVar5 = iVar5 + 4) {
+
+    iVar8 = slice_00 - iVar5;
+
+    if (-iVar5 < 0) {
+
+      iVar10 = gNumSlices;
+
+      if (iVar8 < 0) goto LAB_80070f54;
+
+    }
+
+    else if (gNumSlices <= iVar8) {
+
+      iVar10 = -gNumSlices;
+
+LAB_80070f54:
+
+      iVar8 = iVar8 + iVar10;
+
+    }
+
+    iVar10 = iVar4 + -1;
+
+    uVar2 = AIWorld_CheckForBarrierBetweenLanes(iVar8,iVar4 + 1,iVar10);
+
+    iVar9 = iVar4;
+
+    if (((uVar2 & 2) == 0) &&
+
+       ((((uVar2 & 4) == 0 ||
+
+         (bVar1 = *(u_char *)(iVar8 * 0x20 + (int)BWorldSm_slices + 0x1d),
+
+         iVar10 < (int)(6 - (u_int)(bVar1 >> 4)))) ||
+
+        (iVar9 = iVar10, (int)((bVar1 & 0xf) + 7) < iVar10)))) {
+
+      iVar10 = iVar5;
+
+      if ((uVar2 & 1) == 0) break;
+
+      bVar1 = *(u_char *)(iVar8 * 0x20 + (int)BWorldSm_slices + 0x1d);
+
+      iVar9 = iVar4 + 1;
+
+      if ((iVar9 < (int)(6 - (u_int)(bVar1 >> 4))) || ((int)((bVar1 & 0xf) + 7) < iVar9)) break;
+
+    }
+
+    iVar4 = iVar9;
+
+  }
+
+  local_2c = iVar10;
+
+  iVar4 = slice + 6;
+
+  if (local_30 < local_2c) {
+
+    if (gNumSlices <= iVar4) {
+
+      iVar4 = slice - (gNumSlices + -6);
+
+    }
 
   }
 
   else {
 
-    leftLane = myLane;
-    rightLane = targetLane;
+    iVar4 = iVar8 + -6;
 
-  }
+    if (iVar4 < 0) {
 
-  barrierLane = leftLane;
-
-  while (barrierLane < rightLane) {
-
-    if (AIWorld_CheckForBarrierBetweenLanes(mySlice,barrierLane,barrierLane) != 0) {
-
-      break;
+      iVar4 = iVar8 + gNumSlices + -6;
 
     }
 
-    barrierLane++;
-
   }
 
-  forwardBarrierDistance = backwardsBarrierDistance = 0x53;
-
-  forwardBarrierEndSlice = mySlice + 0x53;
-
-  if (gNumSlices <= forwardBarrierEndSlice) {
-
-    forwardBarrierEndSlice -= gNumSlices;
-
-  }
-
-  backwardsBarrierEndSlice = mySlice - 0x53;
-
-  if (backwardsBarrierEndSlice < 0) {
-
-    backwardsBarrierEndSlice += gNumSlices;
-
-  }
-
-  currentBarrierLane = barrierLane;
-
-  {
-    int sliceLoop;
-
-    for (sliceLoop = 0; sliceLoop < 0x53; sliceLoop += 4) {
-      int sliceCheck;
-      int temp;
-      int leftBarrier;
-      int hereBarrier;
-      int rightBarrier;
-
-      sliceCheck = mySlice + sliceLoop;
-
-      if (0 <= sliceLoop) {
-
-        if (gNumSlices <= sliceCheck) {
-
-          sliceCheck -= gNumSlices;
-
-        }
-
-      }
-
-      else if (sliceCheck < 0) {
-
-        sliceCheck += gNumSlices;
-
-      }
-
-      temp = AIWorld_CheckForBarrierBetweenLanes(
-          sliceCheck,currentBarrierLane + 1,currentBarrierLane - 1);
-      leftBarrier = temp & 4;
-      hereBarrier = temp & 2;
-      rightBarrier = temp & 1;
-
-      if (hereBarrier == 0) {
-
-        if ((leftBarrier != 0) &&
-            (6 - (AISTATE_SLICE_BYTE(sliceCheck,0x1d) >> 4) <= currentBarrierLane - 1) &&
-            (currentBarrierLane - 1 <=
-             (AISTATE_SLICE_BYTE(sliceCheck,0x1d) & 0xf) + 7)) {
-
-          currentBarrierLane--;
-
-        }
-
-        else if ((rightBarrier == 0) ||
-                 (currentBarrierLane + 1 <
-                  6 - (AISTATE_SLICE_BYTE(sliceCheck,0x1d) >> 4)) ||
-                 ((AISTATE_SLICE_BYTE(sliceCheck,0x1d) & 0xf) + 7 <
-                  currentBarrierLane + 1)) {
-
-          forwardBarrierEndSlice = sliceCheck;
-          forwardBarrierDistance = sliceLoop;
-          break;
-
-        }
-
-        else {
-
-          currentBarrierLane++;
-
-        }
-
-      }
-
-    }
-  }
-
-  currentBarrierLane = barrierLane;
-
-  {
-    int sliceLoop;
-
-    for (sliceLoop = 0; sliceLoop < 0x53; sliceLoop += 4) {
-      int sliceCheck;
-      int temp;
-      int leftBarrier;
-      int hereBarrier;
-      int rightBarrier;
-
-      sliceCheck = mySlice - sliceLoop;
-
-      if (0 <= -sliceLoop) {
-
-        if (gNumSlices <= sliceCheck) {
-
-          sliceCheck -= gNumSlices;
-
-        }
-
-      }
-
-      else if (sliceCheck < 0) {
-
-        sliceCheck += gNumSlices;
-
-      }
-
-      temp = AIWorld_CheckForBarrierBetweenLanes(
-          sliceCheck,currentBarrierLane + 1,currentBarrierLane - 1);
-      leftBarrier = temp & 4;
-      hereBarrier = temp & 2;
-      rightBarrier = temp & 1;
-
-      if (hereBarrier == 0) {
-
-        if ((leftBarrier != 0) &&
-            (6 - (AISTATE_SLICE_BYTE(sliceCheck,0x1d) >> 4) <= currentBarrierLane - 1) &&
-            (currentBarrierLane - 1 <=
-             (AISTATE_SLICE_BYTE(sliceCheck,0x1d) & 0xf) + 7)) {
-
-          currentBarrierLane--;
-
-        }
-
-        else if ((rightBarrier == 0) ||
-                 (currentBarrierLane + 1 <
-                  6 - (AISTATE_SLICE_BYTE(sliceCheck,0x1d) >> 4)) ||
-                 ((AISTATE_SLICE_BYTE(sliceCheck,0x1d) & 0xf) + 7 <
-                  currentBarrierLane + 1)) {
-
-          backwardsBarrierEndSlice = sliceCheck;
-          backwardsBarrierDistance = sliceLoop;
-          break;
-
-        }
-
-        else {
-
-          currentBarrierLane++;
-
-        }
-
-      }
-
-    }
-  }
-
-  if (forwardBarrierDistance < backwardsBarrierDistance) {
-
-    if (forwardBarrierEndSlice + 6 < gNumSlices) {
-      return forwardBarrierEndSlice + 6;
-
-    }
-
-    {
-      int numSlicesLess6 = gNumSlices - 6;
-      return forwardBarrierEndSlice - numSlicesLess6;
-    }
-
-  }
-
-  if (backwardsBarrierEndSlice - 6 < 0) {
-    int numSlicesLess6 = gNumSlices - 6;
-
-    return backwardsBarrierEndSlice + numSlicesLess6;
-
-  }
-
-  return backwardsBarrierEndSlice - 6;
+  return iVar4;
 
 }
 
@@ -1770,13 +1810,8 @@ int AIState_Chase::FindBarrierEndSlice()
 
 
 /* ---- _._15AIState_Offroad  AIState_Offroad::dtor  [AISTATE.CPP:887-891] SLD-VERIFIED ---- */
-/* reconstructed as extern "C" ___15AIState_Offroad(AIState_Offroad*,int) free fn -- see
-   AIState_Chase dtor comment for why (real per-class deleting dtor in the oracle).
-   MATCH: the carFlags RMW must go through a FRESH local (pCVar2), not reuse pCVar1 --
-   the 3 carObj_ re-reads are 3 DISTINCT pseudos in the original; reusing pCVar1 merged
-   webs and kept pThis in a0 (oracle: carObj web takes a0, pThis copied to a2). 25->0. */
 
-extern "C" void ___15AIState_Offroad(AIState_Offroad *pThis,int __in_chrg)
+AIState_Offroad::~AIState_Offroad()
 
 
 
@@ -1784,13 +1819,12 @@ extern "C" void ___15AIState_Offroad(AIState_Offroad *pThis,int __in_chrg)
 
   Car_tObj *pCVar1;
 
-  Car_tObj *pCVar2;
 
+  
 
+  pCVar1 = (this->_base_AIState_Base).carObj_;
 
-  pCVar1 = pThis->carObj_;
-
-  pThis->_vf = (__vtbl_ptr_type (*) [4])AIState_Offroad_vtable;
+  (this->_base_AIState_Base)._vf = (__vtbl_ptr_type (*) [4])AIState_Offroad_vtable;
 
   (pCVar1->targetPos).z = 0;
 
@@ -1798,17 +1832,14 @@ extern "C" void ___15AIState_Offroad(AIState_Offroad *pThis,int __in_chrg)
 
   (pCVar1->targetPos).x = 0;
 
-  (pThis->carObj_)->targetLatPos = 0;
+  ((this->_base_AIState_Base).carObj_)->targetLatPos = 0;
 
-  pCVar2 = pThis->carObj_;
+  pCVar1 = (this->_base_AIState_Base).carObj_;
 
-  pCVar2->carFlags = pCVar2->carFlags & 0xfffff7ff;
+  pCVar1->carFlags = pCVar1->carFlags & 0xfffff7ff;
 
-  pThis->_vf = (__vtbl_ptr_type (*) [4])AIState_Base_vtable;
+  (this->_base_AIState_Base)._vf = (__vtbl_ptr_type (*) [4])((char *)AIState_Offroad_vtable + 8);
 
-  if ((__in_chrg & 1U) != 0) {
-    __builtin_delete(pThis);
-  }
 
   return;
 
@@ -1826,38 +1857,54 @@ extern "C" void ___15AIState_Offroad(AIState_Offroad *pThis,int __in_chrg)
 AIState_Offroad::AIState_Offroad(Car_tObj *carObj,int startSlice,coorddef *position,
 
           matrixtdef *orientation,int maxSpeedKPH,int releaseTime,int endSlice)
-  : AIState_Base(carObj)
+  : _base_AIState_Base(carObj)
 {
 
   Car_tObj *pCVar3;
 
+  int iVar4;
 
+  int iVar5;
 
-  this->_vf = (__vtbl_ptr_type (*) [4])AIState_Offroad_vtable;
+  (this->_base_AIState_Base)._vf = (__vtbl_ptr_type (*) [4])AIState_Offroad_vtable;
 
   this->letGo_ = 0;
 
   this->startSlice_ = startSlice;
 
-  /* MATCH (w13-a5): plain struct assignments -- gcc movstrsi expands the 36-byte matrix
-     copy as the oracle's 4-word/iter loop + 1-word tail + end-ptr compare, and the
-     12-byte coorddef copies as grouped lw t0-t2 / sw triples (load-3/store-3). */
+  iVar4 = position->y;
 
-  this->startPosition_ = *position;
+  iVar5 = position->z;
+
+  (this->startPosition_).x = position->x;
+
+  (this->startPosition_).y = iVar4;
+
+  (this->startPosition_).z = iVar5;
 
   this->startOrientation_ = *orientation;
 
-  this->startHeading_ = *(coorddef *)((this->startOrientation_).m + 6);
+  iVar4 = (this->startOrientation_).m[7];
+
+  iVar5 = (this->startOrientation_).m[8];
+
+  (this->startHeading_).x = (this->startOrientation_).m[6];
+
+  (this->startHeading_).y = iVar4;
+
+  (this->startHeading_).z = iVar5;
 
   this->maxSpeedMPS_ = maxSpeedKPH * 0x4700;
 
-  this->releaseTime_ = releaseTime;
-
   this->targetSlice_ = endSlice;
 
-  this->targetPosition_ = *(coorddef *)((char *)AIState_BWorldSmSlices + endSlice * 0x20);
+  this->releaseTime_ = releaseTime;
 
-  pCVar3 = this->carObj_;
+  this->targetPosition_.x = BWorldSm_slices[endSlice].center[0];
+  this->targetPosition_.y = BWorldSm_slices[endSlice].center[1];
+  this->targetPosition_.z = BWorldSm_slices[endSlice].center[2];
+
+  pCVar3 = (this->_base_AIState_Base).carObj_;
 
   pCVar3->carFlags = pCVar3->carFlags | 0x800;
 
@@ -1873,9 +1920,6 @@ AIState_Offroad::AIState_Offroad(Car_tObj *carObj,int startSlice,coorddef *posit
 
 
 /* ---- UnleashIfInRange__15AIState_OffroadP8Car_tObj  AIState_Offroad::UnleashIfInRange  [AISTATE.CPP:926-936] SLD-VERIFIED ---- */
-/* IDA's retail register annotations expose the original max-threshold expression:
-   a single comparison against a ternary-selected limit. This produces the oracle's
-   branch-delay comparison and two separate 0x140000 materializations (30/30 PASS). */
 
 void AIState_Offroad::UnleashIfInRange(Car_tObj *car)
 
@@ -1885,19 +1929,36 @@ void AIState_Offroad::UnleashIfInRange(Car_tObj *car)
   int distanceAbsMeters;
   int releaseDistanceMeters;
 
+  bool bVar1;
+
   int iVar2;
+
+  int iVar3;
 
   
 
-  iVar2 = AIWorld_SplineDistance(this->carObj_,car);
+  iVar2 = AIWorld_SplineDistance((this->_base_AIState_Base).carObj_,car);
 
-  distanceAbsMeters = __builtin_abs(iVar2);
+  if (iVar2 < 0) {
 
-  releaseDistanceMeters = fixedmult((car->N).speedXZ,this->releaseTime_);
+    iVar2 = -iVar2;
 
-  if (distanceAbsMeters <
-      ((releaseDistanceMeters < 0x140000) ? 0x140000 : releaseDistanceMeters)) {
+  }
+
+  iVar3 = fixedmult((car->N).speedXZ,this->releaseTime_);
+
+  bVar1 = iVar2 < iVar3;
+
+  if (iVar3 < 0x140000) {
+
+    bVar1 = iVar2 < 0x140000;
+
+  }
+
+  if (bVar1) {
+
     this->letGo_ = 1;
+
   }
 
   return;
@@ -1922,75 +1983,127 @@ void AIState_Offroad::Execute()
 
   Car_tObj *pCVar1;
 
-  Car_tObj *pCVar2;
+  matrixtdef *pmVar2;
 
-  Car_tObj *pCVar3;
+  matrixtdef *pmVar3;
 
   int iVar4;
 
-  
+  int iVar5;
+
+  int iVar6;
 
   if (this->letGo_ == 0) {
 
-    memset((u_char *)&zero,'\0',0xc);
+    memset((u_char *)&zero,'\0',sizeof(zero));
 
-    (this->carObj_->N).linearVel = zero;
+    pCVar1 = (this->_base_AIState_Base).carObj_;
 
-    (this->carObj_->N).angularVel = zero;
+    (pCVar1->N).linearVel = zero;
 
-    (this->carObj_)->desiredSpeed = 0;
+    pCVar1 = (this->_base_AIState_Base).carObj_;
 
-    (this->carObj_->N).position = this->startPosition_;
+    (pCVar1->N).angularVel = zero;
 
-    (this->carObj_->N).orientMat = this->startOrientation_;
+    ((this->_base_AIState_Base).carObj_)->desiredSpeed = 0;
 
-    pCVar3 = this->carObj_;
+    pCVar1 = (this->_base_AIState_Base).carObj_;
 
-    (pCVar3->targetPos).z = 0;
+    pmVar3 = &this->startOrientation_;
 
-    (pCVar3->targetPos).y = 0;
+    iVar4 = (this->startPosition_).y;
 
-    (pCVar3->targetPos).x = 0;
+    iVar5 = (this->startPosition_).z;
+
+    (pCVar1->N).position.x = (this->startPosition_).x;
+
+    (pCVar1->N).position.y = iVar4;
+
+    (pCVar1->N).position.z = iVar5;
+
+    pmVar2 = &(((this->_base_AIState_Base).carObj_)->N).orientMat;
+
+    do {
+
+      iVar4 = pmVar3->m[1];
+
+      iVar5 = pmVar3->m[2];
+
+      iVar6 = pmVar3->m[3];
+
+      pmVar2->m[0] = pmVar3->m[0];
+
+      pmVar2->m[1] = iVar4;
+
+      pmVar2->m[2] = iVar5;
+
+      pmVar2->m[3] = iVar6;
+
+      pmVar3 = (matrixtdef *)(pmVar3->m + 4);
+
+      pmVar2 = (matrixtdef *)(pmVar2->m + 4);
+
+    } while (pmVar3 != (matrixtdef *)((this->startOrientation_).m + 8));
+
+    pmVar2->m[0] = pmVar3->m[0];
+
+    pCVar1 = (this->_base_AIState_Base).carObj_;
+
+    (pCVar1->targetPos).z = 0;
+
+    (pCVar1->targetPos).y = 0;
+
+    (pCVar1->targetPos).x = 0;
 
   }
 
   else {
 
-    iVar4 = AIWorld_ApxSplineDistance(this->carObj_,this->targetSlice_);
+    iVar4 = AIWorld_ApxSplineDistance((this->_base_AIState_Base).carObj_,this->targetSlice_);
 
-    pCVar1 = this->carObj_;
+    pCVar1 = (this->_base_AIState_Base).carObj_;
 
     this->longMetersBetween_ = iVar4;
 
     pCVar1->desiredSpeed = this->maxSpeedMPS_;
 
-    if (0 < this->longMetersBetween_) {
+    if (this->longMetersBetween_ < 1) {
 
-      (this->carObj_)->desiredDirection = -1;
-
-      pCVar2 = this->carObj_;
-
-      pCVar2->desiredSpeed = -pCVar2->desiredSpeed;
+      ((this->_base_AIState_Base).carObj_)->desiredDirection = 1;
 
     }
 
     else {
 
-      (this->carObj_)->desiredDirection = 1;
+      ((this->_base_AIState_Base).carObj_)->desiredDirection = -1;
+
+      pCVar1 = (this->_base_AIState_Base).carObj_;
+
+      pCVar1->desiredSpeed = -pCVar1->desiredSpeed;
 
     }
 
-    AI_GenericBeginCycle(this->carObj_);
+    AI_GenericBeginCycle((this->_base_AIState_Base).carObj_);
 
-    AI_GenericCycle(this->carObj_);
+    AI_GenericCycle((this->_base_AIState_Base).carObj_);
 
-    AI_GenericEndCycle(this->carObj_);
+    AI_GenericEndCycle((this->_base_AIState_Base).carObj_);
 
-    (this->carObj_)->targetPos = this->targetPosition_;
+    pCVar1 = (this->_base_AIState_Base).carObj_;
+
+    iVar4 = (this->targetPosition_).y;
+
+    iVar5 = (this->targetPosition_).z;
+
+    (pCVar1->targetPos).x = (this->targetPosition_).x;
+
+    (pCVar1->targetPos).y = iVar4;
+
+    (pCVar1->targetPos).z = iVar5;
 
   }
 
-  (this->carObj_)->targetLatPos = 0;
+  ((this->_base_AIState_Base).carObj_)->targetLatPos = 0;
 
   return;
 
@@ -2006,7 +2119,7 @@ void AIState_Offroad::Execute()
 /* ---- __17AIState_PurgatoryP8Car_tObj  AIState_Purgatory::ctor  [AISTATE.CPP:1001-1017] SLD-VERIFIED ---- */
 
 AIState_Purgatory::AIState_Purgatory(Car_tObj *carObj)
-  : AIState_NonActive(carObj)
+
 
 
 {
@@ -2021,44 +2134,47 @@ AIState_Purgatory::AIState_Purgatory(Car_tObj *carObj)
 
   Car_tObj *pCVar4;
 
-  Car_tObj *pCVar5;
+  coorddef cStack_20;
 
+  
 
+  (this->_base_AIState_NonActive)._base_AIState_Base.carObj_ = carObj;
 
-  memset((u_char *)&trafficOffset,'\0',0xc);
+  (this->_base_AIState_NonActive)._base_AIState_Base._vf =
 
-  trafficOffset.y = carObj->carIndex * 0xa0000;
+       (__vtbl_ptr_type (*) [4])((char *)AIState_Purgatory_vtable + 8);
 
-  Newton_SetInitialSlicePositionOrientationEtc(&(this->carObj_)->N,0,&trafficOffset,1);
+  memset((u_char *)&cStack_20,'\0',0xc);
 
-  ((this->carObj_)->N).active = '\0';
+  cStack_20.y = carObj->carIndex * 0xa0000;
 
-  this->_vf = (__vtbl_ptr_type (*) [4])AIState_Purgatory_vtable;
+  Newton_SetInitialSlicePositionOrientationEtc(&((this->_base_AIState_NonActive)._base_AIState_Base.carObj_)->N,0,&cStack_20,1);
 
-  uVar1 = fastRandom * randSeed;
+  (((this->_base_AIState_NonActive)._base_AIState_Base.carObj_)->N).active = '\0';
 
-  /* CORRECTNESS (w13-a5): oracle stores the VALUE of Cars_gList (= Cars_gList[0], the head
-     car) into basisCar -- recon previously stored NULL. lw %lo(Cars_gList) in the oracle. */
+  uVar1 = randSeed;
 
-  (this->carObj_)->basisCar = Cars_gList[0];
+  (this->_base_AIState_NonActive)._base_AIState_Base._vf = (__vtbl_ptr_type (*) [4])AIState_Purgatory_vtable;
+
+  uVar1 = fastRandom * uVar1;
+
+  ((this->_base_AIState_NonActive)._base_AIState_Base.carObj_)->basisCar = (Car_tObj *)0x0;
 
   bVar2 = false;
 
   randtemp = uVar1;
 
-  lifeTimer = AITune_LifeTimer[Cars_gNumTrafficCars];
+  ((this->_base_AIState_NonActive)._base_AIState_Base.carObj_)->physicsModelTimer =
 
-  (this->carObj_)->physicsModelTimer =
-
-       (lifeTimer * (uVar1 >> 8 & 0xffff) >> 0x10) + 1;
+       (AITune_LifeTimer[Cars_gNumTrafficCars] * (uVar1 >> 8 & 0xffff) >> 0x10) + 1;
 
   fastRandom = uVar1 & 0xffff;
 
-  iVar3 = strcmp((this->carObj_)->carName,"SBUS");
+  iVar3 = strcmp(((this->_base_AIState_NonActive)._base_AIState_Base.carObj_)->carName,"SBUS");
 
   if ((iVar3 == 0) ||
 
-     (iVar3 = strcmp((this->carObj_)->carName,"TBUS"),
+     (iVar3 = strcmp(((this->_base_AIState_NonActive)._base_AIState_Base.carObj_)->carName,"TBUS"),
 
      iVar3 == 0)) {
 
@@ -2068,17 +2184,17 @@ AIState_Purgatory::AIState_Purgatory(Car_tObj *carObj)
 
   if (bVar2) {
 
-    pCVar4 = this->carObj_;
+    pCVar4 = (this->_base_AIState_NonActive)._base_AIState_Base.carObj_;
 
     pCVar4->physicsModelTimer = pCVar4->physicsModelTimer * 5;
 
   }
 
-  pCVar5 = this->carObj_;
+  pCVar4 = (this->_base_AIState_NonActive)._base_AIState_Base.carObj_;
 
-  pCVar5->AIFlags = pCVar5->AIFlags | 4;
+  pCVar4->AIFlags = pCVar4->AIFlags | 4;
 
-  if (((this->carObj_)->carFlags & 0x10U) != 0) {
+  if ((((this->_base_AIState_NonActive)._base_AIState_Base.carObj_)->carFlags & 0x10U) != 0) {
 
     AIState_Purgatory_numTrafficCarsInPurgatory = AIState_Purgatory_numTrafficCarsInPurgatory + 1;
 
@@ -2096,22 +2212,8 @@ AIState_Purgatory::AIState_Purgatory(Car_tObj *carObj)
 
 
 /* ---- _._17AIState_Purgatory  AIState_Purgatory::dtor  [AISTATE.CPP:1021-1041] SLD-VERIFIED ---- */
-/* reconstructed as extern "C" ___17AIState_Purgatory(AIState_Purgatory*,int) free fn -- see
-   AIState_Chase dtor comment for why (real per-class deleting dtor in the oracle); __in_chrg
-   is now a real usable param (was previously unreachable/removed from a true member dtor).
-   WALL (register-coloring near-miss) -- same root symptom as the AIState_Offroad dtor (see
-   its WALL comment): oracle copies pThis a0->a3 up front (this fn's bigger body needs a3 not
-   a2, one more caller-saved reg already in play), ours keeps pThis in a0. Same gcc-2.x
-   allocator coin-flip; documented near-miss.
-   [w30-a2 re-gate, baselines moved per wave-30 note 1: now 14 diffs/72 insns, both sides --
-   someone closed most of the original 79-diff gap since this comment was written; comment
-   left/updated rather than deleted since the residual symptom is unchanged. FLOOR confirmed
-   again this session: the `iVar2 = Cars_gNumCars-1` reverse-scan loop index lands in a2 (ours)
-   vs a0 (oracle) -- a0 is free right after the `pThis` a0->a3 copy on both sides, oracle's
-   allocator just prefers the lowest-numbered free temp, ours doesn't; same coin-flip class,
-   not a shape bug. */
 
-extern "C" void ___17AIState_Purgatory(AIState_Purgatory *pThis,int __in_chrg)
+void ___17AIState_Purgatory(AIState_Purgatory *self, int __in_chrg)
 
 
 
@@ -2121,134 +2223,81 @@ extern "C" void ___17AIState_Purgatory(AIState_Purgatory *pThis,int __in_chrg)
 
   Car_tObj *pCVar1;
 
-  Car_tObj *pCVar2;
-
-  Car_tObj *pCVar4;
-
-  Car_tObj *pCVar6;
-
   int iVar2;
 
 
   Car_tObj **ppCVar3;
-  Car_tObj **sortedList;
 
+  
 
+  pCVar1 = (self->_base_AIState_NonActive)._base_AIState_Base.carObj_;
 
-  pCVar1 = pThis->carObj_;
-
-  pThis->_vf = (__vtbl_ptr_type (*) [4])AIState_Purgatory_vtable;
+  (self->_base_AIState_NonActive)._base_AIState_Base._vf = (__vtbl_ptr_type (*) [4])AIState_Purgatory_vtable;
 
   (pCVar1->collision).resetTimer = 0;
 
-  ((pThis->carObj_)->N).collision.disableCollisionTimer = 0;
+  (((self->_base_AIState_NonActive)._base_AIState_Base.carObj_)->N).collision.disableCollisionTimer = 0;
 
-  pCVar2 = pThis->carObj_;
+  pCVar1 = (self->_base_AIState_NonActive)._base_AIState_Base.carObj_;
 
-  pCVar2->AIFlags = pCVar2->AIFlags & 0xfffffffb;
+  pCVar1->AIFlags = pCVar1->AIFlags & 0xfffffffb;
 
-  if (((pThis->carObj_)->carFlags & 0x10U) != 0) {
+  if ((((self->_base_AIState_NonActive)._base_AIState_Base.carObj_)->carFlags & 0x10U) != 0) {
 
     AIState_Purgatory_numTrafficCarsInPurgatory = AIState_Purgatory_numTrafficCarsInPurgatory + -1;
 
   }
 
-  pCVar4 = pThis->carObj_;
-
-  pCVar4->direction = 1;
-
-  pCVar4->desiredDirection = 1;
-
-  /* W54-A15 / LAW 05A: the SLD puts the whole loop header (index init, the sortedList base
-   * materialization, the scaled-index add and the `bltz` test) on retail line 1034 -- i.e.
-   * AFTER the line-1031 direction/desiredDirection stores; our loop-init statements sat
-   * BEFORE them, which flipped the sll-vs-la ready-list order.  The read-only fence is a
-   * 0-insn +1 ref on iVar2 (5->6 = the floor_log2 step), the MINIMAL reqdelta dial that
-   * swaps iVar2/ppCVar3 onto retail's $a0/$a2 (ours had them reversed).
-   * HISTORICAL RESIDUAL 2 diffs (72/72): the `sll v1,a0,2` scheduled before
-   * the &Cars_gSortedList base (lui/addiu) in ours, after it in retail -- a pure
-   * sched1 ready-list tie.  W56-A16 FALSIFIED: `&Cars_gSortedList[iVar2]`
-   * index-form is BYTE-IDENTICAL to the `+iVar2` pointer-form (no change);
-   * moving the fence above the ppCVar3 assign regresses (19 diffs).  §4.6
-   * qtytrace gap -- not source-reachable.  W59-A3 also FALSIFIED the 09I CAST-INT
-   * ARRAY SUBSCRIPT device on this site: both `(Car_tObj**)((iVar2<<2)+(int)Cars_gSortedList)`
-   * and the operand-swapped `((int)Cars_gSortedList+(iVar2<<2))` are byte-identical to
-   * the pointer form (still 2 diffs) -- address-block-order pinning does not reach a
-   * sll-vs-la ready-list tie.
-   * W60-A8 r2 showed the SPLIT-INIT (`ppCVar3 = Cars_gSortedList;` then
-   * `ppCVar3 = ppCVar3 + iVar2;`) DOES flip the sll/la order to retail's, but floats
-   * the whole address block above the line-1031 stores and drops a load-delay nop
-   * (15 diffs / 71 insns).  W61-A12 then falsified the obvious completion -- pinning
-   * the block's POSITION with a void-tail barrier so the split cannot float:
-   * `__asm__("" : : "i"(0))` before the loop init + split -> 21 / 71; the barrier
-   * placed between iVar2 and the split -> 19 / 71; the barrier ALONE (no split,
-   * baseline shape) -> 24 / 72.  The barrier moves the block itself instead of
-   * anchoring it, so a scheduling-barrier device cannot buy the position back.
-   * What is needed is a statement-local, NON-barrier ready-list dial.
-   * W62-A9: the SOURCE axis is now CLOSED and the fn is SOLVED by a
-   * PER_FN_TEXT_MOVES row (probe-verified PASS 72/72, whole-TU 51/52; the
-   * EXTRA={} control on the same probe reproduces 2).  ORCHESTRATOR SPEC --
-   * a new key inside the "recon/game/common/aistate.cpp" entry of
-   * PER_FN_TEXT_MOVES (that file key does not exist yet; create it).  The exact
-   * python row is in scratchpad/w62a9/spec_purg.py -- copy it from there, it is
-   * regex-escaped: take = the sll of $3 from $4 by 2, after = the addiu of $2
-   * carrying %lo(Cars_gSortedList) with a trailing-comment tail.  Both anchors
-   * are unique inside the .ent/.end region (12F).
-   * WHY no source form reaches it (mechanism, now named): the base is an
-   * ARRAY, so `Cars_gSortedList + i` folds to PLUS(MULT, ADDR) -- the address
-   * is TREE_CONSTANT and is canonicalised to operand 2, so expand ALWAYS emits
-   * the sll first; retail's order needs the ADDR as operand 1.  W62-A9 ALSO
-   * FALSIFIED (on top of the earlier index/cast/barrier lists): the plain
-   * `iVar2 + Cars_gSortedList` operand swap (2, inert); a 13B IDENTITY-LAUNDER
-   * on a `Car_tObj **base` local (19/71); the launder without the ref fence
-   * (19/71); split-init plus a launder on ppCVar3 (19/71).  Every split form
-   * loses the load-delay nop (71 insns, not 72).
-   * W78-root SOURCE PASS 72/72: comma-stage the base assignment into the
-   * correctly typed `Car_tObj **sortedList` local inside the final pointer
-   * expression.  This preserves the count/allocation and changes expand's
-   * operand birth order just enough to emit the retail lui/addiu before sll.
-   * No post-cc1 relocation is required. */
   iVar2 = Cars_gNumCars + -1;
 
-  ppCVar3 = (sortedList = Cars_gSortedList, sortedList + iVar2);
+  ppCVar3 = Cars_gSortedList + iVar2;
 
-  __asm__("" : : "r"(iVar2));
+  pCVar1 = (self->_base_AIState_NonActive)._base_AIState_Base.carObj_;
 
-LOOP_800716DC:
+  pCVar1->direction = 1;
 
-  if (-1 < iVar2) {
+  pCVar1->desiredDirection = 1;
 
-    test = *ppCVar3;
+  do {
 
-    ppCVar3 = ppCVar3 + -1;
+    if (iVar2 < 0) {
 
-    if ((test->carFlags & 0x100U) == 0) {
+LAB_80071718:
 
-      iVar2 = iVar2 + -1;
+      pCVar1 = (self->_base_AIState_NonActive)._base_AIState_Base.carObj_;
 
-      goto LOOP_800716DC;
+      (self->_base_AIState_NonActive)._base_AIState_Base._vf =
+
+           (__vtbl_ptr_type (*) [4])AIState_NonActive_vtable;
+
+      (pCVar1->N).active = '\x01';
+
+      (self->_base_AIState_NonActive)._base_AIState_Base._vf =
+
+           (__vtbl_ptr_type (*) [4])AIState_Base_vtable;
+
+      if ((__in_chrg & 1) != 0) {
+        __builtin_delete(self);
+      }
+      return;
 
     }
 
-    (pThis->carObj_)->basisCar = test;
+    pCVar1 = *ppCVar3;
 
-  }
+    ppCVar3 = ppCVar3 + -1;
 
-  pCVar6 = pThis->carObj_;
+    if ((pCVar1->carFlags & 0x100U) != 0) {
 
-  pThis->_vf =
+      ((self->_base_AIState_NonActive)._base_AIState_Base.carObj_)->basisCar = pCVar1;
 
-       (__vtbl_ptr_type (*) [4])((char *)AIState_NonActive_vtable + 8);
+      goto LAB_80071718;
 
-  (pCVar6->N).active = '\x01';
+    }
 
-  pThis->_vf = (__vtbl_ptr_type (*) [4])AIState_Base_vtable;
+    iVar2 = iVar2 + -1;
 
-  if ((__in_chrg & 1U) != 0) {
-    __builtin_delete(pThis);
-  }
-
-  return;
+  } while( true );
 
 }
 
@@ -2268,17 +2317,32 @@ int AIState_Purgatory::TestForRelease()
 {
   int trafficInWorld;
 
-  if (this->carObj_->physicsModelTimer < 1) {
-    trafficInWorld = Cars_gNumTrafficCars - AIState_Purgatory_numTrafficCarsInPurgatory;
+  int iVar1;
 
-    if (trafficInWorld <
-        AITune_MaxTraffic[AIState_GameSetupWords[3] == 1][AIState_GameSetupWords[6]]) {
+  Car_tObj *pCVar2;
+
+  
+
+  pCVar2 = (this->_base_AIState_NonActive)._base_AIState_Base.carObj_;
+
+  if (pCVar2->physicsModelTimer < 1) {
+
+    iVar1 = GameSetup_gData.trafficDensity * 4;
+
+    if (GameSetup_gData.commMode == 1) {
+
+      iVar1 = iVar1 + 0x10;
+
+    }
+
+    if (Cars_gNumTrafficCars - AIState_Purgatory_numTrafficCarsInPurgatory <
+        AITune_MaxTraffic[GameSetup_gData.commMode == 1][GameSetup_gData.trafficDensity]) {
 
       return 1;
 
     }
 
-    this->carObj_->physicsModelTimer = 1;
+    pCVar2->physicsModelTimer = 1;
 
   }
 
@@ -2305,13 +2369,13 @@ void AIState_Purgatory::Execute()
 
   
 
-  ((this->carObj_)->collision).resetTimer = 0;
+  (((this->_base_AIState_NonActive)._base_AIState_Base.carObj_)->collision).resetTimer = 0;
 
-  ((this->carObj_)->N).collision.disableCollisionTimer = 0;
+  (((this->_base_AIState_NonActive)._base_AIState_Base.carObj_)->N).collision.disableCollisionTimer = 0;
 
-  pCVar1 = this->carObj_;
+  pCVar1 = (this->_base_AIState_NonActive)._base_AIState_Base.carObj_;
 
-  if (((pCVar1->carFlags & 0x20U) == 0) && (0x3bf < AIState_SimGlobalWords[1])) {
+  if (((pCVar1->carFlags & 0x20U) == 0) && (0x3bf < simGlobal.gameTicks)) {
 
     pCVar1->physicsModelTimer = pCVar1->physicsModelTimer - AI_elapsedTime;
 
@@ -2352,7 +2416,7 @@ void AIState_Purgatory::StartUp(void)
 /* ---- __21AIState_RovingTrafficP8Car_tObjP9trigger_t  AIState_RovingTraffic::ctor  [AISTATE.CPP:1103-1109] SLD-VERIFIED ---- */
 
 AIState_RovingTraffic::AIState_RovingTraffic(Car_tObj *carObj,trigger_t *trigger)
-  : AIState_Base(carObj)
+  : _base_AIState_Base(carObj)
 {
 
   int iVar1;
@@ -2362,13 +2426,13 @@ AIState_RovingTraffic::AIState_RovingTraffic(Car_tObj *carObj,trigger_t *trigger
   
 
 
-  this->_vf = (__vtbl_ptr_type (*) [4])AIState_RovingTraffic_vtable;
+  (this->_base_AIState_Base)._vf = (__vtbl_ptr_type (*) [4])AIState_RovingTraffic_vtable;
 
-  pCVar2 = this->carObj_;
+  pCVar2 = (this->_base_AIState_Base).carObj_;
 
-  this->path_ = *(trigger_pathPosition_t **)((char *)trigger + 0x3c);
+  this->path_ = *(trigger_pathPosition_t **)(trigger + 0x3c);
 
-  iVar1 = *(int *)((char *)trigger + 0x38);
+  iVar1 = *(int *)(trigger + 0x38);
 
   this->pathIndex_ = 0;
 
@@ -2391,12 +2455,11 @@ AIState_RovingTraffic::AIState_RovingTraffic(Car_tObj *carObj,trigger_t *trigger
 
 /* ---- CheckIfCarIsNearbyAndStop__21AIState_RovingTrafficP8Car_tObjRi  AIState_RovingTraffic::CheckIfCarIsNearbyAndStop  [AISTATE.CPP:1130-1169] SLD-VERIFIED ---- */
 
-void AIState_RovingTraffic::CheckIfCarIsNearbyAndStop(Car_tObj *otherCarObj,int &status_r)
+void AIState_RovingTraffic::CheckIfCarIsNearbyAndStop(Car_tObj *otherCarObj,int *status)
 
 
 
 {
-  int *status = &status_r;   /* R-ref param; alias keeps the pointer-form body codegen-identical */
   int distance;
   coorddef posDiff;
 
@@ -2404,50 +2467,63 @@ void AIState_RovingTraffic::CheckIfCarIsNearbyAndStop(Car_tObj *otherCarObj,int 
 
   int iVar2;
 
-  int iVar5;
+  int iVar3;
 
-  int sum;
+  int iVar4;
 
   Car_tObj *carObj;
 
+  int iVar5;
+
   
 
-  carObj = this->carObj_;
+  carObj = (this->_base_AIState_Base).carObj_;
 
-  if (carObj == otherCarObj) goto LAB_STATUS2;
+  if ((carObj == otherCarObj) || ((otherCarObj->N).active == '\0')) {
 
-  if ((otherCarObj->N).active == '\0') goto LAB_STATUS2;
+LAB_80071a40:
 
-  /* W54-A15: identity/opacity fence (0 insns) -- gcc otherwise proves the incoming $a1 still
-   * holds otherCarObj at the first SplineDistance call and DELETES the arg copy, leaving a
-   * nop in the jal slot; retail rematerializes `addu a1,s0,zero` there. */
-  __asm__("" : "=r"(otherCarObj) : "0"(otherCarObj));
-
-  distance = AIWorld_SplineDistance(carObj,otherCarObj);
-
-  if (0 < distance) {
-
-    distance = AIWorld_SplineDistance(this->carObj_,otherCarObj);
+    *status = 2;
 
   }
 
   else {
 
-    distance = -AIWorld_SplineDistance(this->carObj_,otherCarObj);
+    iVar1 = AIWorld_SplineDistance(carObj,otherCarObj);
 
-  }
+    if (iVar1 < 1) {
 
-  if (0xc0000 < distance) goto LAB_STATUS0;
+      iVar1 = AIWorld_SplineDistance((this->_base_AIState_Base).carObj_,otherCarObj);
 
-  iVar5 = otherCarObj->roadPosition;
+      iVar1 = -iVar1;
 
-  iVar2 = (this->carObj_)->roadPosition;
+    }
 
-  iVar1 = iVar2 - iVar5;
+    else {
 
-  if (0 < iVar1) {
+      iVar1 = AIWorld_SplineDistance((this->_base_AIState_Base).carObj_,otherCarObj);
 
-    if (0x9ffff < iVar1) {
+    }
+
+    if (0xc0000 < iVar1) {
+
+      *status = 0;
+
+      return;
+
+    }
+
+    iVar5 = ((this->_base_AIState_Base).carObj_)->roadPosition;
+
+    iVar1 = iVar5 - otherCarObj->roadPosition;
+
+    if (iVar1 < 1) {
+
+      if (0x9ffff < otherCarObj->roadPosition - iVar5) goto LAB_80071a40;
+
+    }
+
+    else if (0x9ffff < iVar1) {
 
       *status = 2;
 
@@ -2455,54 +2531,35 @@ void AIState_RovingTraffic::CheckIfCarIsNearbyAndStop(Car_tObj *otherCarObj,int 
 
     }
 
+    iVar1 = (otherCarObj->N).position.y;
+
+    iVar3 = (((this->_base_AIState_Base).carObj_)->N).position.y;
+
+    iVar5 = (otherCarObj->N).position.z;
+
+    iVar4 = (((this->_base_AIState_Base).carObj_)->N).position.z;
+
+    iVar2 = fixedmult((((this->_base_AIState_Base).carObj_)->N).orientMat.m[6],
+
+                       (otherCarObj->N).position.x - (((this->_base_AIState_Base).carObj_)->N).position.x)
+
+    ;
+
+    iVar1 = fixedmult((((this->_base_AIState_Base).carObj_)->N).orientMat.m[7],iVar1 - iVar3);
+
+    iVar5 = fixedmult((((this->_base_AIState_Base).carObj_)->N).orientMat.m[8],iVar5 - iVar4);
+
+    if (0 < iVar2 + iVar1 + iVar5) {
+
+      AudioClc_HonkHorn((this->_base_AIState_Base).carObj_,4,0x10,8);
+
+      ((this->_base_AIState_Base).carObj_)->desiredSpeed = 0;
+
+      *status = 1;
+
+    }
+
   }
-
-  else {
-
-    if (0x9ffff < iVar5 - iVar2) goto LAB_STATUS2;
-
-  }
-
-  posDiff.x = (otherCarObj->N).position.x - ((this->carObj_)->N).position.x;
-
-  posDiff.y = (otherCarObj->N).position.y - ((this->carObj_)->N).position.y;
-
-  posDiff.z = (otherCarObj->N).position.z - ((this->carObj_)->N).position.z;
-
-  sum = fixedmult(((this->carObj_)->N).orientMat.m[6],posDiff.x) +
-
-        fixedmult(((this->carObj_)->N).orientMat.m[7],posDiff.y) +
-
-        fixedmult(((this->carObj_)->N).orientMat.m[8],posDiff.z);
-
-  /* CORRECTNESS (w65-a2, REVERSES the w13-a5 note above it): retail's `blez $s0` at
-     0x80071A0C encodes offset 0x000F -> .L80071A4C = the EPILOGUE, NOT the
-     `sw $zero,0($s3)` one word earlier (.L80071A48, which only the
-     `0xC0000 < distance` guard's `bnez` at 0x80071930 reaches).  So retail leaves
-     *status UNTOUCHED on the sum<=0 path; `goto LAB_STATUS0` here wrote a 0 the
-     original never wrote.  The gate could never see it (verify_asm normalises every
-     branch TARGET to `T`); `tools/brdist.py` reported it as (9, 15, 16).  Bare
-     `return;` reproduces retail's branch word and drops the spurious store. */
-
-  if (sum <= 0) return;
-
-  AudioClc_HonkHorn(this->carObj_,4,0x10,8);
-
-  (this->carObj_)->desiredSpeed = 0;
-
-  *status = 1;
-
-  return;
-
-LAB_STATUS2:
-
-  *status = 2;
-
-  return;
-
-LAB_STATUS0:
-
-  *status = 0;
 
   return;
 
@@ -2518,6 +2575,9 @@ LAB_STATUS0:
 /* ---- Execute__21AIState_RovingTraffic  AIState_RovingTraffic::Execute  [AISTATE.CPP:1172-1224] SLD-VERIFIED ---- */
 
 void AIState_RovingTraffic::Execute()
+
+
+
 {
   int search;
   int status;
@@ -2525,7 +2585,19 @@ void AIState_RovingTraffic::Execute()
   coorddef carRelativeForLatPos;
   coorddef carRelativeForDistance;
 
+  trigger_pathPosition_t *ptVar1;
+
+  int *piVar2;
+
+  int iVar3;
+
   Car_tObj *pCVar4;
+
+  int iVar5;
+
+  int iVar6;
+
+  int iVar7;
 
   int iVar8;
 
@@ -2533,57 +2605,101 @@ void AIState_RovingTraffic::Execute()
 
   Car_tObj **ppCVar10;
 
-    /* W57-A11: SLD gives ONE retail line (1177) for the whole 3-word copy and the oracle
-     uses t0/t1/t2 -- that is gcc's movstrsi 12-byte STRUCT ASSIGNMENT, not three per-field
-     statements (catalog 3d(a)). */
-  this->carObj_->targetPos = this->path_[this->pathIndex_].position;
+  int local_20 [2];
 
-  (this->carObj_)->desiredSpeed = this->path_[this->pathIndex_].targetSpeed * 0x7247;
+  
 
-  /* W57-A11: SLD line 1183 = one struct assignment (movstrsi t0/t1/t2). */
-  centerBack = *(coorddef *)(AIState_BWorldSmSlices + this->carObj_->N.simRoadInfo.slice * 0x20);
+  pCVar4 = (this->_base_AIState_Base).carObj_;
 
-  carRelativeForLatPos.x = this->carObj_->targetPos.x - centerBack.x;
+  ptVar1 = this->path_ + this->pathIndex_;
 
-  carRelativeForLatPos.y = this->carObj_->targetPos.y - centerBack.y;
+  iVar8 = (ptVar1->position).y;
 
-  carRelativeForLatPos.z = this->carObj_->targetPos.z - centerBack.z;
+  iVar9 = (ptVar1->position).z;
 
-  /* gcc-2.x signed /256 idiom (bgez;addiu 0xFF;sra 8) -- write the plain division,
-     not a hand-rolled if(x<0)x+=0xff;x>>=8 -- reference_mips_isa_asm.md MULT/DIV section.
-     Statement order matches the oracle's interleave: div-pair, mult, div-pair, mult, ... */
+  (pCVar4->targetPos).x = (ptVar1->position).x;
 
-  this->carObj_->targetLatPos =
-      this->carObj_->N.roadMatrix.m[0] / 256 * (carRelativeForLatPos.x / 256) +
-      this->carObj_->N.roadMatrix.m[1] / 256 * (carRelativeForLatPos.y / 256) +
-      this->carObj_->N.roadMatrix.m[2] / 256 * (carRelativeForLatPos.z / 256);
+  (pCVar4->targetPos).y = iVar8;
 
-  carRelativeForDistance.x = this->carObj_->targetPos.x - this->carObj_->N.position.x;
+  (pCVar4->targetPos).z = iVar9;
 
-  iVar9 = carRelativeForDistance.x >> 0xc;
+  ((this->_base_AIState_Base).carObj_)->desiredSpeed = this->path_[this->pathIndex_].targetSpeed * 0x7247;
 
-  carRelativeForDistance.y = this->carObj_->targetPos.y - this->carObj_->N.position.y;
+  piVar2 = (int *)((((this->_base_AIState_Base).carObj_)->N).simRoadInfo.slice * 0x20 + (int)BWorldSm_slices);
 
-  carRelativeForDistance.z = this->carObj_->targetPos.z - this->carObj_->N.position.z;
+  iVar8 = (((this->_base_AIState_Base).carObj_)->targetPos).x - *piVar2;
 
-  iVar8 = carRelativeForDistance.z >> 0xc;
+  iVar9 = (((this->_base_AIState_Base).carObj_)->targetPos).y - piVar2[1];
 
-  carRelativeForDistance.x = iVar9;
+  iVar3 = (((this->_base_AIState_Base).carObj_)->targetPos).z - piVar2[2];
 
-  carRelativeForDistance.z = iVar8;
+  pCVar4 = (this->_base_AIState_Base).carObj_;
 
-  if (carRelativeForDistance.x * carRelativeForDistance.x +
-      carRelativeForDistance.z * carRelativeForDistance.z < 10000) {
+  iVar5 = (pCVar4->N).roadMatrix.m[0];
+
+  if (iVar5 < 0) {
+
+    iVar5 = iVar5 + 0xff;
+
+  }
+
+  if (iVar8 < 0) {
+
+    iVar8 = iVar8 + 0xff;
+
+  }
+
+  iVar6 = (pCVar4->N).roadMatrix.m[1];
+
+  if (iVar6 < 0) {
+
+    iVar6 = iVar6 + 0xff;
+
+  }
+
+  if (iVar9 < 0) {
+
+    iVar9 = iVar9 + 0xff;
+
+  }
+
+  iVar7 = (pCVar4->N).roadMatrix.m[2];
+
+  if (iVar7 < 0) {
+
+    iVar7 = iVar7 + 0xff;
+
+  }
+
+  if (iVar3 < 0) {
+
+    iVar3 = iVar3 + 0xff;
+
+  }
+
+  pCVar4->targetLatPos =
+
+       (iVar5 >> 8) * (iVar8 >> 8) + (iVar6 >> 8) * (iVar9 >> 8) + (iVar7 >> 8) * (iVar3 >> 8);
+
+  pCVar4 = (this->_base_AIState_Base).carObj_;
+
+  iVar9 = (pCVar4->targetPos).x - (pCVar4->N).position.x >> 0xc;
+
+  pCVar4 = (this->_base_AIState_Base).carObj_;
+
+  iVar8 = (pCVar4->targetPos).z - (pCVar4->N).position.z >> 0xc;
+
+  if (iVar9 * iVar9 + iVar8 * iVar8 < 10000) {
 
     if (this->waitTick_ == 0) {
 
-      this->waitTick_ = AIState_SimGlobalWords[1] + this->path_[this->pathIndex_].waitTime;
+      this->waitTick_ = simGlobal.gameTicks + this->path_[this->pathIndex_].waitTime;
 
     }
 
-    if (AIState_SimGlobalWords[1] < this->waitTick_) {
+    if (simGlobal.gameTicks < this->waitTick_) {
 
-      (this->carObj_)->desiredSpeed = 0;
+      ((this->_base_AIState_Base).carObj_)->desiredSpeed = 0;
 
     }
 
@@ -2597,49 +2713,41 @@ void AIState_RovingTraffic::Execute()
 
   }
 
-  status = 2;
+  local_20[0] = 2;
 
-  search = (this->carObj_)->sortIndex + 1;
+  iVar8 = ((this->_base_AIState_Base).carObj_)->sortIndex + 1;
 
-  ppCVar10 = Cars_gSortedList + search;
+  ppCVar10 = Cars_gSortedList + iVar8;
 
-  /* EXIT-IN-THE-MIDDLE (catalog §B row 51/56) -- oracle keeps a single TOP-test
-     block reached both by fallthrough and by an unconditional j back-edge; a
-     natural while(cond){...} gets ROTATED by gcc to a bottom bnez-test. */
-
-  while (true) {
-
-    if (!(search < Cars_gNumCars && (status == 2))) break;
+  while ((iVar8 < Cars_gNumCars && (local_20[0] == 2))) {
 
     pCVar4 = *ppCVar10;
 
-    this->CheckIfCarIsNearbyAndStop(pCVar4,status);
-
     ppCVar10 = ppCVar10 + 1;
 
-    search = search + 1;
+    iVar8 = iVar8 + 1;
+
+    this->CheckIfCarIsNearbyAndStop(pCVar4,local_20);
 
   }
 
-  if (status != 1) {
+  if (local_20[0] != 1) {
 
-    status = 2;
+    local_20[0] = 2;
 
-    search = (this->carObj_)->sortIndex + -1;
+    iVar8 = ((this->_base_AIState_Base).carObj_)->sortIndex + -1;
 
-    ppCVar10 = Cars_gSortedList + search;
+    ppCVar10 = Cars_gSortedList + iVar8;
 
-    while (true) {
-
-      if (!(-1 < search && (status == 2))) break;
+    while ((-1 < iVar8 && (local_20[0] == 2))) {
 
       pCVar4 = *ppCVar10;
 
-      this->CheckIfCarIsNearbyAndStop(pCVar4,status);
-
       ppCVar10 = ppCVar10 + -1;
 
-      search = search + -1;
+      iVar8 = iVar8 + -1;
+
+      this->CheckIfCarIsNearbyAndStop(pCVar4,local_20);
 
     }
 
@@ -2657,10 +2765,8 @@ void AIState_RovingTraffic::Execute()
 
 
 /* ---- _._14AIState_Donuts  AIState_Donuts::dtor  [AISTATE.CPP:1248-1253] SLD-VERIFIED ---- */
-/* reconstructed as extern "C" ___14AIState_Donuts(AIState_Donuts*,int) free fn -- see
-   AIState_Chase dtor comment for why (real per-class deleting dtor in the oracle). */
 
-extern "C" void ___14AIState_Donuts(AIState_Donuts *pThis,int __in_chrg)
+AIState_Donuts::~AIState_Donuts()
 
 
 
@@ -2669,10 +2775,11 @@ extern "C" void ___14AIState_Donuts(AIState_Donuts *pThis,int __in_chrg)
   Car_tObj *pCVar1;
 
 
+  
 
-  pCVar1 = pThis->carObj_;
+  pCVar1 = (this->_base_AIState_Base).carObj_;
 
-  pThis->_vf = (__vtbl_ptr_type (*) [4])AIState_Donuts_vtable;
+  (this->_base_AIState_Base)._vf = (__vtbl_ptr_type (*) [4])AIState_Donuts_vtable;
 
   (pCVar1->targetPos).z = 0;
 
@@ -2680,15 +2787,12 @@ extern "C" void ___14AIState_Donuts(AIState_Donuts *pThis,int __in_chrg)
 
   (pCVar1->targetPos).x = 0;
 
-  (pThis->carObj_)->targetLatPos = 0;
+  ((this->_base_AIState_Base).carObj_)->targetLatPos = 0;
 
-  (pThis->carObj_)->donutMode = 0;
+  ((this->_base_AIState_Base).carObj_)->donutMode = 0;
 
-  pThis->_vf = (__vtbl_ptr_type (*) [4])AIState_Base_vtable;
+  (this->_base_AIState_Base)._vf = (__vtbl_ptr_type (*) [4])((char *)AIState_Donuts_vtable + 8);
 
-  if ((__in_chrg & 1U) != 0) {
-    __builtin_delete(pThis);
-  }
 
   return;
 
@@ -2702,11 +2806,6 @@ extern "C" void ___14AIState_Donuts(AIState_Donuts *pThis,int __in_chrg)
 
 
 /* ---- Execute__14AIState_Donuts  AIState_Donuts::Execute  [AISTATE.CPP:1256-1334] SLD-VERIFIED ---- */
-/* PASS (319 insns): IDA's retail register annotations and the SYM SLD line trace
-   recovered the real locals, scopes, and statement boundaries.  The candidate
-   fence must precede the copy so the copy fills the jump delay slot; spelling
-   the slice-table access as an integer byte address gives forwardSlice/result
-   v0 and the table base v1, matching retail's allocation. */
 
 void AIState_Donuts::Execute()
 
@@ -2719,84 +2818,192 @@ void AIState_Donuts::Execute()
   int latPos;
   int slice;
   int forwardDot;
+  int forwardSlice;
+  int dCarToCenter;
 
+  int iVar1;
 
+  int iVar2;
 
-  {
-    Car_tObj *carObj = this->carObj_;
+  int iVar3;
 
-    slice = (int)carObj->N.simRoadInfo.slice;
+  int iVar4;
 
-    forwardDot =
-        (carObj->N.orientMat.m[6] / 256) * (carObj->N.roadMatrix.m[6] / 256) +
-        (carObj->N.orientMat.m[7] / 256) * (carObj->N.roadMatrix.m[7] / 256) +
-        (carObj->N.orientMat.m[8] / 256) * (carObj->N.roadMatrix.m[8] / 256);
+  int *piVar5;
 
-    if (forwardDot > 0) {
+  Car_tObj *pCVar6;
 
-      forwardDot = 1;
+  int iVar7;
 
-    }
+  int iVar8;
 
-    else {
+  int iVar9;
 
-      forwardDot = -1;
+  Car_tObj *pCVar10;
 
-    }
+  int iVar11;
 
-    carObj->desiredDirection = carObj->direction = forwardDot;
+  coorddef local_20;
+
+  
+
+  pCVar10 = (this->_base_AIState_Base).carObj_;
+
+  iVar7 = (pCVar10->N).orientMat.m[6];
+
+  iVar11 = (int)(pCVar10->N).simRoadInfo.slice;
+
+  if (iVar7 < 0) {
+
+    iVar7 = iVar7 + 0xff;
+
   }
+
+  iVar1 = (pCVar10->N).roadMatrix.m[6];
+
+  if (iVar1 < 0) {
+
+    iVar1 = iVar1 + 0xff;
+
+  }
+
+  iVar8 = (pCVar10->N).orientMat.m[7];
+
+  if (iVar8 < 0) {
+
+    iVar8 = iVar8 + 0xff;
+
+  }
+
+  iVar2 = (pCVar10->N).roadMatrix.m[7];
+
+  if (iVar2 < 0) {
+
+    iVar2 = iVar2 + 0xff;
+
+  }
+
+  iVar9 = (pCVar10->N).orientMat.m[8];
+
+  if (iVar9 < 0) {
+
+    iVar9 = iVar9 + 0xff;
+
+  }
+
+  iVar3 = (pCVar10->N).roadMatrix.m[8];
+
+  if (iVar3 < 0) {
+
+    iVar3 = iVar3 + 0xff;
+
+  }
+
+  iVar4 = 1;
+
+  if ((iVar7 >> 8) * (iVar1 >> 8) + (iVar8 >> 8) * (iVar2 >> 8) + (iVar9 >> 8) * (iVar3 >> 8) < 1) {
+
+    iVar4 = -1;
+
+  }
+
+  pCVar10->direction = iVar4;
+
+  pCVar10->desiredDirection = iVar4;
 
   if ((this->donutMode_ == 1) || (this->donutMode_ == 3)) {
 
-    int forwardSlice;
-    int forwardDot;
-    int dCarToCenter;
-    int numSlicesLess3;
+    pCVar10 = (this->_base_AIState_Base).carObj_;
 
-    forwardDot =
-        (this->carObj_->N.orientMat.m[6] / 256) * (this->carObj_->N.roadMatrix.m[6] / 256) +
-        (this->carObj_->N.orientMat.m[7] / 256) * (this->carObj_->N.roadMatrix.m[7] / 256) +
-        (this->carObj_->N.orientMat.m[8] / 256) * (this->carObj_->N.roadMatrix.m[8] / 256);
+    iVar7 = (pCVar10->N).orientMat.m[6];
 
-    if (0 <= forwardDot)
+    if (iVar7 < 0) {
+
+      iVar7 = iVar7 + 0xff;
+
+    }
+
+    iVar1 = (pCVar10->N).roadMatrix.m[6];
+
+    if (iVar1 < 0) {
+
+      iVar1 = iVar1 + 0xff;
+
+    }
+
+    iVar8 = (pCVar10->N).orientMat.m[7];
+
+    if (iVar8 < 0) {
+
+      iVar8 = iVar8 + 0xff;
+
+    }
+
+    iVar2 = (pCVar10->N).roadMatrix.m[7];
+
+    if (iVar2 < 0) {
+
+      iVar2 = iVar2 + 0xff;
+
+    }
+
+    iVar9 = (pCVar10->N).orientMat.m[8];
+
+    if (iVar9 < 0) {
+
+      iVar9 = iVar9 + 0xff;
+
+    }
+
+    iVar3 = (pCVar10->N).roadMatrix.m[8];
+
+    if (iVar3 < 0) {
+
+      iVar3 = iVar3 + 0xff;
+
+    }
+
+    iVar4 = iVar11 + 3;
+
+    if ((iVar7 >> 8) * (iVar1 >> 8) + (iVar8 >> 8) * (iVar2 >> 8) + (iVar9 >> 8) * (iVar3 >> 8) < 0)
 
     {
-      int candidateSlice = slice + 3;
-      /* W54-A15: identity/opacity fence (0 insns) -- otherwise local-alloc TIES candidateSlice
-       * to forwardSlice, the then-arm becomes EMPTY and gcc inverts the branch (ours 317 vs
-       * retail 319: retail keeps `addu v0,v1,zero; j` as a real arm and branches `beqz`). */
-      if (candidateSlice < gNumSlices) {
-        __asm__("" : : "r"(candidateSlice));
-        forwardSlice = candidateSlice;
-      }
-      else {
-        numSlicesLess3 = gNumSlices - 3;
-        forwardSlice = slice - numSlicesLess3;
+
+      iVar4 = iVar11 + -3;
+
+      if (iVar4 < 0) {
+
+        iVar4 = iVar11 + gNumSlices + -3;
+
       }
 
     }
 
-    else {
+    else if (gNumSlices <= iVar4) {
 
-      forwardSlice = slice + -3;
-      if (forwardSlice < 0) {
-        numSlicesLess3 = gNumSlices - 3;
-        forwardSlice = slice + numSlicesLess3;
-      }
+      iVar4 = iVar11 - (gNumSlices + -3);
 
     }
 
-    {
-      coorddef &sliceCenter = *(coorddef *)((forwardSlice << 5) + (int)AIState_BWorldSmSlices);
-      targetPos = sliceCenter;
+    piVar5 = (int *)(iVar4 * 0x20 + (int)BWorldSm_slices);
+
+    local_20.x = *piVar5;
+
+    local_20.y = piVar5[1];
+
+    local_20.z = piVar5[2];
+
+    iVar7 = ((this->_base_AIState_Base).carObj_)->roadPosition;
+
+    if (iVar7 < 0) {
+
+      iVar7 = -iVar7;
+
     }
 
-    dCarToCenter = __builtin_abs(this->carObj_->roadPosition);
+    iVar1 = 0;
 
-    latPos = 0;
-
-    if ((this->donutMode_ == 1) && (dCarToCenter < 0x28000)) {
+    if ((this->donutMode_ == 1) && (iVar7 < 0x28000)) {
 
       this->donutMode_ = 2;
 
@@ -2806,9 +3013,11 @@ void AIState_Donuts::Execute()
 
   else {
 
-    this->donutLookForward_ -= 0x10000;
+    iVar7 = this->donutLookForward_ + -0x10000;
 
-    if (this->donutLookForward_ < 0x8000) {
+    this->donutLookForward_ = iVar7;
+
+    if (iVar7 < 0x8000) {
 
       randtemp = fastRandom * randSeed;
 
@@ -2818,60 +3027,65 @@ void AIState_Donuts::Execute()
 
     }
 
-    /* SYM: right/forward/targetPos are real coorddef locals -- right = scaled local
-       right-axis (orientMat row0), forward = scaled local forward-axis (orientMat row2
-       via donutLookForward_), targetPos = position + right + forward. */
+    pCVar10 = (this->_base_AIState_Base).carObj_;
 
-    right = *(coorddef *)&this->carObj_->N.orientMat.m[0];
+    iVar1 = (pCVar10->N).orientMat.m[1];
 
-    forward = *(coorddef *)&this->carObj_->N.orientMat.m[6];
+    iVar8 = (pCVar10->N).orientMat.m[2];
 
-    right.x = fixedmult(0x60000,right.x);
+    pCVar6 = (this->_base_AIState_Base).carObj_;
 
-    right.y = fixedmult(0x60000,right.y);
+    iVar2 = (pCVar6->N).orientMat.m[6];
 
-    right.z = fixedmult(0x60000,right.z);
+    iVar9 = (pCVar6->N).orientMat.m[7];
 
-    forward.x = fixedmult(this->donutLookForward_,forward.x);
+    iVar3 = (pCVar6->N).orientMat.m[8];
 
-    forward.y = fixedmult(this->donutLookForward_,forward.y);
+    iVar7 = fixedmult(0x60000,(pCVar10->N).orientMat.m[0]);
 
-    forward.z = fixedmult(this->donutLookForward_,forward.z);
+    iVar1 = fixedmult(0x60000,iVar1);
 
-    targetPos.x = ((this->carObj_)->N).position.x + right.x;
+    iVar8 = fixedmult(0x60000,iVar8);
 
-    targetPos.y = ((this->carObj_)->N).position.y + right.y;
+    iVar2 = fixedmult(this->donutLookForward_,iVar2);
 
-    targetPos.z = ((this->carObj_)->N).position.z + right.z;
+    iVar9 = fixedmult(this->donutLookForward_,iVar9);
 
-    targetPos.x = targetPos.x + forward.x;
+    local_20.z = fixedmult(this->donutLookForward_,iVar3);
 
-    targetPos.y = targetPos.y + forward.y;
+    local_20.x = (((this->_base_AIState_Base).carObj_)->N).position.x + iVar7 + iVar2;
 
-    targetPos.z = targetPos.z + forward.z;
+    local_20.y = (((this->_base_AIState_Base).carObj_)->N).position.y + iVar1 + iVar9;
 
-    latPos = Newton_CalculateRoadPositionFromSliceAndPosition(
-        (int)this->carObj_->N.simRoadInfo.slice,&targetPos,&this->carObj_->N.roadMatrix);
+    local_20.z = (((this->_base_AIState_Base).carObj_)->N).position.z + iVar8 + local_20.z;
 
-    if (this->carObj_->roadPosition < 0) {
+    pCVar10 = (this->_base_AIState_Base).carObj_;
 
-      if (this->carObj_->roadPosition - 0x20000 <
-          -((AISTATE_SLICE_BYTE(slice,0x1e) << 15) *
-            (AISTATE_SLICE_BYTE(slice,0x1d) >> 4))) goto LAB_800722e8;
+    iVar1 = Newton_CalculateRoadPositionFromSliceAndPosition((int)(pCVar10->N).simRoadInfo.slice,&local_20,&(pCVar10->N).roadMatrix);
 
-      goto LAB_800722ec;
+    iVar7 = ((this->_base_AIState_Base).carObj_)->roadPosition;
+
+    if (iVar7 < 0) {
+
+      iVar11 = iVar11 * 0x20 + (int)BWorldSm_slices;
+
+      if ((int)-((u_int)*(u_char *)(iVar11 + 0x1e) * 0x8000 * (u_int)(*(u_char *)(iVar11 + 0x1d) >> 4)) <=
+
+          iVar7 + -0x20000) goto LAB_800722ec;
 
     }
 
     else {
 
-      if (!((AISTATE_SLICE_BYTE(slice,0x1f) << 15) *
-            (AISTATE_SLICE_BYTE(slice,0x1d) & 0xf) <
-            this->carObj_->roadPosition + 0x20000)) goto LAB_800722ec;
+      iVar11 = iVar11 * 0x20 + (int)BWorldSm_slices;
+
+      if (iVar7 + 0x20000 <=
+
+          (int)((u_int)*(u_char *)(iVar11 + 0x1f) * 0x8000 * (*(u_char *)(iVar11 + 0x1d) & 0xf)))
+
+      goto LAB_800722ec;
 
     }
-
-LAB_800722e8:
 
     this->donutMode_ = 1;
 
@@ -2879,19 +3093,25 @@ LAB_800722e8:
 
 LAB_800722ec:
 
-  (this->carObj_)->donutMode = this->donutMode_;
+  ((this->_base_AIState_Base).carObj_)->donutMode = this->donutMode_;
 
-  AI_GenericBeginCycle(this->carObj_);
+  AI_GenericBeginCycle((this->_base_AIState_Base).carObj_);
 
-  AI_GenericCycle(this->carObj_);
+  AI_GenericCycle((this->_base_AIState_Base).carObj_);
 
-  AI_GenericEndCycle(this->carObj_);
+  AI_GenericEndCycle((this->_base_AIState_Base).carObj_);
 
-  this->carObj_->targetPos = targetPos;
+  pCVar10 = (this->_base_AIState_Base).carObj_;
 
-  (this->carObj_)->targetLatPos = latPos;
+  (pCVar10->targetPos).x = local_20.x;
 
-  (this->carObj_)->desiredSpeed = 0x471c7;
+  (pCVar10->targetPos).y = local_20.y;
+
+  (pCVar10->targetPos).z = local_20.z;
+
+  ((this->_base_AIState_Base).carObj_)->targetLatPos = iVar1;
+
+  ((this->_base_AIState_Base).carObj_)->desiredSpeed = 0x471c7;
 
   return;
 
@@ -2907,11 +3127,11 @@ LAB_800722ec:
 /* ---- __17AIState_GotoSliceP8Car_tObjii  AIState_GotoSlice::ctor  [AISTATE.CPP:1348-1351] SLD-VERIFIED ---- */
 
 AIState_GotoSlice::AIState_GotoSlice(Car_tObj *carObj,int targetSlice,int stopWhenArrivedAtSlice)
-  : AIState_Normal(carObj)
+  : _base_AIState_Normal(carObj)
 {
 
 
-  this->_vf = (__vtbl_ptr_type (*) [4])AIState_GotoSlice_vtable;
+  (this->_base_AIState_Normal)._base_AIState_Base._vf = (__vtbl_ptr_type (*) [4])AIState_GotoSlice_vtable;
 
   this->targetSlice_ = targetSlice;
 
@@ -2936,85 +3156,94 @@ void AIState_GotoSlice::Execute()
 
 {
   int longMetersBetween;
+  int distMeters;
+  int cap;
 
-  longMetersBetween = AIWorld_ApxSplineDistance(this->targetSlice_,this->carObj_);
+  bool bVar1;
 
-  if (-1 < longMetersBetween) {
+  int iVar2;
 
-    (this->carObj_)->desiredDirection = 1;
+  Car_tObj *pCVar3;
+
+  int iVar4;
+
+  
+
+  iVar2 = AIWorld_ApxSplineDistance(this->targetSlice_,(this->_base_AIState_Normal)._base_AIState_Base.carObj_);
+
+  if (iVar2 < 0) {
+
+    ((this->_base_AIState_Normal)._base_AIState_Base.carObj_)->desiredDirection = -1;
 
   }
 
   else {
 
-    (this->carObj_)->desiredDirection = -1;
+    ((this->_base_AIState_Normal)._base_AIState_Base.carObj_)->desiredDirection = 1;
 
   }
 
-  this->AIState_Normal::Execute();
+  this->_base_AIState_Normal.Execute();
 
   if (this->stopWhenArrivedAtSlice_ != 0) {
-    int distMeters;
-    int cap;
 
-    distMeters = __builtin_abs(longMetersBetween);
+    if (iVar2 < 0) {
 
-    cap = 0xc80000;
-
-    if (distMeters < 0xc0000) {
-
-      cap = 0x40000;
+      iVar2 = -iVar2;
 
     }
 
-    else if (distMeters < 0x320000) {
+    iVar4 = 0xc80000;
 
-      cap = 0x140000;
+    if (iVar2 < 0xc0000) {
 
-    }
-
-    else if (distMeters < 0x960000) {
-
-      cap = 0x280000;
+      iVar4 = 0x40000;
 
     }
 
-    else if (distMeters < 0x1900000) {
+    else if (iVar2 < 0x320000) {
 
-      cap = 0x500000;
+      iVar4 = 0x140000;
 
     }
 
-    /* W54-A15: retail's two signed arms each build a LIMIT (a2) and a boolean (v0) and then
-       share ONE tail `if (inRange) limit = speed; carObj->desiredSpeed = limit;` -- the
-       cross-jumped shape (oracle: `bltz a3,Lneg [a2=cap]` / `j Ltest [slt v0,a3,a2]` /
-       `negu a2,a0; slt v0,a2,a3` / `beqz v0; nop; addu a2,a3,zero; sw a2`).  The previous
-       per-arm field-assignment form duplicated the tail (74 vs 70 insns). */
-    {
-      Car_tObj *carObj = this->carObj_;
-      int desiredSpeed = carObj->desiredSpeed;
-      /* W54-A15 REF-STEP (reqdelta): +1 ref on carObj (3->4 = the floor_log2 1->2 step) is the
-         MINIMAL dial that moves the speed CAP off $a3 onto retail's $a0 (and desiredSpeed
-         a2->a3); 0 insns. */
-      __asm__("" : : "r"(carObj));
-      int limit;
-      int inRange;
+    else if (iVar2 < 0x960000) {
 
-      if (desiredSpeed >= 0) {
-        limit = cap;
-        inRange = desiredSpeed < limit;
-      } else {
-        limit = -cap;
-        inRange = limit < desiredSpeed;
-      }
-      /* W54-A15 REF-STEP #2 (reqdelta): +1 ref on inRange (3->4 floor_log2 step) rotates the
-         desiredSpeed/limit/inRange trio onto retail's $a3/$a2/$v0; 0 insns. */
-      __asm__("" : : "r"(inRange));
-      if (inRange) {
-        limit = desiredSpeed;
-      }
-      carObj->desiredSpeed = limit;
+      iVar4 = 0x280000;
+
     }
+
+    else if (iVar2 < 0x1900000) {
+
+      iVar4 = 0x500000;
+
+    }
+
+    pCVar3 = (this->_base_AIState_Normal)._base_AIState_Base.carObj_;
+
+    iVar2 = pCVar3->desiredSpeed;
+
+    if (iVar2 < 0) {
+
+      iVar4 = -iVar4;
+
+      bVar1 = iVar4 < iVar2;
+
+    }
+
+    else {
+
+      bVar1 = iVar2 < iVar4;
+
+    }
+
+    if (bVar1) {
+
+      iVar4 = iVar2;
+
+    }
+
+    pCVar3->desiredSpeed = iVar4;
 
   }
 
@@ -3042,7 +3271,7 @@ int AIState_GotoSlice::InTargetSliceRange(int rangeMeters)
 
   
 
-  iVar1 = AIWorld_ApxSplineDistance(this->carObj_,this->targetSlice_);
+  iVar1 = AIWorld_ApxSplineDistance((this->_base_AIState_Normal)._base_AIState_Base.carObj_,this->targetSlice_);
 
   if (iVar1 < 0) {
 
@@ -3064,11 +3293,11 @@ int AIState_GotoSlice::InTargetSliceRange(int rangeMeters)
 /* ---- __14AIState_CruiseP8Car_tObj12cruiseMode_ti  AIState_Cruise::ctor  [AISTATE.CPP:1403-1408] SLD-VERIFIED ---- */
 
 AIState_Cruise::AIState_Cruise(Car_tObj *carObj,cruiseMode_t cruiseMode,int speedOrFactor)
-  : AIState_Normal(carObj)
+  : _base_AIState_Normal(carObj)
 {
 
 
-  this->_vf = (__vtbl_ptr_type (*) [4])AIState_Cruise_vtable;
+  (this->_base_AIState_Normal)._base_AIState_Base._vf = (__vtbl_ptr_type (*) [4])AIState_Cruise_vtable;
 
   this->cruiseMode_ = cruiseMode;
 
@@ -3111,43 +3340,43 @@ void AIState_Cruise::Execute()
 
   
 
-  cVar2 = this->cruiseMode_;
+  cVar2 = (cruiseMode_t)this->cruiseMode_;
 
-  switch (cVar2) {
+  if (cVar2 == 1) {
 
-  case CRUISE_ATSETSPEED:
+    AISpeeds_CalcDesiredSpeed((this->_base_AIState_Normal)._base_AIState_Base.carObj_);
 
-    pCVar3 = this->carObj_;
-
-    pCVar3->desiredSpeed = this->cruiseSpeed_ * pCVar3->direction;
-
-    break;
-
-  case CRUISE_ATFACTOR:
-
-    AISpeeds_CalcDesiredSpeed(this->carObj_);
-
-    iVar1 = fixedmult((this->carObj_)->desiredSpeed,
+    iVar1 = fixedmult(((this->_base_AIState_Normal)._base_AIState_Base.carObj_)->desiredSpeed,
 
                        this->cruiseFactor_);
 
-    (this->carObj_)->desiredSpeed = iVar1;
-
-    break;
-
-  case CRUISE_ATTRAFFICSPEED:
-
-    AISpeeds_CalcTrafficTopSpeed(this->carObj_);
-
-    break;
+    ((this->_base_AIState_Normal)._base_AIState_Base.carObj_)->desiredSpeed = iVar1;
 
   }
 
-  AI_GenericBeginCycle(this->carObj_);
+  else if ((int)cVar2 < 2) {
 
-  AI_GenericCycle(this->carObj_);
+    if (cVar2 == 0) {
 
-  AI_GenericEndCycle(this->carObj_);
+      pCVar3 = (this->_base_AIState_Normal)._base_AIState_Base.carObj_;
+
+      pCVar3->desiredSpeed = this->cruiseSpeed_ * pCVar3->direction;
+
+    }
+
+  }
+
+  else if (cVar2 == 2) {
+
+    AISpeeds_CalcTrafficTopSpeed((this->_base_AIState_Normal)._base_AIState_Base.carObj_);
+
+  }
+
+  AI_GenericBeginCycle((this->_base_AIState_Normal)._base_AIState_Base.carObj_);
+
+  AI_GenericCycle((this->_base_AIState_Normal)._base_AIState_Base.carObj_);
+
+  AI_GenericEndCycle((this->_base_AIState_Normal)._base_AIState_Base.carObj_);
 
   return;
 
@@ -3161,21 +3390,18 @@ void AIState_Cruise::Execute()
 
 
 /* ---- _._14AIState_Cruise  AIState_Cruise::dtor  [AISTATE.CPP:?] SLD-FLAG:NO_SLD ---- */
-/* reconstructed as extern "C" ___14AIState_Cruise(AIState_Cruise*,int) free fn -- see
-   AIState_Chase dtor comment for why (real per-class deleting dtor in the oracle). */
 
-extern "C" void ___14AIState_Cruise(AIState_Cruise *pThis,int __in_chrg)
+AIState_Cruise::~AIState_Cruise()
 
 
 
 {
 
 
-  pThis->_vf = (__vtbl_ptr_type (*) [4])AIState_Base_vtable;
+  
 
-  if ((__in_chrg & 1U) != 0) {
-    __builtin_delete(pThis);
-  }
+  (this->_base_AIState_Normal)._base_AIState_Base._vf = (__vtbl_ptr_type (*) [4])((char *)AIState_Cruise_vtable + 8);
+
 
   return;
 
@@ -3189,21 +3415,18 @@ extern "C" void ___14AIState_Cruise(AIState_Cruise *pThis,int __in_chrg)
 
 
 /* ---- _._17AIState_GotoSlice  AIState_GotoSlice::dtor  [AISTATE.CPP:?] SLD-FLAG:NO_SLD ---- */
-/* reconstructed as extern "C" ___17AIState_GotoSlice(AIState_GotoSlice*,int) free fn -- see
-   AIState_Chase dtor comment for why (real per-class deleting dtor in the oracle). */
 
-extern "C" void ___17AIState_GotoSlice(AIState_GotoSlice *pThis,int __in_chrg)
+AIState_GotoSlice::~AIState_GotoSlice()
 
 
 
 {
 
 
-  pThis->_vf = (__vtbl_ptr_type (*) [4])AIState_Base_vtable;
+  
 
-  if ((__in_chrg & 1U) != 0) {
-    __builtin_delete(pThis);
-  }
+  (this->_base_AIState_Normal)._base_AIState_Base._vf = (__vtbl_ptr_type (*) [4])((char *)AIState_GotoSlice_vtable + 8);
+
 
   return;
 
@@ -3236,12 +3459,8 @@ int AIState_RovingTraffic::TestForRelease()
 
 
 /* ---- _._21AIState_RovingTraffic  AIState_RovingTraffic::dtor  [AISTATE.CPP:?] SLD-FLAG:NO_SLD ---- */
-/* reconstructed as extern "C" ___21AIState_RovingTraffic(AIState_RovingTraffic*,int) free fn
-   -- see AIState_Chase dtor comment for why (real per-class deleting dtor in the oracle).
-   MATCH: fresh pCVar2 for the carFlags RMW (3 distinct carObj_ pseudos) -- see the
-   AIState_Offroad dtor MATCH note. 25->0. */
 
-extern "C" void ___21AIState_RovingTraffic(AIState_RovingTraffic *pThis,int __in_chrg)
+AIState_RovingTraffic::~AIState_RovingTraffic()
 
 
 
@@ -3249,13 +3468,12 @@ extern "C" void ___21AIState_RovingTraffic(AIState_RovingTraffic *pThis,int __in
 
   Car_tObj *pCVar1;
 
-  Car_tObj *pCVar2;
 
+  
 
+  pCVar1 = (this->_base_AIState_Base).carObj_;
 
-  pCVar1 = pThis->carObj_;
-
-  pThis->_vf = (__vtbl_ptr_type (*) [4])AIState_RovingTraffic_vtable;
+  (this->_base_AIState_Base)._vf = (__vtbl_ptr_type (*) [4])AIState_RovingTraffic_vtable;
 
   (pCVar1->targetPos).z = 0;
 
@@ -3263,17 +3481,14 @@ extern "C" void ___21AIState_RovingTraffic(AIState_RovingTraffic *pThis,int __in
 
   (pCVar1->targetPos).x = 0;
 
-  (pThis->carObj_)->targetLatPos = 0;
+  ((this->_base_AIState_Base).carObj_)->targetLatPos = 0;
 
-  pCVar2 = pThis->carObj_;
+  pCVar1 = (this->_base_AIState_Base).carObj_;
 
-  pCVar2->carFlags = pCVar2->carFlags & 0xfffff7ff;
+  pCVar1->carFlags = pCVar1->carFlags & 0xfffff7ff;
 
-  pThis->_vf = (__vtbl_ptr_type (*) [4])AIState_Base_vtable;
+  (this->_base_AIState_Base)._vf = (__vtbl_ptr_type (*) [4])((char *)AIState_RovingTraffic_vtable + 8);
 
-  if ((__in_chrg & 1U) != 0) {
-    __builtin_delete(pThis);
-  }
 
   return;
 
@@ -3286,22 +3501,11 @@ extern "C" void ___21AIState_RovingTraffic(AIState_RovingTraffic *pThis,int __in
 
 
 
-/* ---- func_80072750  AIState_NonActive::Execute  [rule-8, w30-a2] ----
-   SECOND compiled instance of AIState_NonActive::Execute (empty body) -- the OLD-ABI
-   vague-linkage duplicate sitting immediately next to func_80072758/func_80072830/func_80072838
-   below. Every canonical name (Execute__17AIState_NonActive/___17AIState_NonActive/
-   TestForRelease__12AIState_Base) is already claimed by a DIFFERENT VA
-   (0x8005F624/0x8005F62C/0x8005B4C4 -- see configs/symbol_addrs.txt), so this instance keeps
-   its func_<VA> identity (extern-C name can't collide) with the real identity in this comment.
-   [2026-08-03 NAME-FIX: the four same-TU duplicates now carry VA-SUFFIXED real names
-   (Execute__17AIState_NonActive_80072750 etc.) on BOTH sides -- unique at the symbol level
-   (one obj cannot hold two same-named globals; the canonicals live in THIS TU), real at the
-   display level; renamed in symbol_addrs + asm labels/refs/rodata vtable words + expected
-   obj (objcopy).  The four banners keep their historical func_ text.]
-   PROOF: asm/data/rdata_80054548.rodata.s @0x800555AC (AIState_NonActive_vtable Execute slot,
-   D_800555A0+0xC) holds the literal word `func_80072750`. */
+/* ---- Execute__17AIState_NonActive  AIState_NonActive::Execute  [AISTATE.CPP:?] SLD-FLAG:NO_SLD ---- */
 
-extern "C" void Execute__17AIState_NonActive_80072750(AIState_NonActive *pThis)
+void AIState_NonActive::Execute()
+
+
 
 {
 
@@ -3312,44 +3516,42 @@ extern "C" void Execute__17AIState_NonActive_80072750(AIState_NonActive *pThis)
 
 
 
-/* ---- func_80072758  AIState_NonActive's deleting destructor [rule-8, w30-a2] ----
-   SECOND compiled instance of ~AIState_NonActive (see func_80072750 comment -- canonical name
-   ___17AIState_NonActive already claimed by the instance at 0x8005F62C). Same shape as
-   ___17AIState_Purgatory's tail (own-class vtable -> mark carObj_->N.active -> AIState_Base_vtable
-   -> conditional delete).
-   PROOF: rdata_80054548.rodata.s @0x800555B4 (AIState_NonActive_vtable dtor slot) holds the
-   literal word `func_80072758`; the two lui/addiu loads in the oracle (D_800555A0, D_80055640)
-   are the exact VAs of AIState_NonActive_vtable and AIState_Base_vtable materialized in
-   vtables_aistate.cpp. */
 
-extern "C" void ___17AIState_NonActive_80072758(AIState_NonActive *pThis,int __in_chrg)
+
+
+
+/* ---- _._17AIState_NonActive  AIState_NonActive::dtor  [AISTATE.CPP:?] SLD-FLAG:NO_SLD ---- */
+
+AIState_NonActive::~AIState_NonActive()
 
 
 
 {
 
-  pThis->_vf = (__vtbl_ptr_type (*) [4])AIState_NonActive_vtable;
 
-  ((pThis->carObj_)->N).active = '\x01';
+  
 
-  pThis->_vf = (__vtbl_ptr_type (*) [4])AIState_Base_vtable;
+  (this->_base_AIState_Base)._vf = (__vtbl_ptr_type (*) [4])((char *)AIState_NonActive_vtable + 8);
 
-  if ((__in_chrg & 1U) != 0) {
-    __builtin_delete(pThis);
-  }
+  (((this->_base_AIState_Base).carObj_)->N).active = '\x01';
+
+  (this->_base_AIState_Base)._vf = (__vtbl_ptr_type (*) [4])((char *)AIState_NonActive_vtable + 8);
+
 
   return;
 
 }
+
+
+
+
 
 
 
 
 /* ---- _._12AIState_Idle  AIState_Idle::dtor  [AISTATE.CPP:?] SLD-FLAG:NO_SLD ---- */
-/* reconstructed as extern "C" ___12AIState_Idle(AIState_Idle*,int) free fn -- see
-   AIState_Chase dtor comment for why (real per-class deleting dtor in the oracle). */
 
-extern "C" void ___12AIState_Idle(AIState_Idle *pThis,int __in_chrg)
+AIState_Idle::~AIState_Idle()
 
 
 
@@ -3358,18 +3560,16 @@ extern "C" void ___12AIState_Idle(AIState_Idle *pThis,int __in_chrg)
   Car_tObj *pCVar1;
 
 
+  
 
-  pCVar1 = pThis->carObj_;
+  pCVar1 = (this->_base_AIState_Base).carObj_;
 
-  pThis->_vf = (__vtbl_ptr_type (*) [4])AIState_Idle_vtable;
+  (this->_base_AIState_Base)._vf = (__vtbl_ptr_type (*) [4])AIState_Idle_vtable;
 
   pCVar1->carFlags = pCVar1->carFlags & 0xfffffbff;
 
-  pThis->_vf = (__vtbl_ptr_type (*) [4])AIState_Base_vtable;
+  (this->_base_AIState_Base)._vf = (__vtbl_ptr_type (*) [4])((char *)AIState_Idle_vtable + 8);
 
-  if ((__in_chrg & 1U) != 0) {
-    __builtin_delete(pThis);
-  }
 
   return;
 
@@ -3383,21 +3583,18 @@ extern "C" void ___12AIState_Idle(AIState_Idle *pThis,int __in_chrg)
 
 
 /* ---- _._14AIState_Normal  AIState_Normal::dtor  [AISTATE.CPP:?] SLD-FLAG:NO_SLD ---- */
-/* reconstructed as extern "C" ___14AIState_Normal(AIState_Normal*,int) free fn -- see
-   AIState_Chase dtor comment for why (real per-class deleting dtor in the oracle). */
 
-extern "C" void ___14AIState_Normal(AIState_Normal *pThis,int __in_chrg)
+AIState_Normal::~AIState_Normal()
 
 
 
 {
 
 
-  pThis->_vf = (__vtbl_ptr_type (*) [4])AIState_Base_vtable;
+  
 
-  if ((__in_chrg & 1U) != 0) {
-    __builtin_delete(pThis);
-  }
+  (this->_base_AIState_Base)._vf = (__vtbl_ptr_type (*) [4])((char *)AIState_Normal_vtable + 8);
+
 
   return;
 
@@ -3406,16 +3603,15 @@ extern "C" void ___14AIState_Normal(AIState_Normal *pThis,int __in_chrg)
 
 
 
-/* ---- func_80072830  AIState_Base::TestForRelease  [rule-8, w30-a2] ----
-   SECOND compiled instance of AIState_Base::TestForRelease (canonical name
-   TestForRelease__12AIState_Base already claimed by the instance at 0x8005B4C4). This is the
-   SHARED default impl (return 0) used by every AIState subclass that does not override
-   TestForRelease -- confirmed by rdata_80054548.rodata.s: the literal word `func_80072830`
-   fills the TestForRelease slot of AIState_NonActive_vtable (@0x800555BC), AIState_Offroad's
-   _vt (@0x800555DC), AIState_Chase's _vt (@0x800555FC), AIState_Idle's _vt (@0x8005561C),
-   AIState_Normal's _vt (@0x8005563C) AND AIState_Base_vtable itself (@0x8005565C). */
 
-extern "C" int TestForRelease__12AIState_Base_80072830(AIState_Base *pThis)
+
+
+
+/* ---- TestForRelease__12AIState_Base  AIState_Base::TestForRelease  [AISTATE.CPP:?] SLD-FLAG:NO_SLD ---- */
+
+int AIState_Base::TestForRelease()
+
+
 
 {
 
@@ -3426,30 +3622,63 @@ extern "C" int TestForRelease__12AIState_Base_80072830(AIState_Base *pThis)
 
 
 
-/* ---- func_80072838  AIState_Base's deleting destructor (___12AIState_Base) [rule-8, w30-a2] ----
-   aistate.h forward-declares `void ___12AIState_Base(AIState_Base*,int __in_chrg)` (used by
-   vtables_aistate.cpp's AIState_Base_vtable dtor-slot comment) but NO TU ever defines it --
-   this VA is that real, previously-missing body (canonical name kept free for a future single
-   real definition; this instance keeps its func_<VA> identity per the func_80072750 comment
-   above, since configs/symbol_addrs.txt already reserves ___12AIState_Base for the OTHER
-   duplicate instance at 0x8005B4CC). Same minimal shape as ___14AIState_Normal (no per-class
-   cleanup, straight chain to AIState_Base_vtable then conditional delete) -- AIState_Base has
-   no data members to clear.
-   PROOF: rdata_80054548.rodata.s @0x80055654 (AIState_Base_vtable's OWN dtor slot) holds the
-   literal word `func_80072838`. */
 
-extern "C" void ___12AIState_Base_80072838(AIState_Base *pThis,int __in_chrg)
+
+
+
+/* ---- _._12AIState_Base  AIState_Base::dtor  [AISTATE.CPP:?] SLD-FLAG:NO_SLD ---- */
+
+AIState_Base::~AIState_Base()
 
 
 
 {
 
+  int forwardSlice;
 
-  pThis->_vf = (__vtbl_ptr_type (*) [4])AIState_Base_vtable;
+  int distMeters;
 
-  if ((__in_chrg & 1U) != 0) {
-    __builtin_delete(pThis);
-  }
+  int cap;
+
+
+  int trafficInWorld;
+
+  int xDistance;
+
+  int placementSide;
+
+  int targettingStrength;
+
+  int doBrake;
+
+  int distanceAbsMeters;
+
+  int slice;
+
+  int currentBarrierLane;
+
+  int sliceLoop;
+
+  int barrierLane;
+
+  int longPos;
+
+  int backwardsBarrierEndSlice;
+
+  int forwardBarrierEndSlice;
+
+  coorddef centerBack;
+
+  coorddef right;
+
+  coorddef forward;
+
+  coorddef targetPos;
+
+  
+
+  this->_vf = (__vtbl_ptr_type (*) [4])((char *)AIState_Base_vtable + 8);
+
 
   return;
 
@@ -3460,12 +3689,5 @@ extern "C" void ___12AIState_Base_80072838(AIState_Base *pThis,int __in_chrg)
 
 
 
-
-
-/* W54-A15: the CANONICAL-mangled AIState_Base::TestForRelease / ~AIState_Base bodies
- * (TestForRelease__12AIState_Base @0x8005B4C4, ___12AIState_Base @0x8005B4CC) belong to
- * the AIHIGH object per configs/symbol_addrs.txt -- MOVED to aihigh.cpp so that unit
- * emits them (they were 0.00% NOT-IN-OBJECT there).  aistate keeps only its own
- * VA-suffixed vague-linkage duplicates at 0x80072830 / 0x80072838 (above). */
 
 /* end of aistate.cpp */

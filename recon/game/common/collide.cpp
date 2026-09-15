@@ -3,7 +3,8 @@
  *   collision, registry. SYM-v3 locals applied; owns 16 globals (registry/ranges/basis-dot scratch).
  *   NOT original source; self-contained, recompilable. Ghidra LAB_<addr> goto-labels = deferred-#148 cosmetic.
  */
-#include "collide_types.h"
+#include "../../nfs4_types.h"
+#include "../../mips_semantics.h"
 #include "collide_externs.h"
 
 
@@ -17,13 +18,13 @@ BO_tNewtonObj *obj0;   /* @0x8013c83c  (bss(zero)) */
 BO_tNewtonObj *obj1;   /* @0x8013c840  (bss(zero)) */
 coorddef     *pNormal;   /* @0x8013c844  (bss(zero)) */
 coorddef     *pP;   /* @0x8013c848  (bss(zero)) */
-static int   xRange;   /* SYM STAT @0x8013dd98 */
-static int   yRange;   /* SYM STAT @0x8013dd9c */
-static int   zRange;   /* SYM STAT @0x8013dda0 */
-static int   basisDots[9];   /* SYM STAT @0x8013e008 */
-static int   scaledBasisDots[9];   /* SYM STAT @0x8013e038 */
-static int   scaledBasisDotsOther[9];   /* SYM STAT @0x8013e068 */
-static int   basisDotRelative[6];   /* SYM STAT @0x8013e098 */
+int          xRange;   /* @0x8013dd98  (bss(zero)) */
+int          yRange;   /* @0x8013dd9c  (bss(zero)) */
+int          zRange;   /* @0x8013dda0  (bss(zero)) */
+int          basisDots[9];   /* @0x8013e008  (bss?) */
+int          scaledBasisDots[9];   /* @0x8013e038  (bss?) */
+int          scaledBasisDotsOther[9];   /* @0x8013e068  (bss?) */
+int          basisDotRelative[6];   /* @0x8013e098  (bss?) */
 
 
 /* ---- intra-TU forward declarations ---- */
@@ -33,7 +34,7 @@ int CHECK_VERTEX_WITH_DIRS(int X_DIR,int Y_DIR,int Z_DIR);
 int CHECK_VERTEX_WITH_DIRS_OTHER(int X_DIR,int Y_DIR,int Z_DIR);
 void Collide_DoObjectFixedObjectCollision(BO_tNewtonObj *o,coorddef *p,coorddef *v,coorddef *n);
 void Collide_LimitAngularVel(BO_tNewtonObj *o);
-void Collide_TestWithPlane(BO_tNewtonObj *o,coorddef *normal,coorddef *samplePoint);
+extern "C" { void Collide_TestWithPlane(BO_tNewtonObj *o,coorddef *normal,coorddef *samplePoint); }
 int Collide_DoObjectObjectCollision(BO_tNewtonObj *o0,BO_tNewtonObj *o1,coorddef *p,coorddef *normal);
 int Collide_DoActualObjectCollisionCheck(BO_tNewtonObj *o0,BO_tNewtonObj *o1,coorddef *p,coorddef *normal);
 int Collide_TestObjectVertices(BO_tNewtonObj *o0,BO_tNewtonObj *o1,coorddef *p,coorddef *normal);
@@ -45,172 +46,906 @@ void Collide_CheckMeForCollisions(BO_tNewtonObj *newObj);
 
 /* ---- CHECK_CENTER_VERTEX_WITH_DIRS__Fiii  [@0x8008ba70] ---- */
 int CHECK_CENTER_VERTEX_WITH_DIRS(int X_DIR,int Y_DIR,int Z_DIR)
-{
-  /* MATCH: SYM shows ZERO locals (leaf, fsize=0 mask=0) - direct global derefs everywhere,
-     flat early-return guards (oracle bnez -> shared return-0 tail), no pointer caches. */
-  xRange = X_DIR * scaledBasisDots[0] + Y_DIR * scaledBasisDots[1] + Z_DIR * scaledBasisDots[2] +
-           basisDotRelative[0];
-  yRange = X_DIR * scaledBasisDots[3] + Y_DIR * scaledBasisDots[4] + Z_DIR * scaledBasisDots[5] +
-           basisDotRelative[1];
-  zRange = X_DIR * scaledBasisDots[6] + Y_DIR * scaledBasisDots[7] + Z_DIR * scaledBasisDots[8] +
-           basisDotRelative[2];
-  /* MATCH: goto shared return-0 tail (physically AFTER return 1) keeps all six guards bnez-forward */
-  if ((obj0->dimension).z < zRange) goto ret0;
-  if (zRange < -(obj0->dimension).z) goto ret0;
-  if ((obj0->dimension).x < xRange) goto ret0;
-  if (xRange < -(obj0->dimension).x) goto ret0;
-  if ((obj0->dimension).y < yRange) goto ret0;
-  if (yRange < -(obj0->dimension).y) goto ret0;
-  pNormal->x = X_DIR * (obj1->orientMat).m[0] + Y_DIR * (obj1->orientMat).m[3] +
-               Z_DIR * (obj1->orientMat).m[6];
-  pNormal->y = X_DIR * (obj1->orientMat).m[1] + Y_DIR * (obj1->orientMat).m[4] +
-               Z_DIR * (obj1->orientMat).m[7];
-  pNormal->z = X_DIR * (obj1->orientMat).m[2] + Y_DIR * (obj1->orientMat).m[5] +
-               Z_DIR * (obj1->orientMat).m[8];
-  /* MATCH: signed /256 idiom; association is X_DIR*((m/256)*(dim/256)) - inner product first */
-  pP->x = (obj1->position).x +
-          X_DIR * (((obj1->orientMat).m[0] / 256) * ((obj1->dimension).x / 256)) +
-          Y_DIR * (((obj1->orientMat).m[3] / 256) * ((obj1->dimension).y / 256)) +
-          Z_DIR * (((obj1->orientMat).m[6] / 256) * ((obj1->dimension).z / 256));
-  pP->y = (obj1->position).y +
-          X_DIR * (((obj1->orientMat).m[1] / 256) * ((obj1->dimension).x / 256)) +
-          Y_DIR * (((obj1->orientMat).m[4] / 256) * ((obj1->dimension).y / 256)) +
-          Z_DIR * (((obj1->orientMat).m[7] / 256) * ((obj1->dimension).z / 256));
-  pP->z = (obj1->position).z +
-          X_DIR * (((obj1->orientMat).m[2] / 256) * ((obj1->dimension).x / 256)) +
-          Y_DIR * (((obj1->orientMat).m[5] / 256) * ((obj1->dimension).y / 256)) +
-          Z_DIR * (((obj1->orientMat).m[8] / 256) * ((obj1->dimension).z / 256));
-  return 1;
-ret0:
-  return 0;
-}
 
+
+
+{
+
+  BO_tNewtonObj *pBVar1;
+
+  BO_tNewtonObj *pBVar2;
+
+  coorddef *pcVar3;
+
+  int iVar4;
+
+  int iVar5;
+
+  int iVar6;
+
+  int iVar7;
+
+  int iVar8;
+
+  int iVar9;
+
+  
+
+  pcVar3 = pNormal;
+
+  pBVar1 = obj1;
+
+  xRange = X_DIR * scaledBasisDots[0] + Y_DIR * scaledBasisDots[1] + Z_DIR * scaledBasisDots[2] +
+
+           basisDotRelative[0];
+
+  yRange = X_DIR * scaledBasisDots[3] + Y_DIR * scaledBasisDots[4] + Z_DIR * scaledBasisDots[5] +
+
+           basisDotRelative[1];
+
+  iVar9 = (obj0->dimension).z;
+
+  zRange = X_DIR * scaledBasisDots[6] + Y_DIR * scaledBasisDots[7] + Z_DIR * scaledBasisDots[8] +
+
+           basisDotRelative[2];
+
+  if ((((zRange <= iVar9) && (-iVar9 <= zRange)) && (iVar9 = (obj0->dimension).x, xRange <= iVar9))
+
+     && (((-iVar9 <= xRange && (iVar9 = (obj0->dimension).y, yRange <= iVar9)) && (-iVar9 <= yRange)
+
+         ))) {
+
+    pNormal->x = X_DIR * (obj1->orientMat).m[0] + Y_DIR * (obj1->orientMat).m[3] +
+
+                 Z_DIR * (obj1->orientMat).m[6];
+
+    pcVar3->y = X_DIR * (pBVar1->orientMat).m[1] + Y_DIR * (pBVar1->orientMat).m[4] +
+
+                Z_DIR * (pBVar1->orientMat).m[7];
+
+    pcVar3->z = X_DIR * (pBVar1->orientMat).m[2] + Y_DIR * (pBVar1->orientMat).m[5] +
+
+                Z_DIR * (pBVar1->orientMat).m[8];
+
+    pcVar3 = pP;
+
+    iVar9 = (pBVar1->orientMat).m[0];
+
+    if (iVar9 < 0) {
+
+      iVar9 = iVar9 + 0xff;
+
+    }
+
+    iVar4 = (pBVar1->dimension).x;
+
+    if (iVar4 < 0) {
+
+      iVar4 = iVar4 + 0xff;
+
+    }
+
+    iVar7 = (pBVar1->orientMat).m[3];
+
+    if (iVar7 < 0) {
+
+      iVar7 = iVar7 + 0xff;
+
+    }
+
+    iVar5 = (pBVar1->dimension).y;
+
+    if (iVar5 < 0) {
+
+      iVar5 = iVar5 + 0xff;
+
+    }
+
+    iVar8 = (pBVar1->orientMat).m[6];
+
+    if (iVar8 < 0) {
+
+      iVar8 = iVar8 + 0xff;
+
+    }
+
+    iVar6 = (pBVar1->dimension).z;
+
+    if (iVar6 < 0) {
+
+      iVar6 = iVar6 + 0xff;
+
+    }
+
+    pP->x = (pBVar1->position).x + X_DIR * (iVar9 >> 8) * (iVar4 >> 8) +
+
+            Y_DIR * (iVar7 >> 8) * (iVar5 >> 8) + Z_DIR * (iVar8 >> 8) * (iVar6 >> 8);
+
+    pBVar2 = obj1;
+
+    iVar9 = (pBVar1->orientMat).m[1];
+
+    if (iVar9 < 0) {
+
+      iVar9 = iVar9 + 0xff;
+
+    }
+
+    iVar4 = (pBVar1->dimension).x;
+
+    if (iVar4 < 0) {
+
+      iVar4 = iVar4 + 0xff;
+
+    }
+
+    iVar7 = (pBVar1->orientMat).m[4];
+
+    if (iVar7 < 0) {
+
+      iVar7 = iVar7 + 0xff;
+
+    }
+
+    iVar5 = (pBVar1->dimension).y;
+
+    if (iVar5 < 0) {
+
+      iVar5 = iVar5 + 0xff;
+
+    }
+
+    iVar8 = (obj1->orientMat).m[7];
+
+    if (iVar8 < 0) {
+
+      iVar8 = iVar8 + 0xff;
+
+    }
+
+    iVar6 = (obj1->dimension).z;
+
+    if (iVar6 < 0) {
+
+      iVar6 = iVar6 + 0xff;
+
+    }
+
+    pcVar3->y = (pBVar1->position).y + X_DIR * (iVar9 >> 8) * (iVar4 >> 8) +
+
+                Y_DIR * (iVar7 >> 8) * (iVar5 >> 8) + Z_DIR * (iVar8 >> 8) * (iVar6 >> 8);
+
+    iVar9 = (pBVar2->orientMat).m[2];
+
+    if (iVar9 < 0) {
+
+      iVar9 = iVar9 + 0xff;
+
+    }
+
+    iVar4 = (pBVar2->dimension).x;
+
+    if (iVar4 < 0) {
+
+      iVar4 = iVar4 + 0xff;
+
+    }
+
+    iVar7 = (pBVar2->orientMat).m[5];
+
+    if (iVar7 < 0) {
+
+      iVar7 = iVar7 + 0xff;
+
+    }
+
+    iVar5 = (pBVar2->dimension).y;
+
+    if (iVar5 < 0) {
+
+      iVar5 = iVar5 + 0xff;
+
+    }
+
+    iVar8 = (pBVar2->orientMat).m[8];
+
+    if (iVar8 < 0) {
+
+      iVar8 = iVar8 + 0xff;
+
+    }
+
+    iVar6 = (pBVar2->dimension).z;
+
+    if (iVar6 < 0) {
+
+      iVar6 = iVar6 + 0xff;
+
+    }
+
+    pP->z = (pBVar2->position).z + X_DIR * (iVar9 >> 8) * (iVar4 >> 8) +
+
+            Y_DIR * (iVar7 >> 8) * (iVar5 >> 8) + Z_DIR * (iVar8 >> 8) * (iVar6 >> 8);
+
+    return 1;
+
+  }
+
+  return 0;
+
+}
 
 /* ---- CHECK_CENTER_VERTEX_WITH_DIRS_OTHER__Fiii  [@0x8008bef0] ---- */
 int CHECK_CENTER_VERTEX_WITH_DIRS_OTHER(int X_DIR,int Y_DIR,int Z_DIR)
-{
-  /* MATCH: same template as CHECK_CENTER_VERTEX_WITH_DIRS - zero locals, flat goto-ret0
-     guards, direct global derefs, X_DIR*((m/256)*(dim/256)) association */
-  xRange = (X_DIR * scaledBasisDotsOther[0] + Y_DIR * scaledBasisDotsOther[3] +
-            Z_DIR * scaledBasisDotsOther[6]) - basisDotRelative[3];
-  yRange = (X_DIR * scaledBasisDotsOther[1] + Y_DIR * scaledBasisDotsOther[4] +
-            Z_DIR * scaledBasisDotsOther[7]) - basisDotRelative[4];
-  zRange = (X_DIR * scaledBasisDotsOther[2] + Y_DIR * scaledBasisDotsOther[5] +
-            Z_DIR * scaledBasisDotsOther[8]) - basisDotRelative[5];
-  if ((obj1->dimension).z < zRange) goto ret0;
-  if (zRange < -(obj1->dimension).z) goto ret0;
-  if ((obj1->dimension).x < xRange) goto ret0;
-  if (xRange < -(obj1->dimension).x) goto ret0;
-  if ((obj1->dimension).y < yRange) goto ret0;
-  if (yRange < -(obj1->dimension).y) goto ret0;
-  pNormal->x = -(X_DIR * (obj0->orientMat).m[0] + Y_DIR * (obj0->orientMat).m[3] +
-                 Z_DIR * (obj0->orientMat).m[6]);
-  pNormal->y = -(X_DIR * (obj0->orientMat).m[1] + Y_DIR * (obj0->orientMat).m[4] +
-                 Z_DIR * (obj0->orientMat).m[7]);
-  pNormal->z = -(X_DIR * (obj0->orientMat).m[2] + Y_DIR * (obj0->orientMat).m[5] +
-                 Z_DIR * (obj0->orientMat).m[8]);
-  pP->x = (obj0->position).x +
-          X_DIR * (((obj0->orientMat).m[0] / 256) * ((obj0->dimension).x / 256)) +
-          Y_DIR * (((obj0->orientMat).m[3] / 256) * ((obj0->dimension).y / 256)) +
-          Z_DIR * (((obj0->orientMat).m[6] / 256) * ((obj0->dimension).z / 256));
-  pP->y = (obj0->position).y +
-          X_DIR * (((obj0->orientMat).m[1] / 256) * ((obj0->dimension).x / 256)) +
-          Y_DIR * (((obj0->orientMat).m[4] / 256) * ((obj0->dimension).y / 256)) +
-          Z_DIR * (((obj0->orientMat).m[7] / 256) * ((obj0->dimension).z / 256));
-  pP->z = (obj0->position).z +
-          X_DIR * (((obj0->orientMat).m[2] / 256) * ((obj0->dimension).x / 256)) +
-          Y_DIR * (((obj0->orientMat).m[5] / 256) * ((obj0->dimension).y / 256)) +
-          Z_DIR * (((obj0->orientMat).m[8] / 256) * ((obj0->dimension).z / 256));
-  return 1;
-ret0:
-  return 0;
-}
 
+
+
+{
+
+  BO_tNewtonObj *pBVar1;
+
+  BO_tNewtonObj *pBVar2;
+
+  coorddef *pcVar3;
+
+  int iVar4;
+
+  int iVar5;
+
+  int iVar6;
+
+  int iVar7;
+
+  int iVar8;
+
+  int iVar9;
+
+  
+
+  pcVar3 = pNormal;
+
+  pBVar1 = obj0;
+
+  xRange = (X_DIR * scaledBasisDotsOther[0] + Y_DIR * scaledBasisDotsOther[3] +
+
+           Z_DIR * scaledBasisDotsOther[6]) - basisDotRelative[3];
+
+  yRange = (X_DIR * scaledBasisDotsOther[1] + Y_DIR * scaledBasisDotsOther[4] +
+
+           Z_DIR * scaledBasisDotsOther[7]) - basisDotRelative[4];
+
+  iVar9 = (obj1->dimension).z;
+
+  zRange = (X_DIR * scaledBasisDotsOther[2] + Y_DIR * scaledBasisDotsOther[5] +
+
+           Z_DIR * scaledBasisDotsOther[8]) - basisDotRelative[5];
+
+  if ((((zRange <= iVar9) && (-iVar9 <= zRange)) && (iVar9 = (obj1->dimension).x, xRange <= iVar9))
+
+     && (((-iVar9 <= xRange && (iVar9 = (obj1->dimension).y, yRange <= iVar9)) && (-iVar9 <= yRange)
+
+         ))) {
+
+    pNormal->x = -(X_DIR * (obj0->orientMat).m[0] + Y_DIR * (obj0->orientMat).m[3] +
+
+                  Z_DIR * (obj0->orientMat).m[6]);
+
+    pcVar3->y = -(X_DIR * (pBVar1->orientMat).m[1] + Y_DIR * (pBVar1->orientMat).m[4] +
+
+                 Z_DIR * (pBVar1->orientMat).m[7]);
+
+    pcVar3->z = -(X_DIR * (pBVar1->orientMat).m[2] + Y_DIR * (pBVar1->orientMat).m[5] +
+
+                 Z_DIR * (pBVar1->orientMat).m[8]);
+
+    pcVar3 = pP;
+
+    iVar9 = (pBVar1->orientMat).m[0];
+
+    if (iVar9 < 0) {
+
+      iVar9 = iVar9 + 0xff;
+
+    }
+
+    iVar4 = (pBVar1->dimension).x;
+
+    if (iVar4 < 0) {
+
+      iVar4 = iVar4 + 0xff;
+
+    }
+
+    iVar7 = (pBVar1->orientMat).m[3];
+
+    if (iVar7 < 0) {
+
+      iVar7 = iVar7 + 0xff;
+
+    }
+
+    iVar5 = (pBVar1->dimension).y;
+
+    if (iVar5 < 0) {
+
+      iVar5 = iVar5 + 0xff;
+
+    }
+
+    iVar8 = (pBVar1->orientMat).m[6];
+
+    if (iVar8 < 0) {
+
+      iVar8 = iVar8 + 0xff;
+
+    }
+
+    iVar6 = (pBVar1->dimension).z;
+
+    if (iVar6 < 0) {
+
+      iVar6 = iVar6 + 0xff;
+
+    }
+
+    pP->x = (pBVar1->position).x + X_DIR * (iVar9 >> 8) * (iVar4 >> 8) +
+
+            Y_DIR * (iVar7 >> 8) * (iVar5 >> 8) + Z_DIR * (iVar8 >> 8) * (iVar6 >> 8);
+
+    pBVar2 = obj0;
+
+    iVar9 = (pBVar1->orientMat).m[1];
+
+    if (iVar9 < 0) {
+
+      iVar9 = iVar9 + 0xff;
+
+    }
+
+    iVar4 = (pBVar1->dimension).x;
+
+    if (iVar4 < 0) {
+
+      iVar4 = iVar4 + 0xff;
+
+    }
+
+    iVar7 = (pBVar1->orientMat).m[4];
+
+    if (iVar7 < 0) {
+
+      iVar7 = iVar7 + 0xff;
+
+    }
+
+    iVar5 = (pBVar1->dimension).y;
+
+    if (iVar5 < 0) {
+
+      iVar5 = iVar5 + 0xff;
+
+    }
+
+    iVar8 = (obj0->orientMat).m[7];
+
+    if (iVar8 < 0) {
+
+      iVar8 = iVar8 + 0xff;
+
+    }
+
+    iVar6 = (obj0->dimension).z;
+
+    if (iVar6 < 0) {
+
+      iVar6 = iVar6 + 0xff;
+
+    }
+
+    pcVar3->y = (pBVar1->position).y + X_DIR * (iVar9 >> 8) * (iVar4 >> 8) +
+
+                Y_DIR * (iVar7 >> 8) * (iVar5 >> 8) + Z_DIR * (iVar8 >> 8) * (iVar6 >> 8);
+
+    iVar9 = (pBVar2->orientMat).m[2];
+
+    if (iVar9 < 0) {
+
+      iVar9 = iVar9 + 0xff;
+
+    }
+
+    iVar4 = (pBVar2->dimension).x;
+
+    if (iVar4 < 0) {
+
+      iVar4 = iVar4 + 0xff;
+
+    }
+
+    iVar7 = (pBVar2->orientMat).m[5];
+
+    if (iVar7 < 0) {
+
+      iVar7 = iVar7 + 0xff;
+
+    }
+
+    iVar5 = (pBVar2->dimension).y;
+
+    if (iVar5 < 0) {
+
+      iVar5 = iVar5 + 0xff;
+
+    }
+
+    iVar8 = (pBVar2->orientMat).m[8];
+
+    if (iVar8 < 0) {
+
+      iVar8 = iVar8 + 0xff;
+
+    }
+
+    iVar6 = (pBVar2->dimension).z;
+
+    if (iVar6 < 0) {
+
+      iVar6 = iVar6 + 0xff;
+
+    }
+
+    pP->z = (pBVar2->position).z + X_DIR * (iVar9 >> 8) * (iVar4 >> 8) +
+
+            Y_DIR * (iVar7 >> 8) * (iVar5 >> 8) + Z_DIR * (iVar8 >> 8) * (iVar6 >> 8);
+
+    return 1;
+
+  }
+
+  return 0;
+
+}
 
 /* ---- CHECK_VERTEX_WITH_DIRS__Fiii  [@0x8008c37c] ---- */
 int CHECK_VERTEX_WITH_DIRS(int X_DIR,int Y_DIR,int Z_DIR)
-{
-  /* MATCH: CHECK_CENTER_VERTEX_WITH_DIRS template minus the pNormal writes */
-  xRange = X_DIR * scaledBasisDots[0] + Y_DIR * scaledBasisDots[1] + Z_DIR * scaledBasisDots[2] +
-           basisDotRelative[0];
-  yRange = X_DIR * scaledBasisDots[3] + Y_DIR * scaledBasisDots[4] + Z_DIR * scaledBasisDots[5] +
-           basisDotRelative[1];
-  zRange = X_DIR * scaledBasisDots[6] + Y_DIR * scaledBasisDots[7] + Z_DIR * scaledBasisDots[8] +
-           basisDotRelative[2];
-  if ((obj0->dimension).z < zRange) goto ret0;
-  if (zRange < -(obj0->dimension).z) goto ret0;
-  if ((obj0->dimension).x < xRange) goto ret0;
-  if (xRange < -(obj0->dimension).x) goto ret0;
-  if ((obj0->dimension).y < yRange) goto ret0;
-  if (yRange < -(obj0->dimension).y) goto ret0;
-  pP->x = (obj1->position).x +
-          X_DIR * (((obj1->orientMat).m[0] / 256) * ((obj1->dimension).x / 256)) +
-          Y_DIR * (((obj1->orientMat).m[3] / 256) * ((obj1->dimension).y / 256)) +
-          Z_DIR * (((obj1->orientMat).m[6] / 256) * ((obj1->dimension).z / 256));
-  pP->y = (obj1->position).y +
-          X_DIR * (((obj1->orientMat).m[1] / 256) * ((obj1->dimension).x / 256)) +
-          Y_DIR * (((obj1->orientMat).m[4] / 256) * ((obj1->dimension).y / 256)) +
-          Z_DIR * (((obj1->orientMat).m[7] / 256) * ((obj1->dimension).z / 256));
-  pP->z = (obj1->position).z +
-          X_DIR * (((obj1->orientMat).m[2] / 256) * ((obj1->dimension).x / 256)) +
-          Y_DIR * (((obj1->orientMat).m[5] / 256) * ((obj1->dimension).y / 256)) +
-          Z_DIR * (((obj1->orientMat).m[8] / 256) * ((obj1->dimension).z / 256));
-  return 1;
-ret0:
-  return 0;
-}
 
+
+
+{
+
+  BO_tNewtonObj *pBVar1;
+
+  BO_tNewtonObj *pBVar2;
+
+  coorddef *pcVar3;
+
+  int iVar4;
+
+  int iVar5;
+
+  int iVar6;
+
+  int iVar7;
+
+  int iVar8;
+
+  int iVar9;
+
+  
+
+  pcVar3 = pP;
+
+  pBVar1 = obj1;
+
+  xRange = X_DIR * scaledBasisDots[0] + Y_DIR * scaledBasisDots[1] + Z_DIR * scaledBasisDots[2] +
+
+           basisDotRelative[0];
+
+  yRange = X_DIR * scaledBasisDots[3] + Y_DIR * scaledBasisDots[4] + Z_DIR * scaledBasisDots[5] +
+
+           basisDotRelative[1];
+
+  iVar9 = (obj0->dimension).z;
+
+  zRange = X_DIR * scaledBasisDots[6] + Y_DIR * scaledBasisDots[7] + Z_DIR * scaledBasisDots[8] +
+
+           basisDotRelative[2];
+
+  if ((((zRange <= iVar9) && (-iVar9 <= zRange)) && (iVar9 = (obj0->dimension).x, xRange <= iVar9))
+
+     && (((-iVar9 <= xRange && (iVar9 = (obj0->dimension).y, yRange <= iVar9)) && (-iVar9 <= yRange)
+
+         ))) {
+
+    iVar9 = (obj1->orientMat).m[0];
+
+    if (iVar9 < 0) {
+
+      iVar9 = iVar9 + 0xff;
+
+    }
+
+    iVar4 = (obj1->dimension).x;
+
+    if (iVar4 < 0) {
+
+      iVar4 = iVar4 + 0xff;
+
+    }
+
+    iVar7 = (obj1->orientMat).m[3];
+
+    if (iVar7 < 0) {
+
+      iVar7 = iVar7 + 0xff;
+
+    }
+
+    iVar5 = (obj1->dimension).y;
+
+    if (iVar5 < 0) {
+
+      iVar5 = iVar5 + 0xff;
+
+    }
+
+    iVar8 = (obj1->orientMat).m[6];
+
+    if (iVar8 < 0) {
+
+      iVar8 = iVar8 + 0xff;
+
+    }
+
+    iVar6 = (obj1->dimension).z;
+
+    if (iVar6 < 0) {
+
+      iVar6 = iVar6 + 0xff;
+
+    }
+
+    pP->x = (obj1->position).x + X_DIR * (iVar9 >> 8) * (iVar4 >> 8) +
+
+            Y_DIR * (iVar7 >> 8) * (iVar5 >> 8) + Z_DIR * (iVar8 >> 8) * (iVar6 >> 8);
+
+    pBVar2 = obj1;
+
+    iVar9 = (pBVar1->orientMat).m[1];
+
+    if (iVar9 < 0) {
+
+      iVar9 = iVar9 + 0xff;
+
+    }
+
+    iVar4 = (pBVar1->dimension).x;
+
+    if (iVar4 < 0) {
+
+      iVar4 = iVar4 + 0xff;
+
+    }
+
+    iVar7 = (pBVar1->orientMat).m[4];
+
+    if (iVar7 < 0) {
+
+      iVar7 = iVar7 + 0xff;
+
+    }
+
+    iVar5 = (pBVar1->dimension).y;
+
+    if (iVar5 < 0) {
+
+      iVar5 = iVar5 + 0xff;
+
+    }
+
+    iVar8 = (obj1->orientMat).m[7];
+
+    if (iVar8 < 0) {
+
+      iVar8 = iVar8 + 0xff;
+
+    }
+
+    iVar6 = (obj1->dimension).z;
+
+    if (iVar6 < 0) {
+
+      iVar6 = iVar6 + 0xff;
+
+    }
+
+    pcVar3->y = (pBVar1->position).y + X_DIR * (iVar9 >> 8) * (iVar4 >> 8) +
+
+                Y_DIR * (iVar7 >> 8) * (iVar5 >> 8) + Z_DIR * (iVar8 >> 8) * (iVar6 >> 8);
+
+    iVar9 = (pBVar2->orientMat).m[2];
+
+    if (iVar9 < 0) {
+
+      iVar9 = iVar9 + 0xff;
+
+    }
+
+    iVar4 = (pBVar2->dimension).x;
+
+    if (iVar4 < 0) {
+
+      iVar4 = iVar4 + 0xff;
+
+    }
+
+    iVar7 = (pBVar2->orientMat).m[5];
+
+    if (iVar7 < 0) {
+
+      iVar7 = iVar7 + 0xff;
+
+    }
+
+    iVar5 = (pBVar2->dimension).y;
+
+    if (iVar5 < 0) {
+
+      iVar5 = iVar5 + 0xff;
+
+    }
+
+    iVar8 = (pBVar2->orientMat).m[8];
+
+    if (iVar8 < 0) {
+
+      iVar8 = iVar8 + 0xff;
+
+    }
+
+    iVar6 = (pBVar2->dimension).z;
+
+    if (iVar6 < 0) {
+
+      iVar6 = iVar6 + 0xff;
+
+    }
+
+    pP->z = (pBVar2->position).z + X_DIR * (iVar9 >> 8) * (iVar4 >> 8) +
+
+            Y_DIR * (iVar7 >> 8) * (iVar5 >> 8) + Z_DIR * (iVar8 >> 8) * (iVar6 >> 8);
+
+    return 1;
+
+  }
+
+  return 0;
+
+}
 
 /* ---- CHECK_VERTEX_WITH_DIRS_OTHER__Fiii  [@0x8008c744] ---- */
 int CHECK_VERTEX_WITH_DIRS_OTHER(int X_DIR,int Y_DIR,int Z_DIR)
-{
-  /* MATCH: CHECK_CENTER_VERTEX_WITH_DIRS_OTHER template minus the pNormal writes */
-  xRange = (X_DIR * scaledBasisDotsOther[0] + Y_DIR * scaledBasisDotsOther[3] +
-            Z_DIR * scaledBasisDotsOther[6]) - basisDotRelative[3];
-  yRange = (X_DIR * scaledBasisDotsOther[1] + Y_DIR * scaledBasisDotsOther[4] +
-            Z_DIR * scaledBasisDotsOther[7]) - basisDotRelative[4];
-  zRange = (X_DIR * scaledBasisDotsOther[2] + Y_DIR * scaledBasisDotsOther[5] +
-            Z_DIR * scaledBasisDotsOther[8]) - basisDotRelative[5];
-  if ((obj1->dimension).z < zRange) goto ret0;
-  if (zRange < -(obj1->dimension).z) goto ret0;
-  if ((obj1->dimension).x < xRange) goto ret0;
-  if (xRange < -(obj1->dimension).x) goto ret0;
-  if ((obj1->dimension).y < yRange) goto ret0;
-  if (yRange < -(obj1->dimension).y) goto ret0;
-  pP->x = (obj0->position).x +
-          X_DIR * (((obj0->orientMat).m[0] / 256) * ((obj0->dimension).x / 256)) +
-          Y_DIR * (((obj0->orientMat).m[3] / 256) * ((obj0->dimension).y / 256)) +
-          Z_DIR * (((obj0->orientMat).m[6] / 256) * ((obj0->dimension).z / 256));
-  pP->y = (obj0->position).y +
-          X_DIR * (((obj0->orientMat).m[1] / 256) * ((obj0->dimension).x / 256)) +
-          Y_DIR * (((obj0->orientMat).m[4] / 256) * ((obj0->dimension).y / 256)) +
-          Z_DIR * (((obj0->orientMat).m[7] / 256) * ((obj0->dimension).z / 256));
-  pP->z = (obj0->position).z +
-          X_DIR * (((obj0->orientMat).m[2] / 256) * ((obj0->dimension).x / 256)) +
-          Y_DIR * (((obj0->orientMat).m[5] / 256) * ((obj0->dimension).y / 256)) +
-          Z_DIR * (((obj0->orientMat).m[8] / 256) * ((obj0->dimension).z / 256));
-  return 1;
-ret0:
-  return 0;
-}
 
+
+
+{
+
+  BO_tNewtonObj *pBVar1;
+
+  BO_tNewtonObj *pBVar2;
+
+  coorddef *pcVar3;
+
+  int iVar4;
+
+  int iVar5;
+
+  int iVar6;
+
+  int iVar7;
+
+  int iVar8;
+
+  int iVar9;
+
+  
+
+  pcVar3 = pP;
+
+  pBVar1 = obj0;
+
+  xRange = (X_DIR * scaledBasisDotsOther[0] + Y_DIR * scaledBasisDotsOther[3] +
+
+           Z_DIR * scaledBasisDotsOther[6]) - basisDotRelative[3];
+
+  yRange = (X_DIR * scaledBasisDotsOther[1] + Y_DIR * scaledBasisDotsOther[4] +
+
+           Z_DIR * scaledBasisDotsOther[7]) - basisDotRelative[4];
+
+  iVar9 = (obj1->dimension).z;
+
+  zRange = (X_DIR * scaledBasisDotsOther[2] + Y_DIR * scaledBasisDotsOther[5] +
+
+           Z_DIR * scaledBasisDotsOther[8]) - basisDotRelative[5];
+
+  if ((((zRange <= iVar9) && (-iVar9 <= zRange)) && (iVar9 = (obj1->dimension).x, xRange <= iVar9))
+
+     && (((-iVar9 <= xRange && (iVar9 = (obj1->dimension).y, yRange <= iVar9)) && (-iVar9 <= yRange)
+
+         ))) {
+
+    iVar9 = (obj0->orientMat).m[0];
+
+    if (iVar9 < 0) {
+
+      iVar9 = iVar9 + 0xff;
+
+    }
+
+    iVar4 = (obj0->dimension).x;
+
+    if (iVar4 < 0) {
+
+      iVar4 = iVar4 + 0xff;
+
+    }
+
+    iVar7 = (obj0->orientMat).m[3];
+
+    if (iVar7 < 0) {
+
+      iVar7 = iVar7 + 0xff;
+
+    }
+
+    iVar5 = (obj0->dimension).y;
+
+    if (iVar5 < 0) {
+
+      iVar5 = iVar5 + 0xff;
+
+    }
+
+    iVar8 = (obj0->orientMat).m[6];
+
+    if (iVar8 < 0) {
+
+      iVar8 = iVar8 + 0xff;
+
+    }
+
+    iVar6 = (obj0->dimension).z;
+
+    if (iVar6 < 0) {
+
+      iVar6 = iVar6 + 0xff;
+
+    }
+
+    pP->x = (obj0->position).x + X_DIR * (iVar9 >> 8) * (iVar4 >> 8) +
+
+            Y_DIR * (iVar7 >> 8) * (iVar5 >> 8) + Z_DIR * (iVar8 >> 8) * (iVar6 >> 8);
+
+    pBVar2 = obj0;
+
+    iVar9 = (pBVar1->orientMat).m[1];
+
+    if (iVar9 < 0) {
+
+      iVar9 = iVar9 + 0xff;
+
+    }
+
+    iVar4 = (pBVar1->dimension).x;
+
+    if (iVar4 < 0) {
+
+      iVar4 = iVar4 + 0xff;
+
+    }
+
+    iVar7 = (pBVar1->orientMat).m[4];
+
+    if (iVar7 < 0) {
+
+      iVar7 = iVar7 + 0xff;
+
+    }
+
+    iVar5 = (pBVar1->dimension).y;
+
+    if (iVar5 < 0) {
+
+      iVar5 = iVar5 + 0xff;
+
+    }
+
+    iVar8 = (obj0->orientMat).m[7];
+
+    if (iVar8 < 0) {
+
+      iVar8 = iVar8 + 0xff;
+
+    }
+
+    iVar6 = (obj0->dimension).z;
+
+    if (iVar6 < 0) {
+
+      iVar6 = iVar6 + 0xff;
+
+    }
+
+    pcVar3->y = (pBVar1->position).y + X_DIR * (iVar9 >> 8) * (iVar4 >> 8) +
+
+                Y_DIR * (iVar7 >> 8) * (iVar5 >> 8) + Z_DIR * (iVar8 >> 8) * (iVar6 >> 8);
+
+    iVar9 = (pBVar2->orientMat).m[2];
+
+    if (iVar9 < 0) {
+
+      iVar9 = iVar9 + 0xff;
+
+    }
+
+    iVar4 = (pBVar2->dimension).x;
+
+    if (iVar4 < 0) {
+
+      iVar4 = iVar4 + 0xff;
+
+    }
+
+    iVar7 = (pBVar2->orientMat).m[5];
+
+    if (iVar7 < 0) {
+
+      iVar7 = iVar7 + 0xff;
+
+    }
+
+    iVar5 = (pBVar2->dimension).y;
+
+    if (iVar5 < 0) {
+
+      iVar5 = iVar5 + 0xff;
+
+    }
+
+    iVar8 = (pBVar2->orientMat).m[8];
+
+    if (iVar8 < 0) {
+
+      iVar8 = iVar8 + 0xff;
+
+    }
+
+    iVar6 = (pBVar2->dimension).z;
+
+    if (iVar6 < 0) {
+
+      iVar6 = iVar6 + 0xff;
+
+    }
+
+    pP->z = (pBVar2->position).z + X_DIR * (iVar9 >> 8) * (iVar4 >> 8) +
+
+            Y_DIR * (iVar7 >> 8) * (iVar5 >> 8) + Z_DIR * (iVar8 >> 8) * (iVar6 >> 8);
+
+    return 1;
+
+  }
+
+  return 0;
+
+}
 
 /* ---- Collide_DoObjectFixedObjectCollision__FP13BO_tNewtonObjP8coorddefN21  [@0x8008cb0c] ---- */
 void Collide_DoObjectFixedObjectCollision(BO_tNewtonObj *o,coorddef *p,coorddef *v,coorddef *n)
+
+
+
 {
-  /* RULE-8 rewrite from SYM 8c block @0x8008cb0c (fsize=192 mask=$803f0000 = ra+s0..s5) + m2c
-     pregen + raw oracle, blocks in oracle VA order.  SYM nesting reproduced exactly:
-       fn block { normal,impulse,deltaV,impulseV,temp0-3,r,RCrossN,velocityLength,velocity }
-         block2 @cd84 { frictionalImpulse,deltaVFromFriction,temp,frictionalImpulseOverMoment,
-                        deltaSpeedInFrictionDirection }
-           block3 @cd84 { impulse calc + collision writes + block4 @ce38 {scale,lengthInverse} }
-           block5 @cfe8 { block6 @d00c {upVec,dotx,doty,dotz} }
-           friction body to d558
-         impulse>0 tail (deltaV/impulseV are fn-scope per SYM)
-     MATCH: inline signed /256 idiom throughout; upVec is a REAL rodata coorddef @0x80055A00
-     {0,0x10000,0} struct-copied then dotted against orientMat cols (Ghidra const-folded the load
-     and collapsed the dots); the r x impulseV cross in the impulse>0 tail is written TWICE -
-     retail source computed it twice and the oracle keeps both (Ghidra DSE'd the first copy). */
   coorddef normal;
   int impulse;
   coorddef deltaV;
@@ -223,144 +958,790 @@ void Collide_DoObjectFixedObjectCollision(BO_tNewtonObj *o,coorddef *p,coorddef 
   coorddef RCrossN;
   int velocityLength;
   coorddef velocity;
+  int frictionalImpulse;
+  coorddef deltaVFromFriction;
+  coorddef temp;
+  int frictionalImpulseOverMoment;
+  int deltaSpeedInFrictionDirection;
+  int scale;
+  int lengthInverse;
+  coorddef upVec;
+  int dotx;
+  int doty;
+  int dotz;
 
-  velocity = *v;
-  normal = *n;
-  velocityLength = 0;
-  temp0 = (normal.x / 256) * ((o->linearVel).x / 256) +
-          (normal.y / 256) * ((o->linearVel).y / 256) +
-          (normal.z / 256) * ((o->linearVel).z / 256);
-  r.x = p->x - (o->position).x;
-  r.y = p->y - (o->position).y;
-  r.z = p->z - (o->position).z;
-  RCrossN.x = (r.y / 256) * (normal.z / 256) - (r.z / 256) * (normal.y / 256);
-  RCrossN.y = (r.z / 256) * (normal.x / 256) - (r.x / 256) * (normal.z / 256);
-  RCrossN.z = (r.x / 256) * (normal.y / 256) - (r.y / 256) * (normal.x / 256);
-  temp1 = ((o->angularVel).x / 256) * (RCrossN.x / 256) +
-          ((o->angularVel).y / 256) * (RCrossN.y / 256) +
-          ((o->angularVel).z / 256) * (RCrossN.z / 256);
-  temp2 = o->massInv / 4;
-  {
-    int frictionalImpulse;
-    coorddef deltaVFromFriction;
-    coorddef temp;
-    int frictionalImpulseOverMoment;
-    int deltaSpeedInFrictionDirection;
+  int iVar1;
 
-    {
-      temp3 = temp2 + fixedmult(Math_VectorLength2(&RCrossN), o->moInertiaInv * 2) / 2;
-      impulse = fixedmult(rdiv(-(temp0 + temp1), temp3), 0x6666);
-      (o->collision).impulse = __builtin_abs(temp0) * 4;
-      (o->collision).otherObj = (BO_tNewtonObj *)0;
-      (o->collision).sfxType = o->driveSurfaceType | 0x30000;
-      (o->collision).collisionPoint = *p;
-      if (velocity.x != 0 || velocity.y != 0 || velocity.z != 0) {
-        int scale;
-        int lengthInverse;
+  int iVar2;
 
-        scale = (velocity.x / 256) * (normal.x / 256) +
-                (velocity.y / 256) * (normal.y / 256) +
-                (velocity.z / 256) * (normal.z / 256);
-        velocity.x = velocity.x - (scale / 256) * (normal.x / 256);
-        velocity.y = velocity.y - (scale / 256) * (normal.y / 256);
-        velocity.z = velocity.z - (scale / 256) * (normal.z / 256);
-        velocityLength = fixedsqrt((velocity.x / 256) * (velocity.x / 256) +
-                                   (velocity.y / 256) * (velocity.y / 256) +
-                                   (velocity.z / 256) * (velocity.z / 256));
-        /* MATCH: fixedmult calls duplicated per-arm in retail source; gcc cross-jump-merges
-           only the trailing .z call (oracle j to shared tail) */
-        if (velocityLength / 2 != 0) {
-          lengthInverse = -rdiv(0x8000, velocityLength / 2);
-          velocity.x = fixedmult(lengthInverse, velocity.x);
-          velocity.y = fixedmult(lengthInverse, velocity.y);
-          velocity.z = fixedmult(lengthInverse, velocity.z);
-        } else {
-          velocity.x = fixedmult(-0x10000, velocity.x);
-          velocity.y = fixedmult(-0x10000, velocity.y);
-          velocity.z = fixedmult(-0x10000, velocity.z);
-        }
-      }
-    }
-    {
-      if (__builtin_abs(o->speedXZ) <= 0x9FFFF) {
-        coorddef upVec;
-        int dotx;
-        int doty;
-        int dotz;
+  int iVar3;
 
-        upVec = D_80055A00;   /* {0, 0x10000, 0} */
-        dotx = (upVec.x / 256) * ((o->orientMat).m[0] / 256) +
-               (upVec.y / 256) * ((o->orientMat).m[1] / 256) +
-               (upVec.z / 256) * ((o->orientMat).m[2] / 256);
-        doty = (upVec.x / 256) * ((o->orientMat).m[3] / 256) +
-               (upVec.y / 256) * ((o->orientMat).m[4] / 256) +
-               (upVec.z / 256) * ((o->orientMat).m[5] / 256);
-        dotz = (upVec.x / 256) * ((o->orientMat).m[6] / 256) +
-               (upVec.y / 256) * ((o->orientMat).m[7] / 256) +
-               (upVec.z / 256) * ((o->orientMat).m[8] / 256);
-        if (0xF5C2 < __builtin_abs(dotx) || 0xF5C2 < __builtin_abs(dotz) || doty < -0xF5C2) {
-          frictionLess = 1;
-        }
-      }
-    }
-    frictionalImpulse = fixedmult(frictionLess == 1 ? 0x28F : 0x8000, impulse);
-    deltaVFromFriction.x = fixedmult(fixedmult(frictionalImpulse, o->massInv / 2), velocity.x);
-    deltaVFromFriction.y = fixedmult(fixedmult(frictionalImpulse, o->massInv / 2), velocity.y);
-    deltaVFromFriction.z = fixedmult(fixedmult(frictionalImpulse, o->massInv / 2), velocity.z);
-    frictionLess = 0;
-    frictionalImpulseOverMoment = fixedmult(frictionalImpulse, o->moInertiaInv * 2);
-    /* temp = velocity x r, then temp = temp x r IN PLACE (sequential component update -
-       temp.y reads the NEW temp.x, temp.z reads the NEW x,y; faithful to retail) */
-    temp.x = (velocity.y / 256) * (r.z / 256) - (velocity.z / 256) * (r.y / 256);
-    temp.y = (velocity.z / 256) * (r.x / 256) - (velocity.x / 256) * (r.z / 256);
-    temp.z = (velocity.x / 256) * (r.y / 256) - (velocity.y / 256) * (r.x / 256);
-    temp.x = (temp.y / 256) * (r.z / 256) - (temp.z / 256) * (r.y / 256);
-    temp.y = (temp.z / 256) * (r.x / 256) - (temp.x / 256) * (r.z / 256);
-    temp.z = (temp.x / 256) * (r.y / 256) - (temp.y / 256) * (r.x / 256);
-    temp.x = fixedmult(frictionalImpulseOverMoment, temp.x);
-    temp.y = fixedmult(frictionalImpulseOverMoment, temp.y);
-    temp.z = fixedmult(frictionalImpulseOverMoment, temp.z);
-    deltaVFromFriction.x += temp.x;
-    deltaVFromFriction.y += temp.y;
-    deltaVFromFriction.z += temp.z;
-    deltaSpeedInFrictionDirection = (deltaVFromFriction.x / 256) * (velocity.x / 256) +
-                                    (deltaVFromFriction.y / 256) * (velocity.y / 256) +
-                                    (deltaVFromFriction.z / 256) * (velocity.z / 256);
-    if (velocityLength < deltaSpeedInFrictionDirection) {
-      frictionalImpulse = fixedmult(frictionalImpulse, rdiv(velocityLength, deltaSpeedInFrictionDirection));
-    }
-    velocity.x = fixedmult(frictionalImpulse, velocity.x);
-    velocity.y = fixedmult(frictionalImpulse, velocity.y);
-    velocity.z = fixedmult(frictionalImpulse, velocity.z);
+  int iVar4;
+
+  int iVar5;
+
+  int iVar6;
+
+  int iVar7;
+
+  int iVar8;
+
+  int iVar9;
+
+  u_int uVar10;
+
+  int iVar11;
+
+  int iVar12;
+
+  int iVar13;
+
+  int iVar14;
+
+  int iVar15;
+
+  int iVar16;
+
+  int iVar17;
+
+  coorddef local_70;
+
+  int local_60;
+
+  int local_5c;
+
+  int local_58;
+
+  int local_50;
+
+  int local_4c;
+
+  int local_48;
+
+  int local_40;
+
+  int local_3c;
+
+  int local_38;
+
+  u_int local_30;
+
+  u_int local_2c;
+
+  u_int local_28;
+
+  
+
+  local_60 = v->x;
+
+  local_5c = v->y;
+
+  local_58 = v->z;
+
+  iVar13 = n->x;
+
+  iVar14 = n->y;
+
+  iVar17 = n->z;
+
+  iVar16 = 0;
+
+  iVar6 = iVar13;
+
+  if (iVar13 < 0) {
+
+    iVar6 = iVar13 + 0xff;
+
   }
-  if (0 < impulse) {
-    impulseV.x = fixedmult(impulse, normal.x);
-    impulseV.y = fixedmult(impulse, normal.y);
-    impulseV.z = fixedmult(impulse, normal.z);
-    impulseV.x += velocity.x;
-    impulseV.y += velocity.y;
-    impulseV.z += velocity.z;
-    deltaV.x = fixedmult(o->massInv / 2, impulseV.x);
-    deltaV.y = fixedmult(o->massInv / 2, impulseV.y);
-    deltaV.z = fixedmult(o->massInv / 2, impulseV.z);
-    (o->linearVel).x = (o->linearVel).x + deltaV.x;
-    (o->linearVel).y = (o->linearVel).y + deltaV.y;
-    (o->linearVel).z = (o->linearVel).z + deltaV.z;
-    /* MATCH: deltaV = r x impulseV computed TWICE (duplicate statements in retail source;
-       oracle carries both rounds ~30 insns - do NOT "simplify" the repeat away) */
-    deltaV.x = (r.y / 256) * (impulseV.z / 256) - (r.z / 256) * (impulseV.y / 256);
-    deltaV.y = (r.z / 256) * (impulseV.x / 256) - (r.x / 256) * (impulseV.z / 256);
-    deltaV.z = (r.x / 256) * (impulseV.y / 256) - (r.y / 256) * (impulseV.x / 256);
-    deltaV.x = (r.y / 256) * (impulseV.z / 256) - (r.z / 256) * (impulseV.y / 256);
-    deltaV.y = (r.z / 256) * (impulseV.x / 256) - (r.x / 256) * (impulseV.z / 256);
-    deltaV.z = (r.x / 256) * (impulseV.y / 256) - (r.y / 256) * (impulseV.x / 256);
-    deltaV.x = fixedmult(o->moInertiaInv * 2, deltaV.x);
-    deltaV.y = fixedmult(o->moInertiaInv * 2, deltaV.y);
-    deltaV.z = fixedmult(o->moInertiaInv * 2, deltaV.z);
-    (o->angularVel).x = (o->angularVel).x + deltaV.x;
-    (o->angularVel).y = (o->angularVel).y + deltaV.y;
-    (o->angularVel).z = (o->angularVel).z + deltaV.z;
+
+  iVar1 = (o->linearVel).x;
+
+  if (iVar1 < 0) {
+
+    iVar1 = iVar1 + 0xff;
+
   }
+
+  iVar7 = iVar14;
+
+  if (iVar14 < 0) {
+
+    iVar7 = iVar14 + 0xff;
+
+  }
+
+  iVar2 = (o->linearVel).y;
+
+  if (iVar2 < 0) {
+
+    iVar2 = iVar2 + 0xff;
+
+  }
+
+  iVar3 = iVar17;
+
+  if (iVar17 < 0) {
+
+    iVar3 = iVar17 + 0xff;
+
+  }
+
+  iVar8 = (o->linearVel).z;
+
+  iVar3 = iVar3 >> 8;
+
+  if (iVar8 < 0) {
+
+    iVar8 = iVar8 + 0xff;
+
+  }
+
+  iVar12 = p->x - (o->position).x;
+
+  iVar9 = p->y - (o->position).y;
+
+  iVar11 = p->z - (o->position).z;
+
+  iVar6 = (iVar6 >> 8) * (iVar1 >> 8) + (iVar7 >> 8) * (iVar2 >> 8) + iVar3 * (iVar8 >> 8);
+
+  iVar1 = iVar9;
+
+  if (iVar9 < 0) {
+
+    iVar1 = iVar9 + 0xff;
+
+  }
+
+  iVar2 = iVar11;
+
+  if (iVar11 < 0) {
+
+    iVar2 = iVar11 + 0xff;
+
+  }
+
+  local_70.x = (iVar1 >> 8) * iVar3 - (iVar2 >> 8) * (iVar7 >> 8);
+
+  iVar1 = iVar13;
+
+  if (iVar13 < 0) {
+
+    iVar1 = iVar13 + 0xff;
+
+  }
+
+  iVar7 = iVar12;
+
+  if (iVar12 < 0) {
+
+    iVar7 = iVar12 + 0xff;
+
+  }
+
+  local_70.y = (iVar2 >> 8) * (iVar1 >> 8) - (iVar7 >> 8) * iVar3;
+
+  iVar2 = iVar14;
+
+  if (iVar14 < 0) {
+
+    iVar2 = iVar14 + 0xff;
+
+  }
+
+  iVar3 = iVar9;
+
+  if (iVar9 < 0) {
+
+    iVar3 = iVar9 + 0xff;
+
+  }
+
+  local_70.z = (iVar7 >> 8) * (iVar2 >> 8) - (iVar3 >> 8) * (iVar1 >> 8);
+
+  iVar1 = (o->angularVel).x;
+
+  if (iVar1 < 0) {
+
+    iVar1 = iVar1 + 0xff;
+
+  }
+
+  iVar7 = local_70.x;
+
+  if (local_70.x < 0) {
+
+    iVar7 = local_70.x + 0xff;
+
+  }
+
+  iVar2 = (o->angularVel).y;
+
+  if (iVar2 < 0) {
+
+    iVar2 = iVar2 + 0xff;
+
+  }
+
+  iVar3 = local_70.y;
+
+  if (local_70.y < 0) {
+
+    iVar3 = local_70.y + 0xff;
+
+  }
+
+  iVar8 = (o->angularVel).z;
+
+  if (iVar8 < 0) {
+
+    iVar8 = iVar8 + 0xff;
+
+  }
+
+  iVar4 = local_70.z;
+
+  if (local_70.z < 0) {
+
+    iVar4 = local_70.z + 0xff;
+
+  }
+
+  iVar15 = o->massInv;
+
+  if (iVar15 < 0) {
+
+    iVar15 = iVar15 + 3;
+
+  }
+
+  iVar5 = Math_VectorLength2(&local_70);
+
+  iVar5 = fixedmult(iVar5,o->moInertiaInv << 1);
+
+  iVar1 = fixeddiv(-(iVar6 + (iVar1 >> 8) * (iVar7 >> 8) + (iVar2 >> 8) * (iVar3 >> 8) +
+
+                               (iVar8 >> 8) * (iVar4 >> 8)),(iVar15 >> 2) + iVar5 / 2);
+
+  iVar1 = fixedmult(iVar1,0x6666);
+
+  if (iVar6 < 0) {
+
+    iVar6 = -iVar6;
+
+  }
+
+  (o->collision).impulse = iVar6 << 2;
+
+  uVar10 = o->driveSurfaceType;
+
+  (o->collision).otherObj = (BO_tNewtonObj *)0x0;
+
+  (o->collision).sfxType = uVar10 | 0x30000;
+
+  iVar6 = p->y;
+
+  iVar7 = p->z;
+
+  (o->collision).collisionPoint.x = p->x;
+
+  (o->collision).collisionPoint.y = iVar6;
+
+  (o->collision).collisionPoint.z = iVar7;
+
+  if (((local_60 != 0) || (local_5c != 0)) || (local_58 != 0)) {
+
+    iVar6 = local_60;
+
+    if (local_60 < 0) {
+
+      iVar6 = local_60 + 0xff;
+
+    }
+
+    iVar16 = iVar13;
+
+    if (iVar13 < 0) {
+
+      iVar16 = iVar13 + 0xff;
+
+    }
+
+    iVar7 = local_5c;
+
+    if (local_5c < 0) {
+
+      iVar7 = local_5c + 0xff;
+
+    }
+
+    iVar2 = iVar14;
+
+    if (iVar14 < 0) {
+
+      iVar2 = iVar14 + 0xff;
+
+    }
+
+    iVar3 = local_58;
+
+    if (local_58 < 0) {
+
+      iVar3 = local_58 + 0xff;
+
+    }
+
+    iVar8 = iVar17;
+
+    if (iVar17 < 0) {
+
+      iVar8 = iVar17 + 0xff;
+
+    }
+
+    iVar6 = (iVar6 >> 8) * (iVar16 >> 8) + (iVar7 >> 8) * (iVar2 >> 8) + (iVar3 >> 8) * (iVar8 >> 8)
+
+    ;
+
+    if (iVar6 < 0) {
+
+      iVar6 = iVar6 + 0xff;
+
+    }
+
+    iVar6 = iVar6 >> 8;
+
+    local_60 = local_60 - iVar6 * (iVar16 >> 8);
+
+    local_5c = local_5c - iVar6 * (iVar2 >> 8);
+
+    local_58 = local_58 - iVar6 * (iVar8 >> 8);
+
+    iVar6 = local_60;
+
+    if (local_60 < 0) {
+
+      iVar6 = local_60 + 0xff;
+
+    }
+
+    iVar16 = local_5c;
+
+    if (local_5c < 0) {
+
+      iVar16 = local_5c + 0xff;
+
+    }
+
+    iVar7 = local_58;
+
+    if (local_58 < 0) {
+
+      iVar7 = local_58 + 0xff;
+
+    }
+
+    iVar16 = fixedsqrt((iVar6 >> 8) * (iVar6 >> 8) + (iVar16 >> 8) * (iVar16 >> 8) +
+
+                        (iVar7 >> 8) * (iVar7 >> 8));
+
+    if (iVar16 / 2 == 0) {
+
+      local_60 = fixedmult(-0x10000,local_60);
+
+      local_5c = fixedmult(-0x10000,local_5c);
+
+      iVar6 = -0x10000;
+
+    }
+
+    else {
+
+      iVar6 = fixeddiv(0x8000,iVar16 / 2);
+
+      iVar6 = -iVar6;
+
+      local_60 = fixedmult(iVar6,local_60);
+
+      local_5c = fixedmult(iVar6,local_5c);
+
+    }
+
+    local_58 = fixedmult(iVar6,local_58);
+
+  }
+
+  iVar6 = o->speedXZ;
+
+  if (iVar6 < 0) {
+
+    iVar6 = -iVar6;
+
+  }
+
+  if (iVar6 < 0xa0000) {
+
+    local_30 = 0;
+
+    local_2c = 0x10000;
+
+    local_28 = 0;
+
+    iVar6 = (o->orientMat).m[1];
+
+    if (iVar6 < 0) {
+
+      iVar6 = iVar6 + 0xff;
+
+    }
+
+    iVar7 = (iVar6 >> 8) * 0x100;
+
+    iVar2 = (o->orientMat).m[4];
+
+    if (iVar2 < 0) {
+
+      iVar2 = iVar2 + 0xff;
+
+    }
+
+    iVar3 = (o->orientMat).m[7];
+
+    if (iVar3 < 0) {
+
+      iVar3 = iVar3 + 0xff;
+
+    }
+
+    iVar8 = (iVar3 >> 8) * 0x100;
+
+    if (iVar7 < 0) {
+
+      iVar7 = (iVar6 >> 8) * -0x100;
+
+    }
+
+    if (iVar7 < 0xf5c3) {
+
+      if (iVar8 < 0) {
+
+        iVar8 = (iVar3 >> 8) * -0x100;
+
+      }
+
+      if ((iVar8 < 0xf5c3) && (-0xf5c3 < (iVar2 >> 8) * 0x100)) goto LAB_8008d204;
+
+    }
+
+    frictionLess = 1;
+
+  }
+
+LAB_8008d204:
+
+  iVar6 = 0x8000;
+
+  if (frictionLess == 1) {
+
+    iVar6 = 0x28f;
+
+  }
+
+  iVar7 = fixedmult(iVar6,iVar1);
+
+  iVar6 = fixedmult(iVar7,o->massInv / 2);
+
+  local_50 = fixedmult(iVar6,local_60);
+
+  iVar6 = fixedmult(iVar7,o->massInv / 2);
+
+  local_4c = fixedmult(iVar6,local_5c);
+
+  iVar6 = fixedmult(iVar7,o->massInv / 2);
+
+  local_48 = fixedmult(iVar6,local_58);
+
+  frictionLess = 0;
+
+  iVar2 = fixedmult(iVar7,o->moInertiaInv << 1);
+
+  iVar6 = iVar11;
+
+  if (iVar11 < 0) {
+
+    iVar6 = iVar11 + 0xff;
+
+  }
+
+  iVar3 = local_58;
+
+  if (local_58 < 0) {
+
+    iVar3 = local_58 + 0xff;
+
+  }
+
+  iVar8 = iVar9;
+
+  if (iVar9 < 0) {
+
+    iVar8 = iVar9 + 0xff;
+
+  }
+
+  iVar4 = iVar12;
+
+  if (iVar12 < 0) {
+
+    iVar4 = iVar12 + 0xff;
+
+  }
+
+  iVar15 = local_60;
+
+  if (local_60 < 0) {
+
+    iVar15 = local_60 + 0xff;
+
+  }
+
+  iVar3 = (iVar3 >> 8) * (iVar4 >> 8) - (iVar15 >> 8) * (iVar6 >> 8);
+
+  iVar6 = local_5c;
+
+  if (local_5c < 0) {
+
+    iVar6 = local_5c + 0xff;
+
+  }
+
+  iVar6 = (iVar15 >> 8) * (iVar8 >> 8) - (iVar6 >> 8) * (iVar4 >> 8);
+
+  if (iVar3 < 0) {
+
+    iVar3 = iVar3 + 0xff;
+
+  }
+
+  iVar8 = iVar11;
+
+  if (iVar11 < 0) {
+
+    iVar8 = iVar11 + 0xff;
+
+  }
+
+  if (iVar6 < 0) {
+
+    iVar6 = iVar6 + 0xff;
+
+  }
+
+  iVar4 = iVar9;
+
+  if (iVar9 < 0) {
+
+    iVar4 = iVar9 + 0xff;
+
+  }
+
+  local_40 = (iVar3 >> 8) * (iVar8 >> 8) - (iVar6 >> 8) * (iVar4 >> 8);
+
+  iVar3 = iVar12;
+
+  if (iVar12 < 0) {
+
+    iVar3 = iVar12 + 0xff;
+
+  }
+
+  iVar15 = local_40;
+
+  if (local_40 < 0) {
+
+    iVar15 = local_40 + 0xff;
+
+  }
+
+  local_3c = (iVar6 >> 8) * (iVar3 >> 8) - (iVar15 >> 8) * (iVar8 >> 8);
+
+  iVar6 = local_3c;
+
+  if (local_3c < 0) {
+
+    iVar6 = local_3c + 0xff;
+
+  }
+
+  local_38 = (iVar15 >> 8) * (iVar4 >> 8) - (iVar6 >> 8) * (iVar3 >> 8);
+
+  local_40 = fixedmult(iVar2,local_40);
+
+  local_3c = fixedmult(iVar2,local_3c);
+
+  local_38 = fixedmult(iVar2,local_38);
+
+  local_50 = local_50 + local_40;
+
+  local_48 = local_48 + local_38;
+
+  local_4c = local_4c + local_3c;
+
+  iVar6 = local_50;
+
+  if (local_50 < 0) {
+
+    iVar6 = local_50 + 0xff;
+
+  }
+
+  iVar2 = local_60;
+
+  if (local_60 < 0) {
+
+    iVar2 = local_60 + 0xff;
+
+  }
+
+  iVar3 = local_4c;
+
+  if (local_4c < 0) {
+
+    iVar3 = local_4c + 0xff;
+
+  }
+
+  iVar8 = local_5c;
+
+  if (local_5c < 0) {
+
+    iVar8 = local_5c + 0xff;
+
+  }
+
+  iVar4 = local_48;
+
+  if (local_48 < 0) {
+
+    iVar4 = local_48 + 0xff;
+
+  }
+
+  iVar15 = local_58;
+
+  if (local_58 < 0) {
+
+    iVar15 = local_58 + 0xff;
+
+  }
+
+  iVar6 = (iVar6 >> 8) * (iVar2 >> 8) + (iVar3 >> 8) * (iVar8 >> 8) + (iVar4 >> 8) * (iVar15 >> 8);
+
+  if (iVar16 < iVar6) {
+
+    iVar6 = fixeddiv(iVar16,iVar6);
+
+    iVar7 = fixedmult(iVar7,iVar6);
+
+  }
+
+  local_60 = fixedmult(iVar7,local_60);
+
+  local_5c = fixedmult(iVar7,local_5c);
+
+  local_58 = fixedmult(iVar7,local_58);
+
+  if (0 < iVar1) {
+
+    iVar16 = fixedmult(iVar1,iVar13);
+
+    iVar13 = fixedmult(iVar1,iVar14);
+
+    iVar1 = fixedmult(iVar1,iVar17);
+
+    iVar16 = iVar16 + local_60;
+
+    iVar1 = iVar1 + local_58;
+
+    iVar13 = iVar13 + local_5c;
+
+    iVar6 = fixedmult(o->massInv / 2,iVar16);
+
+    iVar14 = fixedmult(o->massInv / 2,iVar13);
+
+    iVar17 = fixedmult(o->massInv / 2,iVar1);
+
+    (o->linearVel).x = (o->linearVel).x + iVar6;
+
+    (o->linearVel).y = (o->linearVel).y + iVar14;
+
+    (o->linearVel).z = (o->linearVel).z + iVar17;
+
+    iVar6 = iVar9;
+
+    if (iVar9 < 0) {
+
+      iVar6 = iVar9 + 0xff;
+
+    }
+
+    if (iVar1 < 0) {
+
+      iVar1 = iVar1 + 0xff;
+
+    }
+
+    if (iVar11 < 0) {
+
+      iVar11 = iVar11 + 0xff;
+
+    }
+
+    if (iVar13 < 0) {
+
+      iVar13 = iVar13 + 0xff;
+
+    }
+
+    if (iVar16 < 0) {
+
+      iVar16 = iVar16 + 0xff;
+
+    }
+
+    if (iVar12 < 0) {
+
+      iVar12 = iVar12 + 0xff;
+
+    }
+
+    if (iVar9 < 0) {
+
+      iVar9 = iVar9 + 0xff;
+
+    }
+
+    iVar6 = fixedmult(o->moInertiaInv << 1,
+
+                       (iVar6 >> 8) * (iVar1 >> 8) - (iVar11 >> 8) * (iVar13 >> 8));
+
+    iVar14 = fixedmult(o->moInertiaInv << 1,
+
+                        (iVar11 >> 8) * (iVar16 >> 8) - (iVar12 >> 8) * (iVar1 >> 8));
+
+    iVar16 = fixedmult(o->moInertiaInv << 1,
+
+                        (iVar12 >> 8) * (iVar13 >> 8) - (iVar9 >> 8) * (iVar16 >> 8));
+
+    (o->angularVel).x = (o->angularVel).x + iVar6;
+
+    (o->angularVel).y = (o->angularVel).y + iVar14;
+
+    (o->angularVel).z = (o->angularVel).z + iVar16;
+
+  }
+
+  return;
+
 }
 
 /* ---- Collide_LimitAngularVel__FP13BO_tNewtonObj  [@0x8008d8b4] ---- */
@@ -392,7 +1773,13 @@ void Collide_LimitAngularVel(BO_tNewtonObj *o)
 
   else {
 
-    iVar2 = (0x18000 < iVar1) ? 0x18000 : iVar1;
+    iVar2 = 0x18000;
+
+    if (iVar1 < 0x18001) {
+
+      iVar2 = iVar1;
+
+    }
 
     (o->angularVel).x = iVar2;
 
@@ -414,7 +1801,13 @@ void Collide_LimitAngularVel(BO_tNewtonObj *o)
 
   else {
 
-    iVar2 = (0x18000 < iVar1) ? 0x18000 : iVar1;
+    iVar2 = 0x18000;
+
+    if (iVar1 < 0x18001) {
+
+      iVar2 = iVar1;
+
+    }
 
     (o->angularVel).y = iVar2;
 
@@ -436,7 +1829,13 @@ void Collide_LimitAngularVel(BO_tNewtonObj *o)
 
   }
 
-  iVar2 = (0x18000 < iVar1) ? 0x18000 : iVar1;
+  iVar2 = 0x18000;
+
+  if (iVar1 < 0x18001) {
+
+    iVar2 = iVar1;
+
+  }
 
   (o->angularVel).z = iVar2;
 
@@ -445,7 +1844,10 @@ void Collide_LimitAngularVel(BO_tNewtonObj *o)
 }
 
 /* ---- Collide_TestWithPlane__FP13BO_tNewtonObjP8coorddefT1  [@0x8008d9a8] ---- */
-void Collide_TestWithPlane(BO_tNewtonObj *o,coorddef *normal,coorddef *samplePoint)
+extern "C" void Collide_TestWithPlane(BO_tNewtonObj *o,coorddef *normal,coorddef *samplePoint)
+
+
+
 {
   int raiseUp;
   int basisDots[3];
@@ -454,206 +1856,870 @@ void Collide_TestWithPlane(BO_tNewtonObj *o,coorddef *normal,coorddef *samplePoi
   int xDir;
   int Y_DIR;
   int zDir;
-  int relDotFull;
+  int height;
+  coorddef Raise;
+  coorddef vertexVelocity;
+  coorddef r;
+  coorddef spot;
+  int correction;
+  int v2;
+  int impulse;
+  int right;
+  int top;
+  int front;
 
-  /* MATCH: SYM rule-8 rebuild - names/blocks from the SYM 8c block; inline /256 idiom
-     (no hoisted temps); X_DIR*((m/256)*(dim/256)) association.
-     CORRECTNESS fix (oracle-evidenced): the Collide_gRaiseUp gp-rel GATE around both the
-     raise-position block AND the bounce block was folded out by Ghidra (section 3.2c class)
-     - restored at both sites. */
-  (o->angularVel).x = fixedmult(0x6487e,(o->angularVel).x);
-  (o->angularVel).y = fixedmult(0x6487e,(o->angularVel).y);
-  (o->angularVel).z = fixedmult(0x6487e,(o->angularVel).z);
-  raiseUp = 0;
+  bool bVar1;
+
+  int iVar2;
+
+  int iVar3;
+
+  int iVar4;
+
+  int iVar5;
+
+  int iVar6;
+
+  int iVar7;
+
+  int iVar8;
+
+  int iVar9;
+
+  int iVar10;
+
+  int iVar11;
+
+  int iVar12;
+
+  int iVar13;
+
+  u_int zone;
+
+  int local_5c;
+
+  coorddef local_50;
+
+  int local_40;
+
+  int local_3c;
+
+  int local_38;
+
+  coorddef local_30;
+
+  
+
+  iVar2 = fixedmult(0x6487e,(o->angularVel).x);
+
+  (o->angularVel).x = iVar2;
+
+  iVar2 = fixedmult(0x6487e,(o->angularVel).y);
+
+  (o->angularVel).y = iVar2;
+
+  iVar2 = fixedmult(0x6487e,(o->angularVel).z);
+
+  (o->angularVel).z = iVar2;
+
   if (((normal->x == 0) && (normal->y == 0)) && (normal->z == 0)) {
+
     normal->y = 0x10000;
-  }
-  basisDots[0] = ((normal->x / 256) * ((o->orientMat).m[0] / 256) +
-                  (normal->y / 256) * ((o->orientMat).m[1] / 256) +
-                  (normal->z / 256) * ((o->orientMat).m[2] / 256)) / 256 *
-                 ((o->dimension).x / 256);
-  basisDots[1] = ((normal->x / 256) * ((o->orientMat).m[3] / 256) +
-                  (normal->y / 256) * ((o->orientMat).m[4] / 256) +
-                  (normal->z / 256) * ((o->orientMat).m[5] / 256)) / 256 *
-                 ((o->dimension).y / 256);
-  basisDots[2] = ((normal->x / 256) * ((o->orientMat).m[6] / 256) +
-                  (normal->y / 256) * ((o->orientMat).m[7] / 256) +
-                  (normal->z / 256) * ((o->orientMat).m[8] / 256)) / 256 *
-                 ((o->dimension).z / 256);
-  xDir = -1;
-  if (basisDots[0] < 0) {
-    xDir = 1;
-  }
-  Y_DIR = -1;
-  if (basisDots[1] < 0) {
-    Y_DIR = 1;
-  }
-  zDir = -1;
-  if (basisDots[2] < 0) {
-    zDir = 1;
-  }
-  relativePos.x = (o->position).x - samplePoint->x;
-  relativePos.y = (o->position).y - samplePoint->y;
-  relativePos.z = (o->position).z - samplePoint->z;
-  /* MATCH: two statements - rel-group lands in relativeDot ($v1 per SYM) first */
-  relativeDot = (normal->x / 256) * (relativePos.x / 256) +
-                (normal->y / 256) * (relativePos.y / 256) +
-                (normal->z / 256) * (relativePos.z / 256);
-  /* MATCH: fresh (anonymous) result var - oracle keeps the full sum in a scratch ($a1),
-     Asum as LEFT addu operand; accumulating into relativeDot itself flips the operands */
-  relDotFull = (xDir * basisDots[0] + Y_DIR * basisDots[1] + zDir * basisDots[2]) + relativeDot;
-  if (relDotFull < 0) {
-    int height;
-    coorddef Raise;
-    coorddef vertexVelocity;
-    coorddef r;
-    coorddef spot;
 
-    spot.x = (o->position).x +
-             xDir * (((o->orientMat).m[0] / 256) * ((o->dimension).x / 256)) +
-             Y_DIR * (((o->orientMat).m[3] / 256) * ((o->dimension).y / 256)) +
-             zDir * (((o->orientMat).m[6] / 256) * ((o->dimension).z / 256));
-    spot.y = (o->position).y +
-             xDir * (((o->orientMat).m[1] / 256) * ((o->dimension).x / 256)) +
-             Y_DIR * (((o->orientMat).m[4] / 256) * ((o->dimension).y / 256)) +
-             zDir * (((o->orientMat).m[7] / 256) * ((o->dimension).z / 256));
-    spot.z = (o->position).z +
-             xDir * (((o->orientMat).m[2] / 256) * ((o->dimension).x / 256)) +
-             Y_DIR * (((o->orientMat).m[5] / 256) * ((o->dimension).y / 256)) +
-             zDir * (((o->orientMat).m[8] / 256) * ((o->dimension).z / 256));
-    if (raiseUp < -relDotFull) {
-      raiseUp = -relDotFull;
-    }
-    if (Collide_gRaiseUp != 0) {
-      if (raiseUp != 0) {
-        height = raiseUp / 2;
-        Raise.x = fixedmult(height,normal->x);
-        Raise.y = fixedmult(height,normal->y);
-        Raise.z = fixedmult(height,normal->z);
-        (o->position).x = (o->position).x + Raise.x;
-        (o->position).y = (o->position).y + Raise.y;
-        (o->position).z = (o->position).z + Raise.z;
-      }
-    }
-    r.x = spot.x - (o->position).x;
-    r.y = spot.y - (o->position).y;
-    r.z = spot.z - (o->position).z;
-    vertexVelocity.x = ((o->angularVel).y / 256) * (r.z / 256) -
-                       ((o->angularVel).z / 256) * (r.y / 256);
-    vertexVelocity.y = ((o->angularVel).z / 256) * (r.x / 256) -
-                       ((o->angularVel).x / 256) * (r.z / 256);
-    vertexVelocity.z = ((o->angularVel).x / 256) * (r.y / 256) -
-                       ((o->angularVel).y / 256) * (r.x / 256);
-    vertexVelocity.x = vertexVelocity.x + (o->linearVel).x;
-    vertexVelocity.y = vertexVelocity.y + (o->linearVel).y;
-    vertexVelocity.z = vertexVelocity.z + (o->linearVel).z;
-    if ((normal->x / 256) * (vertexVelocity.x / 256) +
-        (normal->y / 256) * (vertexVelocity.y / 256) +
-        (normal->z / 256) * (vertexVelocity.z / 256) < 0) {
-      Collide_DoObjectFixedObjectCollision(o,&spot,&vertexVelocity,normal);
-    }
-    if (Collide_gRaiseUp != 0) {
-      if (raiseUp != 0) {
-        if (0 < Raise.y) {
-          int correction;
-          int v2;
-
-          correction = fixedmult(0x9cccc,Raise.y) * 2;
-          v2 = fixedmult((o->linearVel).y,(o->linearVel).y);
-          if (v2 < correction) {
-            (o->linearVel).y = 0;
-          }
-          else if (0 < (o->linearVel).y) {
-            (o->linearVel).y = fixedsqrt(v2 - correction);
-          }
-          else {
-            (o->linearVel).y = -fixedsqrt(v2 - correction);
-          }
-        }
-      }
-    }
   }
-  (o->angularVel).x = fixedmult(0x28be,(o->angularVel).x);
-  (o->angularVel).y = fixedmult(0x28be,(o->angularVel).y);
-  (o->angularVel).z = fixedmult(0x28be,(o->angularVel).z);
+
+  iVar2 = normal->x;
+
+  if (iVar2 < 0) {
+
+    iVar2 = iVar2 + 0xff;
+
+  }
+
+  iVar3 = (o->orientMat).m[0];
+
+  if (iVar3 < 0) {
+
+    iVar3 = iVar3 + 0xff;
+
+  }
+
+  iVar8 = normal->y;
+
+  if (iVar8 < 0) {
+
+    iVar8 = iVar8 + 0xff;
+
+  }
+
+  iVar4 = (o->orientMat).m[1];
+
+  if (iVar4 < 0) {
+
+    iVar4 = iVar4 + 0xff;
+
+  }
+
+  iVar9 = normal->z;
+
+  if (iVar9 < 0) {
+
+    iVar9 = iVar9 + 0xff;
+
+  }
+
+  iVar5 = (o->orientMat).m[2];
+
+  if (iVar5 < 0) {
+
+    iVar5 = iVar5 + 0xff;
+
+  }
+
+  iVar2 = (iVar2 >> 8) * (iVar3 >> 8) + (iVar8 >> 8) * (iVar4 >> 8) + (iVar9 >> 8) * (iVar5 >> 8);
+
+  if (iVar2 < 0) {
+
+    iVar2 = iVar2 + 0xff;
+
+  }
+
+  iVar3 = (o->dimension).x;
+
+  if (iVar3 < 0) {
+
+    iVar3 = iVar3 + 0xff;
+
+  }
+
+  iVar2 = (iVar2 >> 8) * (iVar3 >> 8);
+
+  iVar3 = normal->x;
+
+  if (iVar3 < 0) {
+
+    iVar3 = iVar3 + 0xff;
+
+  }
+
+  iVar8 = (o->orientMat).m[3];
+
+  if (iVar8 < 0) {
+
+    iVar8 = iVar8 + 0xff;
+
+  }
+
+  iVar4 = normal->y;
+
+  if (iVar4 < 0) {
+
+    iVar4 = iVar4 + 0xff;
+
+  }
+
+  iVar9 = (o->orientMat).m[4];
+
+  if (iVar9 < 0) {
+
+    iVar9 = iVar9 + 0xff;
+
+  }
+
+  iVar5 = normal->z;
+
+  if (iVar5 < 0) {
+
+    iVar5 = iVar5 + 0xff;
+
+  }
+
+  iVar6 = (o->orientMat).m[5];
+
+  if (iVar6 < 0) {
+
+    iVar6 = iVar6 + 0xff;
+
+  }
+
+  iVar3 = (iVar3 >> 8) * (iVar8 >> 8) + (iVar4 >> 8) * (iVar9 >> 8) + (iVar5 >> 8) * (iVar6 >> 8);
+
+  if (iVar3 < 0) {
+
+    iVar3 = iVar3 + 0xff;
+
+  }
+
+  iVar8 = (o->dimension).y;
+
+  if (iVar8 < 0) {
+
+    iVar8 = iVar8 + 0xff;
+
+  }
+
+  iVar3 = (iVar3 >> 8) * (iVar8 >> 8);
+
+  iVar8 = normal->x;
+
+  if (iVar8 < 0) {
+
+    iVar8 = iVar8 + 0xff;
+
+  }
+
+  iVar4 = (o->orientMat).m[6];
+
+  if (iVar4 < 0) {
+
+    iVar4 = iVar4 + 0xff;
+
+  }
+
+  iVar9 = normal->y;
+
+  if (iVar9 < 0) {
+
+    iVar9 = iVar9 + 0xff;
+
+  }
+
+  iVar5 = (o->orientMat).m[7];
+
+  if (iVar5 < 0) {
+
+    iVar5 = iVar5 + 0xff;
+
+  }
+
+  iVar6 = normal->z;
+
+  if (iVar6 < 0) {
+
+    iVar6 = iVar6 + 0xff;
+
+  }
+
+  iVar7 = (o->orientMat).m[8];
+
+  if (iVar7 < 0) {
+
+    iVar7 = iVar7 + 0xff;
+
+  }
+
+  iVar8 = (iVar8 >> 8) * (iVar4 >> 8) + (iVar9 >> 8) * (iVar5 >> 8) + (iVar6 >> 8) * (iVar7 >> 8);
+
+  if (iVar8 < 0) {
+
+    iVar8 = iVar8 + 0xff;
+
+  }
+
+  iVar4 = (o->dimension).z;
+
+  if (iVar4 < 0) {
+
+    iVar4 = iVar4 + 0xff;
+
+  }
+
+  iVar8 = (iVar8 >> 8) * (iVar4 >> 8);
+
+  iVar4 = -1;
+
+  if (iVar2 < 0) {
+
+    iVar4 = 1;
+
+  }
+
+  iVar9 = -1;
+
+  if (iVar3 < 0) {
+
+    iVar9 = 1;
+
+  }
+
+  iVar5 = -1;
+
+  if (iVar8 < 0) {
+
+    iVar5 = 1;
+
+  }
+
+  iVar6 = (o->position).x - samplePoint->x;
+
+  iVar7 = (o->position).y - samplePoint->y;
+
+  iVar13 = (o->position).z - samplePoint->z;
+
+  iVar10 = normal->x;
+
+  if (iVar10 < 0) {
+
+    iVar10 = iVar10 + 0xff;
+
+  }
+
+  if (iVar6 < 0) {
+
+    iVar6 = iVar6 + 0xff;
+
+  }
+
+  iVar11 = normal->y;
+
+  if (iVar11 < 0) {
+
+    iVar11 = iVar11 + 0xff;
+
+  }
+
+  if (iVar7 < 0) {
+
+    iVar7 = iVar7 + 0xff;
+
+  }
+
+  iVar12 = normal->z;
+
+  if (iVar12 < 0) {
+
+    iVar12 = iVar12 + 0xff;
+
+  }
+
+  if (iVar13 < 0) {
+
+    iVar13 = iVar13 + 0xff;
+
+  }
+
+  iVar2 = iVar4 * iVar2 + iVar9 * iVar3 + iVar5 * iVar8 +
+
+          (iVar10 >> 8) * (iVar6 >> 8) + (iVar11 >> 8) * (iVar7 >> 8) +
+
+          (iVar12 >> 8) * (iVar13 >> 8);
+
+  if (iVar2 < 0) {
+
+    iVar3 = (o->orientMat).m[0];
+
+    if (iVar3 < 0) {
+
+      iVar3 = iVar3 + 0xff;
+
+    }
+
+    iVar8 = (o->dimension).x;
+
+    if (iVar8 < 0) {
+
+      iVar8 = iVar8 + 0xff;
+
+    }
+
+    iVar6 = (o->orientMat).m[3];
+
+    if (iVar6 < 0) {
+
+      iVar6 = iVar6 + 0xff;
+
+    }
+
+    iVar7 = (o->dimension).y;
+
+    if (iVar7 < 0) {
+
+      iVar7 = iVar7 + 0xff;
+
+    }
+
+    iVar13 = (o->orientMat).m[6];
+
+    if (iVar13 < 0) {
+
+      iVar13 = iVar13 + 0xff;
+
+    }
+
+    iVar10 = (o->dimension).z;
+
+    if (iVar10 < 0) {
+
+      iVar10 = iVar10 + 0xff;
+
+    }
+
+    local_30.x = (o->position).x + iVar4 * (iVar3 >> 8) * (iVar8 >> 8) +
+
+                 iVar9 * (iVar6 >> 8) * (iVar7 >> 8) + iVar5 * (iVar13 >> 8) * (iVar10 >> 8);
+
+    iVar3 = (o->orientMat).m[1];
+
+    if (iVar3 < 0) {
+
+      iVar3 = iVar3 + 0xff;
+
+    }
+
+    iVar8 = (o->dimension).x;
+
+    if (iVar8 < 0) {
+
+      iVar8 = iVar8 + 0xff;
+
+    }
+
+    iVar6 = (o->orientMat).m[4];
+
+    if (iVar6 < 0) {
+
+      iVar6 = iVar6 + 0xff;
+
+    }
+
+    iVar7 = (o->dimension).y;
+
+    if (iVar7 < 0) {
+
+      iVar7 = iVar7 + 0xff;
+
+    }
+
+    iVar13 = (o->orientMat).m[7];
+
+    if (iVar13 < 0) {
+
+      iVar13 = iVar13 + 0xff;
+
+    }
+
+    iVar10 = (o->dimension).z;
+
+    if (iVar10 < 0) {
+
+      iVar10 = iVar10 + 0xff;
+
+    }
+
+    local_30.y = (o->position).y + iVar4 * (iVar3 >> 8) * (iVar8 >> 8) +
+
+                 iVar9 * (iVar6 >> 8) * (iVar7 >> 8) + iVar5 * (iVar13 >> 8) * (iVar10 >> 8);
+
+    iVar3 = (o->orientMat).m[2];
+
+    if (iVar3 < 0) {
+
+      iVar3 = iVar3 + 0xff;
+
+    }
+
+    iVar8 = (o->dimension).x;
+
+    if (iVar8 < 0) {
+
+      iVar8 = iVar8 + 0xff;
+
+    }
+
+    iVar6 = (o->orientMat).m[5];
+
+    if (iVar6 < 0) {
+
+      iVar6 = iVar6 + 0xff;
+
+    }
+
+    iVar7 = (o->dimension).y;
+
+    if (iVar7 < 0) {
+
+      iVar7 = iVar7 + 0xff;
+
+    }
+
+    iVar13 = (o->orientMat).m[8];
+
+    if (iVar13 < 0) {
+
+      iVar13 = iVar13 + 0xff;
+
+    }
+
+    iVar10 = (o->dimension).z;
+
+    if (iVar10 < 0) {
+
+      iVar10 = iVar10 + 0xff;
+
+    }
+
+    iVar2 = -iVar2;
+
+    local_30.z = (o->position).z + iVar4 * (iVar3 >> 8) * (iVar8 >> 8) +
+
+                 iVar9 * (iVar6 >> 8) * (iVar7 >> 8) + iVar5 * (iVar13 >> 8) * (iVar10 >> 8);
+
+    iVar3 = 0;
+
+    if (0 < iVar2) {
+
+      iVar3 = iVar2;
+
+    }
+
+    if (iVar3 != 0) {
+
+      iVar8 = iVar3 / 2;
+
+      iVar2 = fixedmult(iVar8,normal->x);
+
+      local_5c = fixedmult(iVar8,normal->y);
+
+      iVar8 = fixedmult(iVar8,normal->z);
+
+      (o->position).x = (o->position).x + iVar2;
+
+      (o->position).y = (o->position).y + local_5c;
+
+      (o->position).z = (o->position).z + iVar8;
+
+    }
+
+    local_40 = local_30.x - (o->position).x;
+
+    local_3c = local_30.y - (o->position).y;
+
+    local_38 = local_30.z - (o->position).z;
+
+    iVar2 = (o->angularVel).y;
+
+    if (iVar2 < 0) {
+
+      iVar2 = iVar2 + 0xff;
+
+    }
+
+    iVar8 = local_38;
+
+    if (local_38 < 0) {
+
+      iVar8 = local_38 + 0xff;
+
+    }
+
+    iVar4 = (o->angularVel).z;
+
+    if (iVar4 < 0) {
+
+      iVar4 = iVar4 + 0xff;
+
+    }
+
+    iVar9 = local_3c;
+
+    if (local_3c < 0) {
+
+      iVar9 = local_3c + 0xff;
+
+    }
+
+    iVar5 = (o->angularVel).z;
+
+    if (iVar5 < 0) {
+
+      iVar5 = iVar5 + 0xff;
+
+    }
+
+    iVar6 = local_40;
+
+    if (local_40 < 0) {
+
+      iVar6 = local_40 + 0xff;
+
+    }
+
+    iVar7 = (o->angularVel).x;
+
+    if (iVar7 < 0) {
+
+      iVar7 = iVar7 + 0xff;
+
+    }
+
+    iVar13 = (o->angularVel).x;
+
+    if (iVar13 < 0) {
+
+      iVar13 = iVar13 + 0xff;
+
+    }
+
+    iVar10 = (o->angularVel).y;
+
+    if (iVar10 < 0) {
+
+      iVar10 = iVar10 + 0xff;
+
+    }
+
+    iVar11 = local_40;
+
+    if (local_40 < 0) {
+
+      iVar11 = local_40 + 0xff;
+
+    }
+
+    local_50.x = ((iVar2 >> 8) * (iVar8 >> 8) - (iVar4 >> 8) * (iVar9 >> 8)) + (o->linearVel).x;
+
+    local_50.y = ((iVar5 >> 8) * (iVar6 >> 8) - (iVar7 >> 8) * (iVar8 >> 8)) + (o->linearVel).y;
+
+    local_50.z = ((iVar13 >> 8) * (iVar9 >> 8) - (iVar10 >> 8) * (iVar11 >> 8)) + (o->linearVel).z;
+
+    iVar2 = normal->x;
+
+    if (iVar2 < 0) {
+
+      iVar2 = iVar2 + 0xff;
+
+    }
+
+    iVar8 = local_50.x;
+
+    if (local_50.x < 0) {
+
+      iVar8 = local_50.x + 0xff;
+
+    }
+
+    iVar4 = normal->y;
+
+    if (iVar4 < 0) {
+
+      iVar4 = iVar4 + 0xff;
+
+    }
+
+    iVar9 = local_50.y;
+
+    if (local_50.y < 0) {
+
+      iVar9 = local_50.y + 0xff;
+
+    }
+
+    iVar5 = normal->z;
+
+    if (iVar5 < 0) {
+
+      iVar5 = iVar5 + 0xff;
+
+    }
+
+    iVar6 = local_50.z;
+
+    if (local_50.z < 0) {
+
+      iVar6 = local_50.z + 0xff;
+
+    }
+
+    if ((iVar2 >> 8) * (iVar8 >> 8) + (iVar4 >> 8) * (iVar9 >> 8) + (iVar5 >> 8) * (iVar6 >> 8) < 0)
+
+    {
+
+      Collide_DoObjectFixedObjectCollision(o,&local_30,&local_50,normal);
+
+    }
+
+    if ((iVar3 != 0) && (0 < local_5c)) {
+
+      iVar2 = fixedmult(0x9cccc,local_5c);
+
+      iVar3 = (o->linearVel).y;
+
+      iVar3 = fixedmult(iVar3,iVar3);
+
+      if (iVar3 < iVar2 * 2) {
+
+        (o->linearVel).y = 0;
+
+      }
+
+      else if ((o->linearVel).y < 1) {
+
+        iVar2 = fixedsqrt(iVar3 + iVar2 * -2);
+
+        (o->linearVel).y = -iVar2;
+
+      }
+
+      else {
+
+        iVar2 = fixedsqrt(iVar3 + iVar2 * -2);
+
+        (o->linearVel).y = iVar2;
+
+      }
+
+    }
+
+  }
+
+  iVar2 = fixedmult(0x28be,(o->angularVel).x);
+
+  (o->angularVel).x = iVar2;
+
+  iVar2 = fixedmult(0x28be,(o->angularVel).y);
+
+  (o->angularVel).y = iVar2;
+
+  iVar2 = fixedmult(0x28be,(o->angularVel).z);
+
+  (o->angularVel).z = iVar2;
+
   Collide_LimitAngularVel(o);
-  {
-    int zone;
-    int impulse;
 
-    zone = 9;
-    /* MATCH: anonymous dot-sum web (s0) separate from impulse (s6) - the <<2 lands in impulse */
-    impulse =
-        ((0 < (fixedmult(normal->x,(o->linearVel).x) +
-               fixedmult(normal->y,(o->linearVel).y) +
-               fixedmult(normal->z,(o->linearVel).z)))
-             ? (fixedmult(normal->x,(o->linearVel).x) +
-                fixedmult(normal->y,(o->linearVel).y) +
-                fixedmult(normal->z,(o->linearVel).z))
-             : -(fixedmult(normal->x,(o->linearVel).x) +
-                 fixedmult(normal->y,(o->linearVel).y) +
-                 fixedmult(normal->z,(o->linearVel).z)))
-        << 2;
-    if (0xA0000 < impulse) {
-      int right;
-      int top;
-      int front;
+  zone = 9;
 
-      right = fixedmult(normal->x,(o->orientMat).m[0]) + fixedmult(normal->y,(o->orientMat).m[1]) +
-              fixedmult(normal->z,(o->orientMat).m[2]);
-      top = fixedmult(normal->x,(o->orientMat).m[3]) + fixedmult(normal->y,(o->orientMat).m[4]) +
-            fixedmult(normal->z,(o->orientMat).m[5]);
-      front = fixedmult(normal->x,(o->orientMat).m[6]) + fixedmult(normal->y,(o->orientMat).m[7]) +
-              fixedmult(normal->z,(o->orientMat).m[8]);
-      if (top < -0x8000) {
-        zone = 8;
-        Newton_AddDamageZone(o,impulse,zone,0);
-      }
-      if (front < -0x1999) {
-        if (!(right < 0x199A)) {
-          zone = 0;
-          goto LAB_DAMAGE_ZONE;
-        }
-        else if (right < -0x1999) {
-          zone = 2;
-          goto LAB_DAMAGE_ZONE;
-        }
-      }
-      if (!(front < 0x199A)) { /* MATCH: independent if - oracle re-tests front (no else-if) */
-        if (!(right < 0x199A)) {
-          zone = 4;
-        }
-        else if (right < -0x1999) {
-          zone = 6;
-        }
-      }
-LAB_DAMAGE_ZONE:
-      if (zone < 8) {
-        Newton_AddDamageZone(o,impulse,zone,0);
-      }
-    }
+  iVar2 = fixedmult(normal->x,(o->linearVel).x);
+
+  iVar3 = fixedmult(normal->y,(o->linearVel).y);
+
+  iVar8 = fixedmult(normal->z,(o->linearVel).z);
+
+  if (iVar2 + iVar3 + iVar8 < 1) {
+
+    iVar2 = fixedmult(normal->x,(o->linearVel).x);
+
+    iVar3 = fixedmult(normal->y,(o->linearVel).y);
+
+    iVar8 = fixedmult(normal->z,(o->linearVel).z);
+
+    iVar2 = -(iVar2 + iVar3 + iVar8);
+
   }
-  return;
-}
 
+  else {
+
+    iVar3 = fixedmult(normal->x,(o->linearVel).x);
+
+    iVar8 = fixedmult(normal->y,(o->linearVel).y);
+
+    iVar2 = fixedmult(normal->z,(o->linearVel).z);
+
+    iVar2 = iVar3 + iVar8 + iVar2;
+
+  }
+
+  iVar2 = iVar2 << 2;
+
+  if (iVar2 < 0xa0001) {
+
+    return;
+
+  }
+
+  iVar3 = fixedmult(normal->x,(o->orientMat).m[0]);
+
+  iVar8 = fixedmult(normal->y,(o->orientMat).m[1]);
+
+  iVar4 = fixedmult(normal->z,(o->orientMat).m[2]);
+
+  iVar4 = iVar3 + iVar8 + iVar4;
+
+  iVar3 = fixedmult(normal->x,(o->orientMat).m[3]);
+
+  iVar8 = fixedmult(normal->y,(o->orientMat).m[4]);
+
+  iVar9 = fixedmult(normal->z,(o->orientMat).m[5]);
+
+  iVar5 = fixedmult(normal->x,(o->orientMat).m[6]);
+
+  iVar6 = fixedmult(normal->y,(o->orientMat).m[7]);
+
+  iVar7 = fixedmult(normal->z,(o->orientMat).m[8]);
+
+  iVar7 = iVar5 + iVar6 + iVar7;
+
+  if (iVar3 + iVar8 + iVar9 < -0x8000) {
+
+    zone = 8;
+
+    Newton_AddDamageZone(o,iVar2,8,0);
+
+  }
+
+  if (iVar7 < -0x1999) {
+
+    if (iVar4 < 0x199a) {
+
+      if (-0x199a < iVar4) goto LAB_8008e568;
+
+      zone = 2;
+
+    }
+
+    else {
+
+      zone = 0;
+
+    }
+
+  }
+
+  else {
+
+LAB_8008e568:
+
+    bVar1 = zone < 8;
+
+    if (iVar7 < 0x199a) goto LAB_8008e594;
+
+    if (iVar4 < 0x199a) {
+
+      bVar1 = zone < 8;
+
+      if (-0x199a < iVar4) goto LAB_8008e594;
+
+      zone = 6;
+
+    }
+
+    else {
+
+      zone = 4;
+
+    }
+
+  }
+
+  bVar1 = zone < 8;
+
+LAB_8008e594:
+
+  if (bVar1) {
+
+    Newton_AddDamageZone(o,iVar2,zone,0);
+
+  }
+
+  return;
+
+}
 
 /* ---- Collide_DoObjectObjectCollision__FP13BO_tNewtonObjT0P8coorddefT2  [@0x8008e5d4] ---- */
 int Collide_DoObjectObjectCollision(BO_tNewtonObj *o0,BO_tNewtonObj *o1,coorddef *p,coorddef *normal)
+
+
+
 {
-  /* RULE-8 rewrite from SYM 8c block @0x8008e5d4 (fsize=184 mask=$c0ff0000 = ra+s2..s7) + m2c
-     pregen + raw oracle, blocks in oracle VA order.  Note SYM: o0/normal are class ARG (stack-
-     spilled params, §3.15), o1/p are REGPARM (kept live).  SYM fn-scope names applied verbatim:
-       impulse,impulseWST,impulseV,R0CrossN,R1CrossN,Rt0,Rt1,numerator,deltaV,damageVector
-     Block layout: @ec40 (o0 damage-zone check) nests {zone,impulse}@ecdc, same-VA-nested (no
-     locals of its own) wraps {right,top,front}@ed2c inside the impulse>0xA0000 guard; mirrored
-     @eef4..f15c for o1.  The source-order x,y,z negation schedules to retail's x,z,y instruction
-     order.  The right/top/front 9-way damage-zone dispatch uses the structured IDA conditions;
-     keeping the common zone<8 test after the dispatch reproduces the retail branch-delay layout.
-     MATCH: R0/R1 moment-of-inertia terms use raw >>1 (NOT /2 — no div-guard, non-negative operands);
-     massInv terms use plain /2 (real division, guard regenerates).  moInertiaInv*3/4 angular-scale
-     branch is the plain-/256-idiom family at divisor 4 (if(x<0)x+=3;x>>=2 == x/4); write plain
-     division duplicated per axis (x,y,z) so it recomputes across the fixedmult() call boundary
-     instead of CSE'ing, matching the oracle's 3x recompute — do NOT hoist into a shared temp. */
   int impulse;
   int impulseWST;
   coorddef impulseV;
@@ -664,239 +2730,793 @@ int Collide_DoObjectObjectCollision(BO_tNewtonObj *o0,BO_tNewtonObj *o1,coorddef
   int numerator;
   coorddef deltaV;
   coorddef damageVector;
-  /* MATCH: zero-insn PARM-SPILL PIN.  It must sit BEFORE the first source
-     statement (i.e. ahead of the object1 initializer): assign_parms' arg
-     stores are emitted ahead of it, so `sw a3,196(sp)` (normal's ARG home)
-     stays in the prologue group instead of being sunk 27 insns by sched2,
-     and the un-coalesced parm copy `addu t0,a3,zero` reappears.  One
-     statement LATER it also pins `addu fp,a1,zero`, which retail schedules
-     into a load-delay slot (5 diffs).  2nd operand => 203 diffs (05C). */
-  __asm__("" : : "i"(0));
-  BO_tNewtonObj *object1 = o1;
-#define o1 object1
+  int zone;
+  int right;
+  int top;
+  int front;
 
+  bool bVar1;
 
-  Rt0.x = p->x - (o0->position).x;
-  Rt0.y = p->y - (o0->position).y;
-  Rt0.z = p->z - (o0->position).z;
-  Rt1.x = p->x - (o1->position).x;
-  Rt1.y = p->y - (o1->position).y;
-  Rt1.z = p->z - (o1->position).z;
-  R0CrossN.x = fixedmult(Rt0.y,normal->z) - fixedmult(Rt0.z,normal->y);
-  R0CrossN.y = fixedmult(Rt0.z,normal->x) - fixedmult(Rt0.x,normal->z);
-  R0CrossN.z = fixedmult(Rt0.x,normal->y) - fixedmult(Rt0.y,normal->x);
-  R1CrossN.x = fixedmult(Rt1.y,normal->z) - fixedmult(Rt1.z,normal->y);
-  R1CrossN.y = fixedmult(Rt1.z,normal->x) - fixedmult(Rt1.x,normal->z);
-  R1CrossN.z = fixedmult(Rt1.x,normal->y) - fixedmult(Rt1.y,normal->x);
-  numerator = -(fixedmult((o0->linearVel).x,normal->x) + fixedmult((o0->linearVel).y,normal->y) +
-                fixedmult((o0->linearVel).z,normal->z)) +
-              (fixedmult((o1->linearVel).x,normal->x) + fixedmult((o1->linearVel).y,normal->y) +
-               fixedmult((o1->linearVel).z,normal->z)) -
-              (fixedmult((o0->angularVel).x,R0CrossN.x) + fixedmult((o0->angularVel).y,R0CrossN.y) +
-               fixedmult((o0->angularVel).z,R0CrossN.z)) +
-              (fixedmult((o1->angularVel).x,R1CrossN.x) + fixedmult((o1->angularVel).y,R1CrossN.y) +
-               fixedmult((o1->angularVel).z,R1CrossN.z));
-  impulse = rdiv(numerator,
-                  o0->massInv / 2 + o1->massInv / 2 +
-                  (fixedmult(fixedmult(R0CrossN.x,R0CrossN.x) + fixedmult(R0CrossN.y,R0CrossN.y) +
-                             fixedmult(R0CrossN.z,R0CrossN.z), o0->moInertiaInv) >> 1) +
-                  (fixedmult(fixedmult(R1CrossN.x,R1CrossN.x) + fixedmult(R1CrossN.y,R1CrossN.y) +
-                             fixedmult(R1CrossN.z,R1CrossN.z), o1->moInertiaInv) >> 1));
-  if (impulse < 0) {
+  int iVar2;
+
+  int iVar3;
+
+  int iVar4;
+
+  int iVar5;
+
+  int iVar6;
+
+  int iVar7;
+
+  int iVar8;
+
+  int iVar9;
+
+  int iVar10;
+
+  int iVar11;
+
+  int iVar12;
+
+  int iVar13;
+
+  int iVar14;
+
+  int iVar15;
+
+  int iVar16;
+
+  int iVar17;
+
+  int iVar18;
+
+  int iVar19;
+
+  int iVar20;
+
+  int iVar21;
+
+  int a;
+
+  u_int uVar22;
+
+  int local_58;
+
+  int local_54;
+
+  coorddef local_48;
+
+  int local_38;
+
+  int local_34;
+
+  int local_30;
+
+  
+
+  iVar2 = p->x - (o0->position).x;
+
+  a = p->y - (o0->position).y;
+
+  iVar3 = p->z - (o0->position).z;
+
+  iVar4 = p->x - (o1->position).x;
+
+  iVar5 = p->y - (o1->position).y;
+
+  iVar6 = p->z - (o1->position).z;
+
+  iVar7 = fixedmult(a,normal->z);
+
+  iVar8 = fixedmult(iVar3,normal->y);
+
+  iVar7 = iVar7 - iVar8;
+
+  iVar8 = fixedmult(iVar3,normal->x);
+
+  iVar9 = fixedmult(iVar2,normal->z);
+
+  iVar8 = iVar8 - iVar9;
+
+  iVar9 = fixedmult(iVar2,normal->y);
+
+  iVar10 = fixedmult(a,normal->x);
+
+  iVar9 = iVar9 - iVar10;
+
+  iVar10 = fixedmult(iVar5,normal->z);
+
+  iVar11 = fixedmult(iVar6,normal->y);
+
+  iVar10 = iVar10 - iVar11;
+
+  iVar11 = fixedmult(iVar6,normal->x);
+
+  iVar12 = fixedmult(iVar4,normal->z);
+
+  iVar11 = iVar11 - iVar12;
+
+  iVar12 = fixedmult(iVar4,normal->y);
+
+  iVar13 = fixedmult(iVar5,normal->x);
+
+  iVar12 = iVar12 - iVar13;
+
+  iVar13 = fixedmult((o0->linearVel).x,normal->x);
+
+  local_38 = fixedmult((o0->linearVel).y,normal->y);
+
+  local_34 = fixedmult((o0->linearVel).z,normal->z);
+
+  iVar14 = fixedmult((o1->linearVel).x,normal->x);
+
+  local_30 = fixedmult((o1->linearVel).y,normal->y);
+
+  iVar15 = fixedmult((o1->linearVel).z,normal->z);
+
+  iVar16 = fixedmult((o0->angularVel).x,iVar7);
+
+  iVar17 = fixedmult((o0->angularVel).y,iVar8);
+
+  iVar18 = fixedmult((o0->angularVel).z,iVar9);
+
+  iVar19 = fixedmult((o1->angularVel).x,iVar10);
+
+  iVar20 = fixedmult((o1->angularVel).y,iVar11);
+
+  iVar21 = fixedmult((o1->angularVel).z,iVar12);
+
+  iVar13 = iVar13 + local_38 + local_34;
+
+  iVar14 = iVar14 + local_30;
+
+  iVar7 = fixedmult(iVar7,iVar7);
+
+  iVar8 = fixedmult(iVar8,iVar8);
+
+  iVar9 = fixedmult(iVar9,iVar9);
+
+  iVar7 = fixedmult(iVar7 + iVar8 + iVar9,o0->moInertiaInv);
+
+  iVar8 = fixedmult(iVar10,iVar10);
+
+  iVar9 = fixedmult(iVar11,iVar11);
+
+  iVar10 = fixedmult(iVar12,iVar12);
+
+  iVar8 = fixedmult(iVar8 + iVar9 + iVar10,o1->moInertiaInv);
+
+  iVar7 = fixeddiv((((iVar14 + iVar15) - iVar13) - (iVar16 + iVar17 + iVar18)) +
+
+                     iVar19 + iVar20 + iVar21,
+
+                     o0->massInv / 2 + o1->massInv / 2 + (iVar7 >> 1) + (iVar8 >> 1));
+
+  if (iVar7 < 0) {
+
     return 0;
+
   }
-  if (((o0[1].simRoadInfo.quadPts[1].y & 4) != 0) && ((o0->collision).collided == 0)) {
+
+  if (((((Car_tObj *)o0)->carFlags & 4U) != 0) && ((o0->collision).collided == 0)) {
+
     (o0->collision).collided = 2;
+
   }
-  if (((o1[1].simRoadInfo.quadPts[1].y & 4) != 0) && ((o1->collision).collided == 0)) {
+
+  if (((((Car_tObj *)o1)->carFlags & 4U) != 0) && ((o1->collision).collided == 0)) {
+
     (o1->collision).collided = 2;
+
   }
+
+  iVar8 = 0x3333;
+
+  if (((((Car_tObj *)o0)->carFlags & 4U) != 0) && ((((Car_tObj *)o1)->carFlags & 4U) != 0))
+
   {
-    int scaleFactor;
 
-    scaleFactor = 0x3333;
-    if (((o0[1].simRoadInfo.quadPts[1].y & 4) != 0) && ((o1[1].simRoadInfo.quadPts[1].y & 4) != 0)) {
-      scaleFactor = 0x4000;
-    }
-    impulse = fixedmult(scaleFactor,impulse);
+    iVar8 = 0x4000;
+
   }
-  /* MATCH: zero-insn USE FENCE (sched-issue-position fixpoint).  Without it the
-     `addu s6,v0,zero` that lands the scaled impulse sinks into the load-delay
-     slot of the following `lw t0,196(sp)`; retail issues it straight after the
-     jal's delay slot and nops the load shadow. */
-  __asm__("" : : "i"(0));
-  impulseV.x = fixedmult(impulse,normal->x);
-  impulseV.y = fixedmult(impulse,normal->y);
-  impulseV.z = fixedmult(impulse,normal->z);
-  impulseWST = fixedmult((fixedmult((o0->linearVel).x,normal->x) + fixedmult((o0->linearVel).y,normal->y) +
-                           fixedmult((o0->linearVel).z,normal->z)) -
-                          (fixedmult((o1->linearVel).x,normal->x) + fixedmult((o1->linearVel).y,normal->y) +
-                           fixedmult((o1->linearVel).z,normal->z)),
-                          o0->mass + o1->mass);
-  (o0->collision).impulse =
-    0 < fixedmult(impulseWST,o0->massInv) ?
-      fixedmult(impulseWST,o0->massInv) : -fixedmult(impulseWST,o0->massInv);
-  (o1->collision).impulse =
-    0 < fixedmult(impulseWST,o1->massInv) ?
-      fixedmult(impulseWST,o1->massInv) : -fixedmult(impulseWST,o1->massInv);
-  if (0x1ff < o0->objID || 0x1ff < o1->objID) {
+
+  iVar7 = fixedmult(iVar8,iVar7);
+
+  iVar8 = fixedmult(iVar7,normal->x);
+
+  iVar9 = fixedmult(iVar7,normal->y);
+
+  iVar10 = fixedmult(iVar7,normal->z);
+
+  iVar11 = fixedmult((o0->linearVel).x,normal->x);
+
+  iVar12 = fixedmult((o0->linearVel).y,normal->y);
+
+  iVar13 = fixedmult((o0->linearVel).z,normal->z);
+
+  iVar14 = fixedmult((o1->linearVel).x,normal->x);
+
+  iVar15 = fixedmult((o1->linearVel).y,normal->y);
+
+  iVar16 = fixedmult((o1->linearVel).z,normal->z);
+
+  iVar11 = fixedmult((iVar11 + iVar12 + iVar13) - (iVar14 + iVar15 + iVar16),o0->mass + o1->mass);
+
+  iVar12 = fixedmult(iVar11,o0->massInv);
+
+  if (iVar12 < 1) {
+
+    iVar12 = fixedmult(iVar11,o0->massInv);
+
+    iVar12 = -iVar12;
+
+  }
+
+  else {
+
+    iVar12 = fixedmult(iVar11,o0->massInv);
+
+  }
+
+  (o0->collision).impulse = iVar12;
+
+  iVar12 = fixedmult(iVar11,o1->massInv);
+
+  if (iVar12 < 1) {
+
+    iVar11 = fixedmult(iVar11,o1->massInv);
+
+    (o1->collision).impulse = -iVar11;
+
+  }
+
+  else {
+
+    iVar11 = fixedmult(iVar11,o1->massInv);
+
+    (o1->collision).impulse = iVar11;
+
+  }
+
+  if ((0x1ff < o0->objID) || (0x1ff < o1->objID)) {
+
     (o0->collision).impulse = (o0->collision).impulse / 3;
+
     (o1->collision).impulse = (o1->collision).impulse / 3;
+
   }
-  deltaV.x = fixedmult(o0->massInv,impulseV.x);
-  deltaV.y = fixedmult(o0->massInv,impulseV.y);
-  deltaV.z = fixedmult(o0->massInv,impulseV.z);
-  (o0->linearVel).x = (o0->linearVel).x + deltaV.x;
-  (o0->linearVel).y = (o0->linearVel).y + deltaV.y;
-  (o0->linearVel).z = (o0->linearVel).z + deltaV.z;
+
+  iVar11 = fixedmult(o0->massInv,iVar8);
+
+  iVar12 = fixedmult(o0->massInv,iVar9);
+
+  iVar13 = fixedmult(o0->massInv,iVar10);
+
+  (o0->linearVel).x = (o0->linearVel).x + iVar11;
+
+  (o0->linearVel).y = (o0->linearVel).y + iVar12;
+
+  iVar11 = (o0->linearVel).z;
+
+  iVar12 = o0->objID;
+
   (o0->collision).sfxType = 0x50001;
+
   (o0->collision).otherObj = o1;
-  if (o0->objID < 0x200) {
-    {
-      int zone;
-      int impulse;
 
-      impulse = (o0->collision).impulse;
-      damageVector.x = (o0->position).x - (o1->position).x;
-      zone = 9;
-      damageVector.y = (o0->position).y - (o1->position).y;
-      damageVector.z = (o0->position).z - (o1->position).z;
-      Math_NormalizeShortVector(&damageVector);
-      if (0xA0000 < impulse) {
-        int right;
-        int top;
-        int front;
+  (o0->linearVel).z = iVar11 + iVar13;
 
-        right = fixedmult(damageVector.x,(o0->orientMat).m[0]) + fixedmult(damageVector.y,(o0->orientMat).m[1]) +
-                fixedmult(damageVector.z,(o0->orientMat).m[2]);
-        top = fixedmult(damageVector.x,(o0->orientMat).m[3]) + fixedmult(damageVector.y,(o0->orientMat).m[4]) +
-              fixedmult(damageVector.z,(o0->orientMat).m[5]);
-        front = fixedmult(damageVector.x,(o0->orientMat).m[6]) + fixedmult(damageVector.y,(o0->orientMat).m[7]) +
-                fixedmult(damageVector.z,(o0->orientMat).m[8]);
-        if (top < -0x8000) {
-          zone = 8;
-          Newton_AddDamageZone(o0,impulse,8,2);
-        }
-        if (__builtin_abs(right) < 0x1999) {
-          if (front < -0x1999) { zone = 1; goto o0_zdisp; }
-          if (front >= 0x199A) { zone = 5; goto o0_zdisp; }
-        }
-        if (__builtin_abs(front) < 0x1999) {
-          if (right >= 0x199A) { zone = 7; goto o0_zdisp; }
-          if (right < -0x1999) { zone = 3; goto o0_zdisp; }
-        }
-        if (front < -0x1999) {
-          if (right >= 0x199A) { zone = 0; goto o0_zdisp; }
-          if (right < -0x1999) { zone = 2; goto o0_zdisp; }
-        }
-        if (front >= 0x199A) {
-          if (right >= 0x199A) { zone = 6; goto o0_zdisp; }
-          if (right < -0x1999) {
-            zone = 4;
-          }
-        }
-o0_zdisp:
-        if (zone < 8) {
-          Newton_AddDamageZone(o0,impulse,zone,2);
-        }
+  if (iVar12 < 0x200) {
+
+    iVar11 = (o0->collision).impulse;
+
+    local_48.x = (o0->position).x - (o1->position).x;
+
+    uVar22 = 9;
+
+    local_48.y = (o0->position).y - (o1->position).y;
+
+    local_48.z = (o0->position).z - (o1->position).z;
+
+    Math_NormalizeShortVector(&local_48);
+
+    if (0xa0000 < iVar11) {
+
+      iVar12 = fixedmult(local_48.x,(o0->orientMat).m[0]);
+
+      iVar13 = fixedmult(local_48.y,(o0->orientMat).m[1]);
+
+      iVar14 = fixedmult(local_48.z,(o0->orientMat).m[2]);
+
+      iVar14 = iVar12 + iVar13 + iVar14;
+
+      iVar12 = fixedmult(local_48.x,(o0->orientMat).m[3]);
+
+      iVar13 = fixedmult(local_48.y,(o0->orientMat).m[4]);
+
+      iVar15 = fixedmult(local_48.z,(o0->orientMat).m[5]);
+
+      iVar16 = fixedmult(local_48.x,(o0->orientMat).m[6]);
+
+      iVar17 = fixedmult(local_48.y,(o0->orientMat).m[7]);
+
+      iVar18 = fixedmult(local_48.z,(o0->orientMat).m[8]);
+
+      iVar18 = iVar16 + iVar17 + iVar18;
+
+      if (iVar12 + iVar13 + iVar15 < -0x8000) {
+
+        uVar22 = 8;
+
+        Newton_AddDamageZone(o0,iVar11,8,2);
+
       }
+
+      iVar12 = iVar14;
+
+      if (iVar14 < 0) {
+
+        iVar12 = -iVar14;
+
+      }
+
+      if (iVar12 < 0x1999) {
+
+        if (iVar18 < -0x1999) {
+
+          uVar22 = 1;
+
+        }
+
+        else {
+
+          if (iVar18 < 0x199a) goto LAB_8008ee48;
+
+          uVar22 = 5;
+
+        }
+
+LAB_8008eed8:
+
+        bVar1 = uVar22 < 8;
+
+      }
+
+      else {
+
+LAB_8008ee48:
+
+        iVar12 = iVar18;
+
+        if (iVar18 < 0) {
+
+          iVar12 = -iVar18;
+
+        }
+
+        if (iVar12 < 0x1999) {
+
+          if (iVar14 < 0x199a) {
+
+            if (-0x199a < iVar14) goto LAB_8008ee84;
+
+            uVar22 = 3;
+
+          }
+
+          else {
+
+            uVar22 = 7;
+
+          }
+
+          goto LAB_8008eed8;
+
+        }
+
+LAB_8008ee84:
+
+        if (iVar18 < -0x1999) {
+
+          if (iVar14 < 0x199a) {
+
+            if (-0x199a < iVar14) goto LAB_8008eeb0;
+
+            uVar22 = 2;
+
+          }
+
+          else {
+
+            uVar22 = 0;
+
+          }
+
+          goto LAB_8008eed8;
+
+        }
+
+LAB_8008eeb0:
+
+        bVar1 = uVar22 < 8;
+
+        if (0x1999 < iVar18) {
+
+          if (iVar14 < 0x199a) {
+
+            bVar1 = uVar22 < 8;
+
+            if (-0x199a < iVar14) goto LAB_8008eedc;
+
+            uVar22 = 4;
+
+          }
+
+          else {
+
+            uVar22 = 6;
+
+          }
+
+          goto LAB_8008eed8;
+
+        }
+
+      }
+
+LAB_8008eedc:
+
+      if (bVar1) {
+
+        Newton_AddDamageZone(o0,iVar11,uVar22,2);
+
+      }
+
     }
+
   }
-  deltaV.x = fixedmult(o1->massInv,impulseV.x);
-  deltaV.y = fixedmult(o1->massInv,impulseV.y);
-  deltaV.z = fixedmult(o1->massInv,impulseV.z);
-  (o1->linearVel).x = (o1->linearVel).x - deltaV.x;
-  (o1->linearVel).y = (o1->linearVel).y - deltaV.y;
-  (o1->linearVel).z = (o1->linearVel).z - deltaV.z;
+
+  iVar11 = fixedmult(o1->massInv,iVar8);
+
+  iVar12 = fixedmult(o1->massInv,iVar9);
+
+  iVar13 = fixedmult(o1->massInv,iVar10);
+
+  (o1->linearVel).x = (o1->linearVel).x - iVar11;
+
+  (o1->linearVel).y = (o1->linearVel).y - iVar12;
+
   (o1->collision).sfxType = 0x50001;
+
+  iVar11 = o1->objID;
+
   (o1->collision).otherObj = o0;
-  if (o1->objID < 0x200) {
-    {
-      int zone;
-      int impulse;
 
-      impulse = (o1->collision).impulse;
-      damageVector.x = -damageVector.x;
-      damageVector.y = -damageVector.y;
-      damageVector.z = -damageVector.z;
-      zone = 9;
-      if (0xA0000 < impulse) {
-        int right;
-        int top;
-        int front;
+  (o1->linearVel).z = (o1->linearVel).z - iVar13;
 
-        right = fixedmult(damageVector.x,(o1->orientMat).m[0]) + fixedmult(damageVector.y,(o1->orientMat).m[1]) +
-                fixedmult(damageVector.z,(o1->orientMat).m[2]);
-        top = fixedmult(damageVector.x,(o1->orientMat).m[3]) + fixedmult(damageVector.y,(o1->orientMat).m[4]) +
-              fixedmult(damageVector.z,(o1->orientMat).m[5]);
-        front = fixedmult(damageVector.x,(o1->orientMat).m[6]) + fixedmult(damageVector.y,(o1->orientMat).m[7]) +
-                fixedmult(damageVector.z,(o1->orientMat).m[8]);
-        if (top < -0x8000) {
-          zone = 8;
-          Newton_AddDamageZone(o1,impulse,8,2);
-        }
-        if (__builtin_abs(right) < 0x1999) {
-          if (front < -0x1999) { zone = 1; goto o1_zdisp; }
-          if (front >= 0x199A) { zone = 5; goto o1_zdisp; }
-        }
-        if (__builtin_abs(front) < 0x1999) {
-          if (right >= 0x199A) { zone = 7; goto o1_zdisp; }
-          if (right < -0x1999) { zone = 3; goto o1_zdisp; }
-        }
-        if (front < -0x1999) {
-          if (right >= 0x199A) { zone = 0; goto o1_zdisp; }
-          if (right < -0x1999) { zone = 2; goto o1_zdisp; }
-        }
-        if (front >= 0x199A) {
-          if (right >= 0x199A) { zone = 6; goto o1_zdisp; }
-          if (right < -0x1999) {
-            zone = 4;
-          }
-        }
-o1_zdisp:
-        if (zone < 8) {
-          Newton_AddDamageZone(o1,impulse,zone,2);
-        }
-      }
+  if (0x1ff < iVar11) goto LAB_8008f15c;
+
+  iVar11 = (o1->collision).impulse;
+
+  local_48.x = -local_48.x;
+
+  local_48.z = -local_48.z;
+
+  local_48.y = -local_48.y;
+
+  uVar22 = 9;
+
+  if (iVar11 < 0xa0001) goto LAB_8008f15c;
+
+  iVar12 = fixedmult(local_48.x,(o1->orientMat).m[0]);
+
+  iVar13 = fixedmult(local_48.y,(o1->orientMat).m[1]);
+
+  iVar14 = fixedmult(local_48.z,(o1->orientMat).m[2]);
+
+  iVar14 = iVar12 + iVar13 + iVar14;
+
+  iVar12 = fixedmult(local_48.x,(o1->orientMat).m[3]);
+
+  iVar13 = fixedmult(local_48.y,(o1->orientMat).m[4]);
+
+  iVar15 = fixedmult(local_48.z,(o1->orientMat).m[5]);
+
+  iVar16 = fixedmult(local_48.x,(o1->orientMat).m[6]);
+
+  iVar17 = fixedmult(local_48.y,(o1->orientMat).m[7]);
+
+  iVar18 = fixedmult(local_48.z,(o1->orientMat).m[8]);
+
+  iVar18 = iVar16 + iVar17 + iVar18;
+
+  if (iVar12 + iVar13 + iVar15 < -0x8000) {
+
+    uVar22 = 8;
+
+    Newton_AddDamageZone(o1,iVar11,8,2);
+
+  }
+
+  iVar12 = iVar14;
+
+  if (iVar14 < 0) {
+
+    iVar12 = -iVar14;
+
+  }
+
+  if (iVar12 < 0x1999) {
+
+    if (iVar18 < -0x1999) {
+
+      uVar22 = 1;
+
     }
+
+    else {
+
+      if (iVar18 < 0x199a) goto LAB_8008f0b0;
+
+      uVar22 = 5;
+
+    }
+
+LAB_8008f140:
+
+    bVar1 = uVar22 < 8;
+
   }
-  deltaV.x = fixedmult(Rt0.y,impulseV.z) - fixedmult(Rt0.z,impulseV.y);
-  deltaV.y = fixedmult(Rt0.z,impulseV.x) - fixedmult(Rt0.x,impulseV.z);
-  deltaV.z = fixedmult(Rt0.x,impulseV.y) - fixedmult(Rt0.y,impulseV.x);
-  if (((o0[1].simRoadInfo.quadPts[1].y & 4) != 0) && (impulse <= 0x3FFFFF)) {
-    deltaV.x = fixedmult((o0->moInertiaInv * 3) / 4,deltaV.x);
-    deltaV.y = fixedmult((o0->moInertiaInv * 3) / 4,deltaV.y);
-    deltaV.z = fixedmult((o0->moInertiaInv * 3) / 4,deltaV.z);
-  } else {
-    deltaV.x = fixedmult(o0->moInertiaInv,deltaV.x);
-    deltaV.y = fixedmult(o0->moInertiaInv,deltaV.y);
-    deltaV.z = fixedmult(o0->moInertiaInv,deltaV.z);
+
+  else {
+
+LAB_8008f0b0:
+
+    iVar12 = iVar18;
+
+    if (iVar18 < 0) {
+
+      iVar12 = -iVar18;
+
+    }
+
+    if (iVar12 < 0x1999) {
+
+      if (iVar14 < 0x199a) {
+
+        if (-0x199a < iVar14) goto LAB_8008f0ec;
+
+        uVar22 = 3;
+
+      }
+
+      else {
+
+        uVar22 = 7;
+
+      }
+
+      goto LAB_8008f140;
+
+    }
+
+LAB_8008f0ec:
+
+    if (iVar18 < -0x1999) {
+
+      if (iVar14 < 0x199a) {
+
+        if (-0x199a < iVar14) goto LAB_8008f118;
+
+        uVar22 = 2;
+
+      }
+
+      else {
+
+        uVar22 = 0;
+
+      }
+
+      goto LAB_8008f140;
+
+    }
+
+LAB_8008f118:
+
+    bVar1 = uVar22 < 8;
+
+    if (0x1999 < iVar18) {
+
+      if (iVar14 < 0x199a) {
+
+        bVar1 = uVar22 < 8;
+
+        if (-0x199a < iVar14) goto LAB_8008f144;
+
+        uVar22 = 4;
+
+      }
+
+      else {
+
+        uVar22 = 6;
+
+      }
+
+      goto LAB_8008f140;
+
+    }
+
   }
-  (o0->angularVel).x = (o0->angularVel).x + deltaV.x;
-  (o0->angularVel).y = (o0->angularVel).y + deltaV.y;
-  (o0->angularVel).z = (o0->angularVel).z + deltaV.z;
-  deltaV.x = fixedmult(Rt1.y,impulseV.z) - fixedmult(Rt1.z,impulseV.y);
-  deltaV.y = fixedmult(Rt1.z,impulseV.x) - fixedmult(Rt1.x,impulseV.z);
-  deltaV.z = fixedmult(Rt1.x,impulseV.y) - fixedmult(Rt1.y,impulseV.x);
-  if (((o1[1].simRoadInfo.quadPts[1].y & 4) != 0) && (impulse <= 0x3FFFFF)) {
-    deltaV.x = fixedmult((o1->moInertiaInv * 3) / 4,deltaV.x);
-    deltaV.y = fixedmult((o1->moInertiaInv * 3) / 4,deltaV.y);
-    deltaV.z = fixedmult((o1->moInertiaInv * 3) / 4,deltaV.z);
-  } else {
-    deltaV.x = fixedmult(o1->moInertiaInv,deltaV.x);
-    deltaV.y = fixedmult(o1->moInertiaInv,deltaV.y);
-    deltaV.z = fixedmult(o1->moInertiaInv,deltaV.z);
+
+LAB_8008f144:
+
+  if (bVar1) {
+
+    Newton_AddDamageZone(o1,iVar11,uVar22,2);
+
   }
-  (o1->angularVel).x = (o1->angularVel).x - deltaV.x;
-  (o1->angularVel).y = (o1->angularVel).y - deltaV.y;
-  (o1->angularVel).z = (o1->angularVel).z - deltaV.z;
+
+LAB_8008f15c:
+
+  iVar11 = fixedmult(a,iVar10);
+
+  iVar12 = fixedmult(iVar3,iVar9);
+
+  iVar3 = fixedmult(iVar3,iVar8);
+
+  iVar13 = fixedmult(iVar2,iVar10);
+
+  iVar2 = fixedmult(iVar2,iVar9);
+
+  iVar14 = fixedmult(a,iVar8);
+
+  if (((((Car_tObj *)o0)->carFlags & 4U) == 0) || (0x3fffff < iVar7)) {
+
+    local_58 = fixedmult(o0->moInertiaInv,iVar11 - iVar12);
+
+    local_54 = fixedmult(o0->moInertiaInv,iVar3 - iVar13);
+
+    iVar3 = o0->moInertiaInv;
+
+  }
+
+  else {
+
+    iVar15 = o0->moInertiaInv * 3;
+
+    if (iVar15 < 0) {
+
+      iVar15 = iVar15 + 3;
+
+    }
+
+    local_58 = fixedmult(iVar15 >> 2,iVar11 - iVar12);
+
+    iVar11 = o0->moInertiaInv * 3;
+
+    if (iVar11 < 0) {
+
+      iVar11 = iVar11 + 3;
+
+    }
+
+    local_54 = fixedmult(iVar11 >> 2,iVar3 - iVar13);
+
+    iVar3 = o0->moInertiaInv * 3;
+
+    if (iVar3 < 0) {
+
+      iVar3 = iVar3 + 3;
+
+    }
+
+    iVar3 = iVar3 >> 2;
+
+  }
+
+  iVar2 = fixedmult(iVar3,iVar2 - iVar14);
+
+  (o0->angularVel).x = (o0->angularVel).x + local_58;
+
+  (o0->angularVel).y = (o0->angularVel).y + local_54;
+
+  (o0->angularVel).z = (o0->angularVel).z + iVar2;
+
+  iVar2 = fixedmult(iVar5,iVar10);
+
+  iVar3 = fixedmult(iVar6,iVar9);
+
+  iVar6 = fixedmult(iVar6,iVar8);
+
+  iVar10 = fixedmult(iVar4,iVar10);
+
+  iVar4 = fixedmult(iVar4,iVar9);
+
+  iVar5 = fixedmult(iVar5,iVar8);
+
+  if (((((Car_tObj *)o1)->carFlags & 4U) == 0) || (0x3fffff < iVar7)) {
+
+    local_58 = fixedmult(o1->moInertiaInv,iVar2 - iVar3);
+
+    local_54 = fixedmult(o1->moInertiaInv,iVar6 - iVar10);
+
+    iVar2 = o1->moInertiaInv;
+
+  }
+
+  else {
+
+    iVar7 = o1->moInertiaInv * 3;
+
+    if (iVar7 < 0) {
+
+      iVar7 = iVar7 + 3;
+
+    }
+
+    local_58 = fixedmult(iVar7 >> 2,iVar2 - iVar3);
+
+    iVar2 = o1->moInertiaInv * 3;
+
+    if (iVar2 < 0) {
+
+      iVar2 = iVar2 + 3;
+
+    }
+
+    local_54 = fixedmult(iVar2 >> 2,iVar6 - iVar10);
+
+    iVar2 = o1->moInertiaInv * 3;
+
+    if (iVar2 < 0) {
+
+      iVar2 = iVar2 + 3;
+
+    }
+
+    iVar2 = iVar2 >> 2;
+
+  }
+
+  iVar2 = fixedmult(iVar2,iVar4 - iVar5);
+
+  (o1->angularVel).x = (o1->angularVel).x - local_58;
+
+  (o1->angularVel).y = (o1->angularVel).y - local_54;
+
+  (o1->angularVel).z = (o1->angularVel).z - iVar2;
+
   o0->flightTime = o0->flightTime + 1;
+
+  iVar2 = (o1->position).x;
+
   o1->flightTime = o1->flightTime + 1;
-  (o0->collision).collisionPoint.x = (o1->collision).collisionPoint.x = ((o0->position).x + (o1->position).x) / 2;
-  (o0->collision).collisionPoint.y = (o1->collision).collisionPoint.y = ((o0->position).y + (o1->position).y) / 2;
-  (o0->collision).collisionPoint.z = (o1->collision).collisionPoint.z = ((o0->position).z + (o1->position).z) / 2;
-#undef o1
+
+  iVar2 = ((o0->position).x + iVar2) / 2;
+
+  (o1->collision).collisionPoint.x = iVar2;
+
+  (o0->collision).collisionPoint.x = iVar2;
+
+  iVar2 = ((o0->position).y + (o1->position).y) / 2;
+
+  (o1->collision).collisionPoint.y = iVar2;
+
+  iVar3 = (o0->position).z;
+
+  (o0->collision).collisionPoint.y = iVar2;
+
+  iVar2 = (iVar3 + (o1->position).z) / 2;
+
+  (o1->collision).collisionPoint.z = iVar2;
+
+  (o0->collision).collisionPoint.z = iVar2;
+
   return 1;
+
 }
 
 /* ---- Collide_DoActualObjectCollisionCheck__FP13BO_tNewtonObjT0P8coorddefT2  [@0x8008f550] ---- */
@@ -905,760 +3525,2467 @@ int Collide_DoActualObjectCollisionCheck(BO_tNewtonObj *o0,BO_tNewtonObj *o1,coo
 
 
 {
-  /* MATCH (2026-08-13): SYM/SLD + raw 0x8008F550..0x80090140 require two symmetric
-     halves and three physical shared tails: high-velocity normal X/Y/Z, low-velocity
-     negation, and return-one.  SYM-CODEGEN-CARRIER: selectedRange; reconstructing those
-     funnels plus this shared-tail carrier removed
-     the duplicated arm tests (101 -> 88 -> 20 -> 16 authoritative diffs).  The empty
-     normal fences price p83 refs to 38, yielding retail o0/o1/normal = s1/s2/s0.
-     A zero-insn boundary after each dotz expression preserves the two retail branch-delay
-     nops (16 -> 14, 763/765).  The remaining source build is exactly two symmetric sched1
-     clusters; moving the existing dotx/doty normalization blocks and comparison ahead of
-     mflo, plus restoring dotz's nop slot, produces PASS 765/765 in the isolated scratch
-     build without changing source instructions or registers. CheckMe/CheckAccurate/Clear
-     retain their prior results. */
+  int maxv;
+  int vx;
+  int vy;
+  int vz;
+  coorddef normalx;
+  coorddef normaly;
+  coorddef normalz;
+  int dotx;
+  int doty;
+  int dotz;
+  coorddef vel;
+  int xDiff;
+  int yDiff;
+  int zDiff;
+
+  int iVar1;
+
+  int iVar2;
+
+  int iVar3;
+
+  int iVar4;
+
+  int iVar5;
+
+  int iVar6;
+
+  int iVar7;
+
+  int iVar8;
+
+  int iVar9;
+
+  int iVar10;
+
+  int local_60;
+
+  int local_5c;
+
+  int local_58;
+
+  int local_50;
+
+  int local_4c;
+
+  int local_48;
+
+  int local_40;
+
+  int local_3c;
+
+  int local_38;
+
+  
+
   obj0 = o0;
+
   obj1 = o1;
-  pP = p;
+
   pNormal = normal;
-  if (CHECK_CENTER_VERTEX_WITH_DIRS(1,0,0) != 0) {
-    return 1;
-  }
-  if (CHECK_CENTER_VERTEX_WITH_DIRS(0,1,0) != 0) {
-    return 1;
-  }
-  if (CHECK_CENTER_VERTEX_WITH_DIRS(0,0,1) != 0) {
-    return 1;
-  }
-  if (CHECK_CENTER_VERTEX_WITH_DIRS(-1,0,0) != 0) {
-    return 1;
-  }
-  if (CHECK_CENTER_VERTEX_WITH_DIRS(0,-1,0) != 0) {
-    return 1;
-  }
-  if (CHECK_CENTER_VERTEX_WITH_DIRS(0,0,-1) != 0) {
-    return 1;
-  }
-  if (CHECK_CENTER_VERTEX_WITH_DIRS_OTHER(1,0,0) != 0) {
-    return 1;
-  }
-  if (CHECK_CENTER_VERTEX_WITH_DIRS_OTHER(0,1,0) != 0) {
-    return 1;
-  }
-  if (CHECK_CENTER_VERTEX_WITH_DIRS_OTHER(0,0,1) != 0) {
-    return 1;
-  }
-  if (CHECK_CENTER_VERTEX_WITH_DIRS_OTHER(-1,0,0) != 0) {
-    return 1;
-  }
-  if (CHECK_CENTER_VERTEX_WITH_DIRS_OTHER(0,-1,0) != 0) {
-    return 1;
-  }
-  if (CHECK_CENTER_VERTEX_WITH_DIRS_OTHER(0,0,-1) != 0) {
-    return 1;
-  }
-  /* Oracle dispatch in VA ORDER: each VERTEX!=0 -> vhalf (o0 matrix, .L8008F7EC,
-     physically FIRST); each OTHER!=0 -> ohalf (o1 matrix, .L8008FC50); both all-zero
-     -> return 0. goto = the genuine per-operand bnez-to-forward-block dispatch. */
-  if (CHECK_VERTEX_WITH_DIRS(1,1,1) != 0) goto vhalf;
-  if (CHECK_VERTEX_WITH_DIRS(1,1,-1) != 0) goto vhalf;
-  if (CHECK_VERTEX_WITH_DIRS(1,-1,1) != 0) goto vhalf;
-  if (CHECK_VERTEX_WITH_DIRS(1,-1,-1) != 0) goto vhalf;
-  if (CHECK_VERTEX_WITH_DIRS(-1,1,1) != 0) goto vhalf;
-  if (CHECK_VERTEX_WITH_DIRS(-1,1,-1) != 0) goto vhalf;
-  if (CHECK_VERTEX_WITH_DIRS(-1,-1,1) != 0) goto vhalf;
-  if (CHECK_VERTEX_WITH_DIRS(-1,-1,-1) != 0) goto vhalf;
-  if (CHECK_VERTEX_WITH_DIRS_OTHER(1,1,1) != 0) goto ohalf;
-  if (CHECK_VERTEX_WITH_DIRS_OTHER(1,1,-1) != 0) goto ohalf;
-  if (CHECK_VERTEX_WITH_DIRS_OTHER(1,-1,1) != 0) goto ohalf;
-  if (CHECK_VERTEX_WITH_DIRS_OTHER(1,-1,-1) != 0) goto ohalf;
-  if (CHECK_VERTEX_WITH_DIRS_OTHER(-1,1,1) != 0) goto ohalf;
-  if (CHECK_VERTEX_WITH_DIRS_OTHER(-1,1,-1) != 0) goto ohalf;
-  if (CHECK_VERTEX_WITH_DIRS_OTHER(-1,-1,1) != 0) goto ohalf;
-  if (CHECK_VERTEX_WITH_DIRS_OTHER(-1,-1,-1) != 0) goto ohalf;
-  return 0;
-vhalf:   /* VERTEX!=0 : o0 orientMat, if(0<xRange) negation */
-  {
-    {
-      int maxv;
-      int vx;
-      int vy;
-      int vz;
 
-      findClosestSideDave = 0;
-      vx = (o1->linearVel).x - (o0->linearVel).x;
-      if (vx <= 0) {
-        vx = (o0->linearVel).x - (o1->linearVel).x;
-      }
-      vy = (o1->linearVel).y - (o0->linearVel).y;
-      if (vy <= 0) {
-        vy = (o0->linearVel).y - (o1->linearVel).y;
-      }
-      vz = (o1->linearVel).z - (o0->linearVel).z;
-      if (vz <= 0) {
-        vz = (o0->linearVel).z - (o1->linearVel).z;
-      }
-      maxv = vx;
-      if (maxv < vy) {
-        maxv = vy;
-      }
-      if (maxv < vz) {
-        maxv = vz;
-      }
-      if (0xF0000 < maxv) {
-        findClosestSideDave = 1;
-      }
+  pP = p;
+
+  iVar1 = CHECK_CENTER_VERTEX_WITH_DIRS(1,0,0);
+
+  if (iVar1 != 0) {
+
+    return 1;
+
+  }
+
+  iVar1 = CHECK_CENTER_VERTEX_WITH_DIRS(0,1,0);
+
+  if (iVar1 != 0) {
+
+    return 1;
+
+  }
+
+  iVar1 = CHECK_CENTER_VERTEX_WITH_DIRS(0,0,1);
+
+  if (iVar1 != 0) {
+
+    return 1;
+
+  }
+
+  iVar1 = CHECK_CENTER_VERTEX_WITH_DIRS(-1,0,0);
+
+  if (iVar1 != 0) {
+
+    return 1;
+
+  }
+
+  iVar1 = CHECK_CENTER_VERTEX_WITH_DIRS(0,-1,0);
+
+  if (iVar1 != 0) {
+
+    return 1;
+
+  }
+
+  iVar1 = CHECK_CENTER_VERTEX_WITH_DIRS(0,0,-1);
+
+  if (iVar1 != 0) {
+
+    return 1;
+
+  }
+
+  iVar1 = CHECK_CENTER_VERTEX_WITH_DIRS_OTHER(1,0,0);
+
+  if (iVar1 != 0) {
+
+    return 1;
+
+  }
+
+  iVar1 = CHECK_CENTER_VERTEX_WITH_DIRS_OTHER(0,1,0);
+
+  if (iVar1 != 0) {
+
+    return 1;
+
+  }
+
+  iVar1 = CHECK_CENTER_VERTEX_WITH_DIRS_OTHER(0,0,1);
+
+  if (iVar1 != 0) {
+
+    return 1;
+
+  }
+
+  iVar1 = CHECK_CENTER_VERTEX_WITH_DIRS_OTHER(-1,0,0);
+
+  if (iVar1 != 0) {
+
+    return 1;
+
+  }
+
+  iVar1 = CHECK_CENTER_VERTEX_WITH_DIRS_OTHER(0,-1,0);
+
+  if (iVar1 != 0) {
+
+    return 1;
+
+  }
+
+  iVar1 = CHECK_CENTER_VERTEX_WITH_DIRS_OTHER(0,0,-1);
+
+  if (iVar1 != 0) {
+
+    return 1;
+
+  }
+
+  iVar1 = CHECK_VERTEX_WITH_DIRS(1,1,1);
+
+  if (((((iVar1 == 0) && (iVar1 = CHECK_VERTEX_WITH_DIRS(1,1,-1), iVar1 == 0)) &&
+
+       (iVar1 = CHECK_VERTEX_WITH_DIRS(1,-1,1), iVar1 == 0)) &&
+
+      ((iVar1 = CHECK_VERTEX_WITH_DIRS(1,-1,-1), iVar1 == 0 &&
+
+       (iVar1 = CHECK_VERTEX_WITH_DIRS(-1,1,1), iVar1 == 0)))) &&
+
+     ((iVar1 = CHECK_VERTEX_WITH_DIRS(-1,1,-1), iVar1 == 0 &&
+
+      ((iVar1 = CHECK_VERTEX_WITH_DIRS(-1,-1,1), iVar1 == 0 &&
+
+       (iVar1 = CHECK_VERTEX_WITH_DIRS(-1,-1,-1), iVar1 == 0)))))) {
+
+    iVar1 = CHECK_VERTEX_WITH_DIRS_OTHER(1,1,1);
+
+    if ((((iVar1 == 0) && (iVar1 = CHECK_VERTEX_WITH_DIRS_OTHER(1,1,-1), iVar1 == 0)) &&
+
+        (iVar1 = CHECK_VERTEX_WITH_DIRS_OTHER(1,-1,1), iVar1 == 0)) &&
+
+       (((iVar1 = CHECK_VERTEX_WITH_DIRS_OTHER(1,-1,-1), iVar1 == 0 &&
+
+         (iVar1 = CHECK_VERTEX_WITH_DIRS_OTHER(-1,1,1), iVar1 == 0)) &&
+
+        ((iVar1 = CHECK_VERTEX_WITH_DIRS_OTHER(-1,1,-1), iVar1 == 0 &&
+
+         ((iVar1 = CHECK_VERTEX_WITH_DIRS_OTHER(-1,-1,1), iVar1 == 0 &&
+
+          (iVar1 = CHECK_VERTEX_WITH_DIRS_OTHER(-1,-1,-1), iVar1 == 0)))))))) {
+
+      return 0;
+
     }
-    {
-      if (findClosestSideDave != 0) {
-        coorddef normalx;
-        coorddef normaly;
-        coorddef normalz;
-        int dotx;
-        int doty;
-        int dotz;
-        coorddef vel;
 
-        vel = o1->linearVel;
-        normalx = *(coorddef *)&(o0->orientMat).m[0];
-        normaly = *(coorddef *)&(o0->orientMat).m[3];
-        normalz = *(coorddef *)&(o0->orientMat).m[6];
-        if (0 < xRange) {
-          normalx.x = -normalx.x;
-          normalx.y = -normalx.y;
-          normalx.z = -normalx.z;
-        }
-        if (0 < yRange) {
-          normaly.x = -normaly.x;
-          normaly.y = -normaly.y;
-          normaly.z = -normaly.z;
-        }
-        if (0 < zRange) {
-          normalz.x = -normalz.x;
-          normalz.y = -normalz.y;
-          normalz.z = -normalz.z;
-        }
-        dotx = normalx.x / 256 * (vel.x / 256) + normalx.y / 256 * (vel.y / 256) +
-               normalx.z / 256 * (vel.z / 256);
-        doty = normaly.x / 256 * (vel.x / 256) + normaly.y / 256 * (vel.y / 256) +
-               normaly.z / 256 * (vel.z / 256);
-        dotz = normalz.x / 256 * (vel.x / 256) + normalz.y / 256 * (vel.y / 256) +
-               normalz.z / 256 * (vel.z / 256);
-        /* SEALED W72-A10 (2026-08-22): 14 diffs @763/765 -> PASS 765/765.  TWO edits,
-           both applied at BOTH sites (this one and the `zRange < 0` twin below):
-             (1) `x = __builtin_abs(x)` for the dotx/doty/dotz triple instead of
-                 `if (x < 0) x = -x;`   ** THE LAW **
-             (2) delete the bare `__asm__("")` that used to sit after the dotz
-                 statement.
-           WHY (mips.md `abssi2`, gcc-2.8.1 config/mips/mips.md:1800-1822): abssi2 is a
-           SINGLE define_insn whose template emits the whole `bgez %1,1f%#\n\tsubu
-           %0,$0,%0\n1:` sequence (dst==src arm; `%#` = the delay-slot nop, and the
-           pattern bumps dslots_jump_total/filled itself, length 3).  So the retail abs
-           chain is NOT three basic blocks -- it is three ordinary insns.  The whole
-           region `mult / abs / abs / slt / mflo / addu / abs` therefore lives in ONE
-           basic block, and gcc's per-BB scheduler is free to sink dotz's `mflo`+`addu`
-           past the two abs insns and hoist the `slt $v0,$a1,$a3` above them -- exactly
-           retail's order -- and the two "missing" nops are the abssi2 templates' own
-           `%#`, not reorg slots.  Written as `if (x<0) x=-x;` the abs is a real branch
-           + BB, sched2 cannot cross it, the mflo stays welded to its mult, and reorg
-           then steals the `slt` into the abs(dotz) branch's slot (= the old 2-insn
-           deficit + the 14-diff residual).  The bare `__asm__("")` was a volatile
-           scheduling BARRIER pinning `mflo` next to `mult`; with the abs insns in place
-           it was the last thing blocking the sink.  (SLD confirms retail's statement
-           order is ours: 863 = dotz, 864/865/866 = the three abs, 868 = the compare;
-           insns 366-368 carry lines 868/863/863 out of order = pure scheduling.)
-           MEASURED ON THE WAY (real gate runs, both sites unless noted):
-             baseline (if-form abs + bare fence) ................ 14 @763/765
-             + head-of-thread void fence `("" : : "i"(0))` before
-               the `doty<dotx` compare ......................... 20 @765/765
-               (zero-insn, restores BOTH nops by blocking reorg's
-                eager steal -- proves the deficit was slot theft)
-             + zprod split (3rd term in its own local) ......... 220 @765/765
-             + third term recomputed after the abs blocks ....... 88 @769/765
-             __builtin_abs, bare fence KEPT .................... 20 @765/765
-             __builtin_abs, bare fence REMOVED ................. PASS 765/765
-           W64-A15's "absfirst" basin (44 @765) was the same insight seen from the
-           wrong side: hoisting the abs STATEMENTS restored the length by accident;
-           making the abs an INSN restores it by construction. */
-        dotx = __builtin_abs(dotx);
-        doty = __builtin_abs(doty);
-        dotz = __builtin_abs(dotz);
-        if (doty < dotx && dotz < dotx) {
-          goto useNormalX;
-        }
-        if (dotz < doty) {
-          goto useNormalY;
-        }
-        goto useNormalZ;
-      }
-      {
-        int xDiff;
-        int yDiff;
-        int zDiff;
-        int selectedRange;
+    iVar10 = zRange;
 
-        if (xRange < 0) {
-          xDiff = (o0->dimension).x + xRange;
-        }
-        else {
-          xDiff = (o0->dimension).x - xRange;
-        }
-        if (yRange < 0) {
-          yDiff = (o0->dimension).y + yRange;
-        }
-        else {
-          yDiff = (o0->dimension).y - yRange;
-        }
-        if (zRange < 0) {
-          zDiff = (o0->dimension).z + zRange;
-        }
-        else {
-          zDiff = (o0->dimension).z - zRange;
-        }
-        if (xDiff < yDiff && xDiff < zDiff) {
-          *normal = *(coorddef *)&(o0->orientMat).m[0];
-          selectedRange = xRange;
-        }
-        else if (yDiff < zDiff) {
-          *normal = *(coorddef *)&(o0->orientMat).m[3];
-          selectedRange = yRange;
-        }
-        else {
-          *normal = *(coorddef *)&(o0->orientMat).m[6];
-          selectedRange = zRange;
-        }
-        if (selectedRange <= 0) {
-          goto returnOne;
-        }
-        goto negateNormal;
-ohalf:   /* OTHER!=0 : o1 orientMat, if(xRange<0) negation */
-  {
-    {
-      int maxv;
-      int vx;
-      int vy;
-      int vz;
+    iVar9 = yRange;
 
-      findClosestSideDave = 0;
-      vx = (o1->linearVel).x - (o0->linearVel).x;
-      if (vx <= 0) {
-        vx = (o0->linearVel).x - (o1->linearVel).x;
-      }
-      vy = (o1->linearVel).y - (o0->linearVel).y;
-      if (vy <= 0) {
-        vy = (o0->linearVel).y - (o1->linearVel).y;
-      }
-      vz = (o1->linearVel).z - (o0->linearVel).z;
-      if (vz <= 0) {
-        vz = (o0->linearVel).z - (o1->linearVel).z;
-      }
-      maxv = vx;
-      if (maxv < vy) {
-        maxv = vy;
-      }
-      if (maxv < vz) {
-        maxv = vz;
-      }
-      if (0xF0000 < maxv) {
-        findClosestSideDave = 1;
-      }
+    iVar1 = xRange;
+
+    iVar6 = (o1->linearVel).x;
+
+    iVar3 = (o0->linearVel).x;
+
+    iVar2 = iVar6 - iVar3;
+
+    if (iVar2 < 1) {
+
+      iVar2 = iVar3 - iVar6;
+
     }
-    {
-      if (findClosestSideDave != 0) {
-        coorddef normalx;
-        coorddef normaly;
-        coorddef normalz;
-        int dotx;
-        int doty;
-        int dotz;
-        coorddef vel;
 
-        vel = o0->linearVel;
-        normalx = *(coorddef *)&(o1->orientMat).m[0];
-        normaly = *(coorddef *)&(o1->orientMat).m[3];
-        normalz = *(coorddef *)&(o1->orientMat).m[6];
-        if (xRange < 0) {
-          normalx.x = -normalx.x;
-          normalx.y = -normalx.y;
-          normalx.z = -normalx.z;
-        }
-        if (yRange < 0) {
-          normaly.x = -normaly.x;
-          normaly.y = -normaly.y;
-          normaly.z = -normaly.z;
-        }
-        if (zRange < 0) {
-          normalz.x = -normalz.x;
-          normalz.y = -normalz.y;
-          normalz.z = -normalz.z;
-        }
-        dotx = normalx.x / 256 * (vel.x / 256) + normalx.y / 256 * (vel.y / 256) +
-               normalx.z / 256 * (vel.z / 256);
-        doty = normaly.x / 256 * (vel.x / 256) + normaly.y / 256 * (vel.y / 256) +
-               normaly.z / 256 * (vel.z / 256);
-        dotz = normalz.x / 256 * (vel.x / 256) + normalz.y / 256 * (vel.y / 256) +
-               normalz.z / 256 * (vel.z / 256);
-        dotx = __builtin_abs(dotx);
-        doty = __builtin_abs(doty);
-        dotz = __builtin_abs(dotz);
-        if (doty < dotx && dotz < dotx) {
-useNormalX:
-          *normal = normalx;
-          return 1;
-        }
-        if (dotz < doty) {
-useNormalY:
-          *normal = normaly;
-          return 1;
-        }
-useNormalZ:
-        *normal = normalz;
+    iVar6 = (o1->linearVel).y;
+
+    iVar3 = (o0->linearVel).y;
+
+    iVar7 = iVar6 - iVar3;
+
+    if (iVar7 < 1) {
+
+      iVar7 = iVar3 - iVar6;
+
+    }
+
+    iVar8 = (o1->linearVel).z;
+
+    iVar3 = (o0->linearVel).z;
+
+    iVar6 = iVar8 - iVar3;
+
+    if (iVar6 < 1) {
+
+      iVar6 = iVar3 - iVar8;
+
+    }
+
+    if (iVar2 < iVar7) {
+
+      iVar2 = iVar7;
+
+    }
+
+    if (iVar2 < iVar6) {
+
+      iVar2 = iVar6;
+
+    }
+
+    findClosestSideDave = (int)(0xf0000 < iVar2);
+
+    if (findClosestSideDave != 0) {
+
+      iVar1 = (o0->linearVel).x;
+
+      iVar9 = (o0->linearVel).y;
+
+      iVar10 = (o0->linearVel).z;
+
+      local_60 = (o1->orientMat).m[0];
+
+      local_5c = (o1->orientMat).m[1];
+
+      local_58 = (o1->orientMat).m[2];
+
+      local_50 = (o1->orientMat).m[3];
+
+      local_4c = (o1->orientMat).m[4];
+
+      local_48 = (o1->orientMat).m[5];
+
+      local_40 = (o1->orientMat).m[6];
+
+      local_3c = (o1->orientMat).m[7];
+
+      local_38 = (o1->orientMat).m[8];
+
+      if (xRange < 0) {
+
+        local_60 = -local_60;
+
+        local_58 = -local_58;
+
+        local_5c = -local_5c;
+
+      }
+
+      if (yRange < 0) {
+
+        local_50 = -local_50;
+
+        local_48 = -local_48;
+
+        local_4c = -local_4c;
+
+      }
+
+      if (zRange < 0) {
+
+        local_40 = -local_40;
+
+        local_38 = -local_38;
+
+        local_3c = -local_3c;
+
+      }
+
+      iVar2 = local_60;
+
+      if (local_60 < 0) {
+
+        iVar2 = local_60 + 0xff;
+
+      }
+
+      iVar3 = iVar1;
+
+      if (iVar1 < 0) {
+
+        iVar3 = iVar1 + 0xff;
+
+      }
+
+      iVar6 = local_5c;
+
+      if (local_5c < 0) {
+
+        iVar6 = local_5c + 0xff;
+
+      }
+
+      iVar7 = iVar9;
+
+      if (iVar9 < 0) {
+
+        iVar7 = iVar9 + 0xff;
+
+      }
+
+      iVar8 = local_58;
+
+      if (local_58 < 0) {
+
+        iVar8 = local_58 + 0xff;
+
+      }
+
+      iVar4 = iVar10;
+
+      if (iVar10 < 0) {
+
+        iVar4 = iVar10 + 0xff;
+
+      }
+
+      iVar2 = (iVar2 >> 8) * (iVar3 >> 8) + (iVar6 >> 8) * (iVar7 >> 8) +
+
+              (iVar8 >> 8) * (iVar4 >> 8);
+
+      iVar6 = local_50;
+
+      if (local_50 < 0) {
+
+        iVar6 = local_50 + 0xff;
+
+      }
+
+      iVar8 = local_4c;
+
+      if (local_4c < 0) {
+
+        iVar8 = local_4c + 0xff;
+
+      }
+
+      iVar5 = local_48;
+
+      if (local_48 < 0) {
+
+        iVar5 = local_48 + 0xff;
+
+      }
+
+      iVar3 = (iVar6 >> 8) * (iVar3 >> 8) + (iVar8 >> 8) * (iVar7 >> 8) +
+
+              (iVar5 >> 8) * (iVar4 >> 8);
+
+      iVar6 = local_40;
+
+      if (local_40 < 0) {
+
+        iVar6 = local_40 + 0xff;
+
+      }
+
+      if (iVar1 < 0) {
+
+        iVar1 = iVar1 + 0xff;
+
+      }
+
+      iVar7 = local_3c;
+
+      if (local_3c < 0) {
+
+        iVar7 = local_3c + 0xff;
+
+      }
+
+      if (iVar9 < 0) {
+
+        iVar9 = iVar9 + 0xff;
+
+      }
+
+      iVar8 = local_38;
+
+      if (local_38 < 0) {
+
+        iVar8 = local_38 + 0xff;
+
+      }
+
+      if (iVar10 < 0) {
+
+        iVar10 = iVar10 + 0xff;
+
+      }
+
+      if (iVar2 < 0) {
+
+        iVar2 = -iVar2;
+
+      }
+
+      if (iVar3 < 0) {
+
+        iVar3 = -iVar3;
+
+      }
+
+      iVar1 = (iVar6 >> 8) * (iVar1 >> 8) + (iVar7 >> 8) * (iVar9 >> 8) +
+
+              (iVar8 >> 8) * (iVar10 >> 8);
+
+      if (iVar1 < 0) {
+
+        iVar1 = -iVar1;
+
+      }
+
+      if ((iVar3 < iVar2) && (iVar1 < iVar2)) {
+
+LAB_8008ff94:
+
+        normal->x = local_60;
+
+        normal->y = local_5c;
+
+        normal->z = local_58;
+
         return 1;
-      }
-      {
-        int xDiff;
-        int yDiff;
-        int zDiff;
-        int selectedRange;
 
-        if (xRange < 0) {
-          xDiff = (o1->dimension).x + xRange;
-        }
-        else {
-          xDiff = (o1->dimension).x - xRange;
-        }
-        if (yRange < 0) {
-          yDiff = (o1->dimension).y + yRange;
-        }
-        else {
-          yDiff = (o1->dimension).y - yRange;
-        }
-        if (zRange < 0) {
-          zDiff = (o1->dimension).z + zRange;
-        }
-        else {
-          zDiff = (o1->dimension).z - zRange;
-        }
-        if (xDiff < yDiff && xDiff < zDiff) {
-          *normal = *(coorddef *)&(o1->orientMat).m[0];
-          selectedRange = xRange;
-        }
-        else if (yDiff < zDiff) {
-          *normal = *(coorddef *)&(o1->orientMat).m[3];
-          selectedRange = yRange;
-        }
-        else {
-          *normal = *(coorddef *)&(o1->orientMat).m[6];
-          selectedRange = zRange;
-        }
-        if (0 <= selectedRange) {
-          goto returnOne;
-        }
-negateNormal:
-        normal->x = -normal->x;
-        normal->y = -normal->y;
-        normal->z = -normal->z;
-        __asm__("" : : "r"(normal), "r"(normal), "r"(normal), "r"(normal), "r"(normal),
-                     "r"(normal), "r"(normal), "r"(normal), "r"(normal), "r"(normal));
-        __asm__("" : : "r"(normal), "r"(normal), "r"(normal), "r"(normal), "r"(normal),
-                     "r"(normal), "r"(normal), "r"(normal), "r"(normal), "r"(normal));
-        __asm__("" : : "r"(normal));
-returnOne:
-        return 1;
       }
-    }
-  }
+
+      if (iVar3 <= iVar1) {
+
+LAB_8008ffe0:
+
+        normal->x = local_40;
+
+        normal->y = local_3c;
+
+        normal->z = local_38;
+
         return 1;
+
       }
+
+LAB_8008ffc0:
+
+      normal->x = local_50;
+
+      normal->y = local_4c;
+
+      normal->z = local_48;
+
+      return 1;
+
     }
+
+    if (xRange < 0) {
+
+      iVar2 = (o1->dimension).x + xRange;
+
+    }
+
+    else {
+
+      iVar2 = (o1->dimension).x - xRange;
+
+    }
+
+    if (yRange < 0) {
+
+      iVar3 = (o1->dimension).y + yRange;
+
+    }
+
+    else {
+
+      iVar3 = (o1->dimension).y - yRange;
+
+    }
+
+    if (zRange < 0) {
+
+      iVar6 = (o1->dimension).z + zRange;
+
+    }
+
+    else {
+
+      iVar6 = (o1->dimension).z - zRange;
+
+    }
+
+    if ((iVar2 < iVar3) && (iVar2 < iVar6)) {
+
+      iVar9 = (o1->orientMat).m[1];
+
+      iVar10 = (o1->orientMat).m[2];
+
+      normal->x = (o1->orientMat).m[0];
+
+      normal->y = iVar9;
+
+      normal->z = iVar10;
+
+      iVar10 = iVar1;
+
+    }
+
+    else if (iVar3 < iVar6) {
+
+      iVar1 = (o1->orientMat).m[4];
+
+      iVar10 = (o1->orientMat).m[5];
+
+      normal->x = (o1->orientMat).m[3];
+
+      normal->y = iVar1;
+
+      normal->z = iVar10;
+
+      iVar10 = iVar9;
+
+    }
+
+    else {
+
+      iVar1 = (o1->orientMat).m[7];
+
+      iVar9 = (o1->orientMat).m[8];
+
+      normal->x = (o1->orientMat).m[6];
+
+      normal->y = iVar1;
+
+      normal->z = iVar9;
+
+    }
+
+    if (-1 < iVar10) {
+
+      return 1;
+
+    }
+
   }
+
+  else {
+
+    iVar10 = zRange;
+
+    iVar9 = yRange;
+
+    iVar1 = xRange;
+
+    iVar6 = (o1->linearVel).x;
+
+    iVar3 = (o0->linearVel).x;
+
+    iVar2 = iVar6 - iVar3;
+
+    if (iVar2 < 1) {
+
+      iVar2 = iVar3 - iVar6;
+
+    }
+
+    iVar6 = (o1->linearVel).y;
+
+    iVar3 = (o0->linearVel).y;
+
+    iVar7 = iVar6 - iVar3;
+
+    if (iVar7 < 1) {
+
+      iVar7 = iVar3 - iVar6;
+
+    }
+
+    iVar8 = (o1->linearVel).z;
+
+    iVar3 = (o0->linearVel).z;
+
+    iVar6 = iVar8 - iVar3;
+
+    if (iVar6 < 1) {
+
+      iVar6 = iVar3 - iVar8;
+
+    }
+
+    if (iVar2 < iVar7) {
+
+      iVar2 = iVar7;
+
+    }
+
+    if (iVar2 < iVar6) {
+
+      iVar2 = iVar6;
+
+    }
+
+    findClosestSideDave = (int)(0xf0000 < iVar2);
+
+    if (findClosestSideDave != 0) {
+
+      iVar1 = (o1->linearVel).x;
+
+      iVar9 = (o1->linearVel).y;
+
+      iVar10 = (o1->linearVel).z;
+
+      local_60 = (o0->orientMat).m[0];
+
+      local_5c = (o0->orientMat).m[1];
+
+      local_58 = (o0->orientMat).m[2];
+
+      local_50 = (o0->orientMat).m[3];
+
+      local_4c = (o0->orientMat).m[4];
+
+      local_48 = (o0->orientMat).m[5];
+
+      local_40 = (o0->orientMat).m[6];
+
+      local_3c = (o0->orientMat).m[7];
+
+      local_38 = (o0->orientMat).m[8];
+
+      if (0 < xRange) {
+
+        local_60 = -local_60;
+
+        local_58 = -local_58;
+
+        local_5c = -local_5c;
+
+      }
+
+      if (0 < yRange) {
+
+        local_50 = -local_50;
+
+        local_48 = -local_48;
+
+        local_4c = -local_4c;
+
+      }
+
+      if (0 < zRange) {
+
+        local_40 = -local_40;
+
+        local_38 = -local_38;
+
+        local_3c = -local_3c;
+
+      }
+
+      iVar2 = local_60;
+
+      if (local_60 < 0) {
+
+        iVar2 = local_60 + 0xff;
+
+      }
+
+      iVar3 = iVar1;
+
+      if (iVar1 < 0) {
+
+        iVar3 = iVar1 + 0xff;
+
+      }
+
+      iVar6 = local_5c;
+
+      if (local_5c < 0) {
+
+        iVar6 = local_5c + 0xff;
+
+      }
+
+      iVar7 = iVar9;
+
+      if (iVar9 < 0) {
+
+        iVar7 = iVar9 + 0xff;
+
+      }
+
+      iVar8 = local_58;
+
+      if (local_58 < 0) {
+
+        iVar8 = local_58 + 0xff;
+
+      }
+
+      iVar4 = iVar10;
+
+      if (iVar10 < 0) {
+
+        iVar4 = iVar10 + 0xff;
+
+      }
+
+      iVar2 = (iVar2 >> 8) * (iVar3 >> 8) + (iVar6 >> 8) * (iVar7 >> 8) +
+
+              (iVar8 >> 8) * (iVar4 >> 8);
+
+      iVar6 = local_50;
+
+      if (local_50 < 0) {
+
+        iVar6 = local_50 + 0xff;
+
+      }
+
+      iVar8 = local_4c;
+
+      if (local_4c < 0) {
+
+        iVar8 = local_4c + 0xff;
+
+      }
+
+      iVar5 = local_48;
+
+      if (local_48 < 0) {
+
+        iVar5 = local_48 + 0xff;
+
+      }
+
+      iVar3 = (iVar6 >> 8) * (iVar3 >> 8) + (iVar8 >> 8) * (iVar7 >> 8) +
+
+              (iVar5 >> 8) * (iVar4 >> 8);
+
+      iVar6 = local_40;
+
+      if (local_40 < 0) {
+
+        iVar6 = local_40 + 0xff;
+
+      }
+
+      if (iVar1 < 0) {
+
+        iVar1 = iVar1 + 0xff;
+
+      }
+
+      iVar7 = local_3c;
+
+      if (local_3c < 0) {
+
+        iVar7 = local_3c + 0xff;
+
+      }
+
+      if (iVar9 < 0) {
+
+        iVar9 = iVar9 + 0xff;
+
+      }
+
+      iVar8 = local_38;
+
+      if (local_38 < 0) {
+
+        iVar8 = local_38 + 0xff;
+
+      }
+
+      if (iVar10 < 0) {
+
+        iVar10 = iVar10 + 0xff;
+
+      }
+
+      if (iVar2 < 0) {
+
+        iVar2 = -iVar2;
+
+      }
+
+      if (iVar3 < 0) {
+
+        iVar3 = -iVar3;
+
+      }
+
+      iVar1 = (iVar6 >> 8) * (iVar1 >> 8) + (iVar7 >> 8) * (iVar9 >> 8) +
+
+              (iVar8 >> 8) * (iVar10 >> 8);
+
+      if (iVar1 < 0) {
+
+        iVar1 = -iVar1;
+
+      }
+
+      if ((iVar3 < iVar2) && (iVar1 < iVar2)) goto LAB_8008ff94;
+
+      if (iVar3 <= iVar1) goto LAB_8008ffe0;
+
+      goto LAB_8008ffc0;
+
+    }
+
+    if (xRange < 0) {
+
+      iVar2 = (o0->dimension).x + xRange;
+
+    }
+
+    else {
+
+      iVar2 = (o0->dimension).x - xRange;
+
+    }
+
+    if (yRange < 0) {
+
+      iVar3 = (o0->dimension).y + yRange;
+
+    }
+
+    else {
+
+      iVar3 = (o0->dimension).y - yRange;
+
+    }
+
+    if (zRange < 0) {
+
+      iVar6 = (o0->dimension).z + zRange;
+
+    }
+
+    else {
+
+      iVar6 = (o0->dimension).z - zRange;
+
+    }
+
+    if ((iVar2 < iVar3) && (iVar2 < iVar6)) {
+
+      iVar9 = (o0->orientMat).m[1];
+
+      iVar10 = (o0->orientMat).m[2];
+
+      normal->x = (o0->orientMat).m[0];
+
+      normal->y = iVar9;
+
+      normal->z = iVar10;
+
+      iVar10 = iVar1;
+
+    }
+
+    else if (iVar3 < iVar6) {
+
+      iVar1 = (o0->orientMat).m[4];
+
+      iVar10 = (o0->orientMat).m[5];
+
+      normal->x = (o0->orientMat).m[3];
+
+      normal->y = iVar1;
+
+      normal->z = iVar10;
+
+      iVar10 = iVar9;
+
+    }
+
+    else {
+
+      iVar1 = (o0->orientMat).m[7];
+
+      iVar9 = (o0->orientMat).m[8];
+
+      normal->x = (o0->orientMat).m[6];
+
+      normal->y = iVar1;
+
+      normal->z = iVar9;
+
+    }
+
+    if (iVar10 < 1) {
+
+      return 1;
+
+    }
+
+  }
+
+  normal->x = -normal->x;
+
+  normal->z = -normal->z;
+
+  normal->y = -normal->y;
+
+  return 1;
+
 }
 
 /* ---- Collide_TestObjectVertices__FP13BO_tNewtonObjT0P8coorddefT2  [@0x80090144] ---- */
 int Collide_TestObjectVertices(BO_tNewtonObj *o0,BO_tNewtonObj *o1,coorddef *p,coorddef *normal)
+
+
+
 {
-  /* RULE-8 rewrite from SYM 8c block @0x80090144 (fsize=176 mask=$c0ff0000 = ra+fp+s0..s7) +
-     m2c pregen + raw oracle.  SYM facts wired in: numbackoffsteps is a REAL REG local ($fp)
-     holding 0x20 (Ghidra folded it to a literal); collisionHappened and useVelocity share $16
-     (useVelocity=1 doubles as the collision flag path); `temp` redeclared in TWO sibling blocks
-     (fresh pseudo each); relativeUnit/maxrv/maxrp/inverseRelativeVelocityLength live in the
-     line-94 block.  Loop = top-test label-goto (TEST: if(cond){...goto TEST;}), exit both by
-     count and by DoActual()==0 (return staged in the beqz delay).  Inline signed /256 idiom
-     house style throughout. */
   int collisionHappened;
   int ctr;
   int numbackoffsteps;
   coorddef backoff0;
   coorddef backoff1;
+  coorddef relativePosition;
+  coorddef relativeVelocity;
+  int useVelocity;
+  coorddef relativeUnit;
+  int maxrv;
+  int maxrp;
+  int inverseRelativeVelocityLength;
+  int temp;
+  int dot;
+  coorddef velocityUnit;
+  coorddef positionUnit;
+  int totalMass;
+  int r0;
+  int r1;
 
-  collisionHappened = 0;
-  basisDots[0] = ((o0->orientMat).m[0] / 256) * ((o1->orientMat).m[0] / 256) +
-                 ((o0->orientMat).m[1] / 256) * ((o1->orientMat).m[1] / 256) +
-                 ((o0->orientMat).m[2] / 256) * ((o1->orientMat).m[2] / 256);
-  basisDots[1] = ((o0->orientMat).m[0] / 256) * ((o1->orientMat).m[3] / 256) +
-                 ((o0->orientMat).m[1] / 256) * ((o1->orientMat).m[4] / 256) +
-                 ((o0->orientMat).m[2] / 256) * ((o1->orientMat).m[5] / 256);
-  basisDots[2] = ((o0->orientMat).m[0] / 256) * ((o1->orientMat).m[6] / 256) +
-                 ((o0->orientMat).m[1] / 256) * ((o1->orientMat).m[7] / 256) +
-                 ((o0->orientMat).m[2] / 256) * ((o1->orientMat).m[8] / 256);
-  basisDots[3] = ((o0->orientMat).m[3] / 256) * ((o1->orientMat).m[0] / 256) +
-                 ((o0->orientMat).m[4] / 256) * ((o1->orientMat).m[1] / 256) +
-                 ((o0->orientMat).m[5] / 256) * ((o1->orientMat).m[2] / 256);
-  basisDots[4] = ((o0->orientMat).m[3] / 256) * ((o1->orientMat).m[3] / 256) +
-                 ((o0->orientMat).m[4] / 256) * ((o1->orientMat).m[4] / 256) +
-                 ((o0->orientMat).m[5] / 256) * ((o1->orientMat).m[5] / 256);
-  basisDots[5] = ((o0->orientMat).m[3] / 256) * ((o1->orientMat).m[6] / 256) +
-                 ((o0->orientMat).m[4] / 256) * ((o1->orientMat).m[7] / 256) +
-                 ((o0->orientMat).m[5] / 256) * ((o1->orientMat).m[8] / 256);
-  basisDots[6] = ((o0->orientMat).m[6] / 256) * ((o1->orientMat).m[0] / 256) +
-                 ((o0->orientMat).m[7] / 256) * ((o1->orientMat).m[1] / 256) +
-                 ((o0->orientMat).m[8] / 256) * ((o1->orientMat).m[2] / 256);
-  basisDots[7] = ((o0->orientMat).m[6] / 256) * ((o1->orientMat).m[3] / 256) +
-                 ((o0->orientMat).m[7] / 256) * ((o1->orientMat).m[4] / 256) +
-                 ((o0->orientMat).m[8] / 256) * ((o1->orientMat).m[5] / 256);
-  basisDots[8] = ((o0->orientMat).m[6] / 256) * ((o1->orientMat).m[6] / 256) +
-                 ((o0->orientMat).m[7] / 256) * ((o1->orientMat).m[7] / 256) +
-                 ((o0->orientMat).m[8] / 256) * ((o1->orientMat).m[8] / 256);
-  scaledBasisDots[0] = (basisDots[0] / 256) * ((o1->dimension).x / 256);
-  scaledBasisDots[1] = (basisDots[1] / 256) * ((o1->dimension).y / 256);
-  scaledBasisDots[2] = (basisDots[2] / 256) * ((o1->dimension).z / 256);
-  scaledBasisDots[3] = (basisDots[3] / 256) * ((o1->dimension).x / 256);
-  scaledBasisDots[4] = (basisDots[4] / 256) * ((o1->dimension).y / 256);
-  scaledBasisDots[5] = (basisDots[5] / 256) * ((o1->dimension).z / 256);
-  scaledBasisDots[6] = (basisDots[6] / 256) * ((o1->dimension).x / 256);
-  scaledBasisDots[7] = (basisDots[7] / 256) * ((o1->dimension).y / 256);
-  scaledBasisDots[8] = (basisDots[8] / 256) * ((o1->dimension).z / 256);
-  scaledBasisDotsOther[0] = (basisDots[0] / 256) * ((o0->dimension).x / 256);
-  scaledBasisDotsOther[1] = (basisDots[1] / 256) * ((o0->dimension).x / 256);
-  scaledBasisDotsOther[2] = (basisDots[2] / 256) * ((o0->dimension).x / 256);
-  scaledBasisDotsOther[3] = (basisDots[3] / 256) * ((o0->dimension).y / 256);
-  scaledBasisDotsOther[4] = (basisDots[4] / 256) * ((o0->dimension).y / 256);
-  scaledBasisDotsOther[5] = (basisDots[5] / 256) * ((o0->dimension).y / 256);
-  scaledBasisDotsOther[6] = (basisDots[6] / 256) * ((o0->dimension).z / 256);
-  scaledBasisDotsOther[7] = (basisDots[7] / 256) * ((o0->dimension).z / 256);
-  scaledBasisDotsOther[8] = (basisDots[8] / 256) * ((o0->dimension).z / 256);
-  numbackoffsteps = 0x20;
-  ctr = 0;
-  /* MATCH: real while + exit-in-the-middle (NOT a goto-TEST loop) - gcc loop notes enable the
-     LIM hoists the oracle has (&basisDotRelative -> s4/s6, &relativeVelocity spill to sp+0x80);
-     a goto-formed loop skips loop.c entirely and re-materializes per-iteration */
-  while (true) {
-    if (numbackoffsteps <= ctr) break;
-    {
-      coorddef relativePosition;
+  bool bVar1;
 
-      relativePosition.x = (o1->position).x - (o0->position).x;
-      relativePosition.y = (o1->position).y - (o0->position).y;
-      relativePosition.z = (o1->position).z - (o0->position).z;
-      basisDotRelative[0] = ((o0->orientMat).m[0] / 256) * (relativePosition.x / 256) +
-                            ((o0->orientMat).m[1] / 256) * (relativePosition.y / 256) +
-                            ((o0->orientMat).m[2] / 256) * (relativePosition.z / 256);
-      basisDotRelative[1] = ((o0->orientMat).m[3] / 256) * (relativePosition.x / 256) +
-                            ((o0->orientMat).m[4] / 256) * (relativePosition.y / 256) +
-                            ((o0->orientMat).m[5] / 256) * (relativePosition.z / 256);
-      basisDotRelative[2] = ((o0->orientMat).m[6] / 256) * (relativePosition.x / 256) +
-                            ((o0->orientMat).m[7] / 256) * (relativePosition.y / 256) +
-                            ((o0->orientMat).m[8] / 256) * (relativePosition.z / 256);
-      basisDotRelative[3] = ((o1->orientMat).m[0] / 256) * (relativePosition.x / 256) +
-                            ((o1->orientMat).m[1] / 256) * (relativePosition.y / 256) +
-                            ((o1->orientMat).m[2] / 256) * (relativePosition.z / 256);
-      basisDotRelative[4] = ((o1->orientMat).m[3] / 256) * (relativePosition.x / 256) +
-                            ((o1->orientMat).m[4] / 256) * (relativePosition.y / 256) +
-                            ((o1->orientMat).m[5] / 256) * (relativePosition.z / 256);
-      basisDotRelative[5] = ((o1->orientMat).m[6] / 256) * (relativePosition.x / 256) +
-                            ((o1->orientMat).m[7] / 256) * (relativePosition.y / 256) +
-                            ((o1->orientMat).m[8] / 256) * (relativePosition.z / 256);
-      if (Collide_DoActualObjectCollisionCheck(o0,o1,p,normal) == 0) break;
-      if (collisionHappened == 0) {
-          coorddef relativeVelocity;
-          int useVelocity;
-          coorddef relativeUnit;
-          int maxrv;
-          int maxrp;
-          int inverseRelativeVelocityLength;
+  int iVar2;
 
-          useVelocity = 0;
-          relativeVelocity.x = (o0->linearVel).x - (o1->linearVel).x;
-          inverseRelativeVelocityLength = 0;
-          relativeVelocity.y = (o0->linearVel).y - (o1->linearVel).y;
-          relativeVelocity.z = (o0->linearVel).z - (o1->linearVel).z;
-          maxrv = (relativeVelocity.x / 256) * (relativeVelocity.x / 256) +
-                  (relativeVelocity.z / 256) * (relativeVelocity.z / 256);
-          if (0x0E100000 < maxrv) {
-            /* MATCH INVESTIGATION (2026-08-13): SLD puts both component loads on
-               line 1149 and the divide/square copies on 1151.  Keeping rp.x alive
-               after its divide reaches the exact 1164-instruction basin (15 -> 8).
-               The residual is retail's `lw a0,48; lw a2,56; addu v0,a0` versus our
-               `lw v0,48; ... lw s7,48; lw v1,56`.  Reusing dead maxrv as the Z
-               accumulator explains the retail v0/v1 names but gates 28/49 depending
-               accumulation order; inline identity and early-clobber variants also
-               regress.  The remaining angle is the line-1149 load-temporary graph.
-               W61-A13 (2026-08-15) SHARPENED + 10 MORE FALSIFICATIONS.  Retail's
-               shape is exactly 2 LOADS + 2 COPIES (rp.x -> $a0, rp.z -> $a2 loaded
-               ADJACENTLY so the second fills the first's load-delay slot, then
-               `addu $v0,$a0` / `addu $v1,$a2` feed the two /256 idioms).  Ours is
-               3 LOADS + 1 nop + 0 copies (same count, hence 1164/1164 both ways).
-               So the missing device is "hold BOTH components live in their own
-               pseudos across the divides", not a spelling of the accumulation.
-               FALSIFIED, each a real gate run:
-                 plain symmetric expression (no split, no fence) ......... 15 @1163
-                 two block-local temps rpx/rpz (decl-init) ............... 22 @1162
-                 same, comma decl + separate assignment .................. 22 @1162
-                 rpz temp only .......................................... 22 @1162
-                 rpx temp only .......................................... 15 @1163
-                 plain + read-only fence on rp.z before the statement .... 16 @1164
-                 split + fence on rp.z instead of rp.x ................... 8 @1164 (ties base)
-                 split + fence on rp.z placed before the whole block ..... 16 @1164
-                 split + 2-operand fence "r"(rp.x),"r"(rp.z) ............. 9 @1165
-                 split + fence moved between the load and the /256 ....... 15 @1163
-               Every named-temp form is 2 insns SHORT: cse merges the temp with the
-               divide's working pseudo, deleting BOTH copies.  The copies survive in
-               retail because each source pseudo is still live at the copy point.
-               NEXT ANGLE (instrument, not spelling): -dl on this TU to see whether
-               our RTL even contains the two copies before local-alloc (the W59-11A
-               CalcWheelLockAcc lesson -- if cse folds them at expand, no source
-               spelling downstream can matter and the cure is an opacity fence on the
-               SOURCE, hoisted above every load it must not block).
+  int iVar3;
 
-               W71-A20 (2026-08-21) -- THE NEXT ANGLE WAS RIGHT AND IT WORKS: the
-               PAIR read-only fence placed BEFORE the whole statement,
-                   asm volatile("" : : "r"(relativePosition.x), "r"(relativePosition.z));
-                   maxrp = relativePosition.x;  maxrp /= 256;
-                   maxrp = maxrp*maxrp + (relativePosition.z/256)*(relativePosition.z/256);
-               reproduces retail's EXACT 10-instruction shape for the first time --
-               `lw ?,48; lw ?,56; addu v0,?,zero; bgez v0; addu ?,v0,zero;
-                addiu ?,v0,255; sra v0,?,8; mult v0,v0; <z>; mflo a1` -- the two
-               ADJACENT loads (no load-delay nop), the x copy, and the divide-in-place
-               all land.  The anonymous asm read IS the missing first evaluation: cse
-               then turns `maxrp = relativePosition.x` into retail's `addu v0,a0,zero`
-               instead of a second load.  It gates 16 @1164 (NOT landed -- honest-count
-               rule, control is 8), and the whole residual is now only SEATS plus one
-               z re-load:
-                   ours  lw s7,48 / lw t8,56 / addu v0,s7 / addu a0,v0 / sra v0,a0
-                                                                 / lw v1,56(sp)
-                   retail lw a0,48 / lw a2,56 / addu v0,a0 / addu v1,v0 / sra v0,v1
-                                                                 / addu v1,a2,zero
-               i.e. our two fenced pseudos are seated in CALLEE-SAVED s7/t8 where
-               retail uses caller-saved a0/a2, the divide temp is a0-vs-v1, and the
-               z value is RE-LOADED because the z use sits in a different extended BB
-               (past the bgez) so cse has lost the mem<->pseudo equivalence -- retail's
-               `addu v1,a2,zero` is a live-pseudo copy, not a cse substitution.
-               FALSIFIED from that basin (all real gate runs): reusing dead `maxrv`
-               as the z carrier -- before the x read 51 @1165 | after the x divide
-               51 @1165 | with the square split out 18 @1164 | inline `maxrv =
-               relativePosition.z / 256` 55 @1165; the same maxrv-carrier forms with
-               NO fence 49/50/28; identity-launder (`"=r"(x) : "0"(x)`) on named
-               rpx/rpz copies 22-23 @1162-1163 (the copies fold, 2 SHORT); a single
-               2-operand identity launder 22 @1162; block-local rpx/rpz + the
-               divide-in-place split 45-49; plain symmetric expression 15 @1163;
-               plain + void fence either side 15 @1163; the pair fence AFTER the
-               divide 9 @1165.
-               NEXT: from the PAIR-FENCE basin the problem is now purely
-               find_free_reg availability (catalog 16B) -- price the s7/t8-vs-a0/a2
-               seats with -dl/allocsim and try the 20B preference-killer
-               (`__asm__("" : "=r"(x) : "0"(x) : "$N")`) on each fenced pseudo, which
-               is exactly the device that sealed Physics_Real this wave.  The z
-               re-load needs a live pseudo across the bgez, i.e. the SAME launder in
-               its output-bearing (non-volatile) form so the value survives the BB
-               boundary.  NOT a floor.
+  int iVar4;
 
-               W72-A10 (2026-08-22) -- THE MECHANISM IS NAMED AND THE Z HALF LANDS.
-               gcc-2.8.1 `local-alloc.c` combine_regs (:1866 header comment, verbatim):
-               "If UREG is a pseudo-register that hasn't already been assigned a
-                quantity number, it means that it is NOT LOCAL TO THIS BLOCK or dies
-                more than once.  In either event, we can't do anything with it."
-               => a reg-reg copy whose SOURCE pseudo crosses a basic-block boundary is
-               NOT coalescible, so it SURVIVES.  Retail's two copies (`addu $v0,$a0`
-               and `addu $v1,$a2`) are exactly that: two carriers loaded at SLD line
-               1149 and copied into their consumers at 1151, uncoalescible because they
-               cross the /256 branches.  Our carriers die inside one block => the copies
-               fold => the chronic "2 SHORT" (1162).
-               BEST BASIN FOUND (not landed, honest-count 8 stands):
-                 K1  int rpx = relativePosition.x, rpz = relativePosition.z;
-                     maxrp = rpx;  maxrp /= 256;
-                     maxrv = rpz;                      <- DEAD maxrv as the z carrier
-                     maxrp = maxrp*maxrp + (maxrv/256)*(maxrv/256);
-                 => 9 diffs @1163.  The Z COPY MINTS (`addu $v1,$a0,$zero`, retail
-                 `addu $v1,$a2,$zero`) and the whole z divide matches, because `maxrv`
-                 is a GLOBAL allocno (live since SLD 1145) whose assignment sits in a
-                 different block from rpz's load.  SYM agrees: maxrv = REG $3 = $v1 IS
-                 retail's z-copy destination.  The single remaining insn is the X copy
-                 `addu $v0,$a0,$zero`: `maxrp = rpx` has def and use in the SAME block,
-                 so combine_regs ties them and the load lands straight in $v0.
-               PROOF OF THE MECHANISM (probe, not a candidate): hoisting the rpx/rpz
-               declaration ABOVE `if (0x0E100000 < maxrv)` makes both carriers cross the
-               guard branch -- BOTH copies mint (`addu $v0,$v1,$zero` appears) -- but the
-               loads then emit before the beqz: 15 @1163.
-               MEASURED THIS WAVE (all real gate runs, all at both-copy granularity):
-                 S1 two block-local temps + maxrp=rpx ........... 14 @1162
-                 S2 temps assigned on one line .................. 14 @1162
-                 S3 temps + plain symmetric expression .......... 22 @1162
-                 S4 temps + anonymous re-reads of BOTH .......... 15 @1163 (temps DCE'd)
-                 E1 identity launder on rpx ..................... 15 @1163
-                 E4 read-only fences on BOTH after the statement . 15 @1163
-                    (x copy MINTS; load seats swap a2/a0; z copy lost)
-                 G1-G3 `*(volatile int*)&relativePosition.[xz]` .. 14 @1162
-                    => the fold is NOT combine merging the load into the copy
-                 F1-F6 launder-mid / split sum / z-divide-in-place  14-50
-                 H1-H6 decl order, separate decl lines, 3rd temp,
-                       read-only fence placements ............... 14-45
-                 K3 maxrv assigned before maxrp ................. 14 @1162
-                 K5/K6 separate z temp divided in place ......... 44-45
-                 L1-L6 x-side devices on top of K1 .............. 9-11
-               ROUTE (sharp): a shape in which the X carrier's single use lies in a
-               DIFFERENT basic block from its load, without moving the loads out of the
-               `if`.  No asm device can do it -- an asm does not split a basic block.
+  int iVar5;
 
-               W74-A10 (2026-08-22) -- SEALED, 0 @1164.  The W72 route was right and its
-               closing premise was the only thing wrong: an asm indeed cannot split a
-               basic block, but it does not have to -- THE /256 IDIOM ALREADY DID.
-               `maxrp /= 256` expands to `bgez; addiu; L: sra`, so every statement after
-               the divide already lives in a different basic block from the carrier's
-               load.  A zero-insn read-only fence placed there,
-                   asm volatile("" : : "r"(rpx));
-               gives the X carrier a second reference in a second block => flow marks it
-               non-local => local-alloc.c:472 leaves reg_qty[rpx] = -1 => combine_regs
-               (:1866 "not local to this block or dies more than once") REFUSES the tie
-               => retail's X copy `addu $v0,$a0,$zero` MINTS, with the load still inside
-               the `if` (no +15 hoist shape).  Combined with the K1 dead-`maxrv` Z carrier
-               (uncoalescible through the other clause of the same test, being a global
-               allocno) BOTH copies mint and the two loads sit adjacent: 8 -> 4 @1164,
-               residual = exactly ONE SEAT (our z carrier $a1 vs retail $a2).
-               The seat fell to a 20B-family clobber on that SAME zero-insn fence:
-               `: "a1"` denies $5 to every allocno LIVE AT THAT INSN (22B-1) -- rpz is
-               live there -- so find_free_reg walks on to $6 = $a2 = retail's seat.
-               MEASURED THIS WAVE (every line a real gate run):
-                 K1 alone .......................................... 9 @1163
-                 K1 + read-only fence on rpx AFTER the divide ...... 4 @1164
-                 same + clobber "a1" ............................... 0 PASS
-                 same + clobber "$5" ............................... 0 PASS (identical)
-                 fence after the `maxrv = rpz` carrier ............. 10 @1164
-                 fence at the end of the statement ................. 10 @1164
-                 pair fence "r"(rpx),"r"(rpz) after the divide ..... 10 @1164
-                 declaration order z-first ......................... 12 @1164
-                 fence on rpx + 20B launder on rpz w/ clobber ...... 15 @1163
-                 fence on rpx + separate clobbering fence on rpz ... 10 @1164
-               LAW: a pseudo whose ONLY problem is "def and use in the same block" can be
-               de-coalesced by ONE zero-insn read-only fence placed past ANY branch the
-               source already emits -- a /256, a clamp, a guard.  Look for an existing
-               block boundary before concluding a copy is unreachable. */
-            int rpx = relativePosition.x, rpz = relativePosition.z;
+  int iVar6;
 
-            maxrp = rpx;
-            maxrp /= 256;
-            /* MATCH: zero-insn fence in the POST-divide basic block.  It makes rpx
-               multi-block so combine_regs cannot fold retail's X copy, and the "a1"
-               clobber pushes the live z carrier off $5 onto retail's $a2.  Deleting
-               either half costs 4 and 4 diffs respectively. */
-            asm volatile("" : : "r"(rpx) : "a1");
-            maxrv = rpz;   /* dead maxrv IS retail's z carrier (SYM: maxrv = REG $3) */
-            maxrp = maxrp * maxrp + (maxrv / 256) * (maxrv / 256);
-            if (maxrp < 0xCCC) {
-              int temp;
+  int iVar7;
 
-              temp = Math_VectorLength(&relativeVelocity) / 2;
-              inverseRelativeVelocityLength = 0x10000;
-              /* MATCH: rdiv arm duplicated inline (cross-jump merges it into the sibling copy,
-                 stopping at the inverted branch sense = oracle bnez->1008); m2c's goto block_270
-                 is that merge artifact */
-              if (temp != 0) {
-                inverseRelativeVelocityLength = rdiv(0x8000, temp);
-                useVelocity = 1;
-              } else {
-                useVelocity = 1;
-              }
-            } else {
-              int dot;
-              coorddef velocityUnit;
-              coorddef positionUnit;
+  int iVar8;
 
-              velocityUnit = relativeVelocity;
-              Math_NormalizeVector(&velocityUnit);
-              positionUnit = relativePosition;
-              Math_NormalizeShortVector(&positionUnit);
-              dot = (velocityUnit.x / 256) * (positionUnit.x / 256) +
-                    (velocityUnit.y / 256) * (positionUnit.y / 256) +
-                    (velocityUnit.z / 256) * (positionUnit.z / 256);
-              if (0xD999 < dot) {
-                int temp;
+  int iVar9;
 
-                temp = Math_VectorLength(&relativeVelocity) / 2;
-                /* MATCH: 0x10000 as the ELSE arm - dbr steals the lui into the beqz delay
-                   slot (safe both paths); a pre-set form lets sched hoist it into the CALL
-                   slot instead (oracle jal slot = nop) */
-                if (temp != 0) {
-                  inverseRelativeVelocityLength = rdiv(0x8000, temp);
-                } else {
-                  inverseRelativeVelocityLength = 0x10000;
-                }
-                useVelocity = 1;
-              }
-            }
-          }
-          if (useVelocity != 0) {
-            if (o0->objID >= 0x200) {
-              backoff0.x = 0;
-              backoff0.y = 0;
-              backoff0.z = 0;
-            } else {
-              backoff0.x = fixedmult(-inverseRelativeVelocityLength,(o0->linearVel).x);
-              backoff0.y = fixedmult(-inverseRelativeVelocityLength,(o0->linearVel).y);
-              backoff0.z = fixedmult(-inverseRelativeVelocityLength,(o0->linearVel).z);
-              backoff0.x = backoff0.x >> 5;
-              backoff0.y = backoff0.y >> 5;
-              backoff0.z = backoff0.z >> 5;
-            }
-            if (o1->objID >= 0x200) {
-              backoff1.x = 0;
-              backoff1.y = 0;
-              backoff1.z = 0;
-            } else {
-              backoff1.x = fixedmult(-inverseRelativeVelocityLength,(o1->linearVel).x);
-              backoff1.y = fixedmult(-inverseRelativeVelocityLength,(o1->linearVel).y);
-              backoff1.z = fixedmult(-inverseRelativeVelocityLength,(o1->linearVel).z);
-              backoff1.x = backoff1.x >> 5;
-              backoff1.y = backoff1.y >> 5;
-              backoff1.z = backoff1.z >> 5;
-            }
-          } else {
-            int totalMass;
-            int r0;
-            int r1;
+  int iVar10;
 
-            relativeUnit = relativePosition;
-            Math_NormalizeShortVector(&relativeUnit);
-            totalMass = o0->mass + o1->mass;
-            r1 = rdiv(o0->mass, totalMass);
-            r0 = rdiv(o1->mass, totalMass);
-            backoff0.x = (-((relativeUnit.x * (r0 / 4)) / 16384)) >> 5;
-            backoff0.y = (-((relativeUnit.y * (r0 / 4)) / 16384)) >> 5;
-            backoff0.z = (-((relativeUnit.z * (r0 / 4)) / 16384)) >> 5;
-            backoff1.x = ((relativeUnit.x * (r1 / 4)) / 16384) >> 5;
-            backoff1.y = ((relativeUnit.y * (r1 / 4)) / 16384) >> 5;
-            backoff1.z = ((relativeUnit.z * (r1 / 4)) / 16384) >> 5;
-            if (o0->objID >= 0x200) {
-              backoff1.x = backoff1.x / 2;
-              backoff1.y = backoff1.y / 2;
-              backoff1.z = backoff1.z / 2;
-            }
-            if (o1->objID >= 0x200) {
-              backoff0.x = backoff0.x / 2;
-              backoff0.y = backoff0.y / 2;
-              backoff0.z = backoff0.z / 2;
-            }
-          }
-          collisionHappened = 1;
-        }
-      (o0->position).x = (o0->position).x + backoff0.x;
-      (o0->position).y = (o0->position).y + backoff0.y;
-      (o0->position).z = (o0->position).z + backoff0.z;
-      (o1->position).x = (o1->position).x + backoff1.x;
-      (o1->position).y = (o1->position).y + backoff1.y;
-      (o1->position).z = (o1->position).z + backoff1.z;
-      ctr = ctr + 1;
-    }
+  int iVar11;
+
+  int iVar12;
+
+  int local_a0;
+
+  int local_9c;
+
+  int local_98;
+
+  int local_90;
+
+  int local_8c;
+
+  int local_88;
+
+  coorddef local_70;
+
+  coorddef local_60;
+
+  coorddef local_50;
+
+  coorddef local_40;
+
+  coorddef *local_30;
+
+  
+
+  iVar12 = 0;
+
+  iVar6 = (o0->orientMat).m[0];
+
+  if (iVar6 < 0) {
+
+    iVar6 = iVar6 + 0xff;
+
   }
-  return collisionHappened;
+
+  iVar2 = (o1->orientMat).m[0];
+
+  if (iVar2 < 0) {
+
+    iVar2 = iVar2 + 0xff;
+
+  }
+
+  iVar7 = (o0->orientMat).m[1];
+
+  if (iVar7 < 0) {
+
+    iVar7 = iVar7 + 0xff;
+
+  }
+
+  iVar3 = (o1->orientMat).m[1];
+
+  if (iVar3 < 0) {
+
+    iVar3 = iVar3 + 0xff;
+
+  }
+
+  iVar8 = (o0->orientMat).m[2];
+
+  if (iVar8 < 0) {
+
+    iVar8 = iVar8 + 0xff;
+
+  }
+
+  iVar4 = (o1->orientMat).m[2];
+
+  if (iVar4 < 0) {
+
+    iVar4 = iVar4 + 0xff;
+
+  }
+
+  basisDots[0] = (iVar6 >> 8) * (iVar2 >> 8) + (iVar7 >> 8) * (iVar3 >> 8) +
+
+                 (iVar8 >> 8) * (iVar4 >> 8);
+
+  iVar6 = (o0->orientMat).m[0];
+
+  if (iVar6 < 0) {
+
+    iVar6 = iVar6 + 0xff;
+
+  }
+
+  iVar2 = (o1->orientMat).m[3];
+
+  if (iVar2 < 0) {
+
+    iVar2 = iVar2 + 0xff;
+
+  }
+
+  iVar7 = (o0->orientMat).m[1];
+
+  if (iVar7 < 0) {
+
+    iVar7 = iVar7 + 0xff;
+
+  }
+
+  iVar3 = (o1->orientMat).m[4];
+
+  if (iVar3 < 0) {
+
+    iVar3 = iVar3 + 0xff;
+
+  }
+
+  iVar8 = (o0->orientMat).m[2];
+
+  if (iVar8 < 0) {
+
+    iVar8 = iVar8 + 0xff;
+
+  }
+
+  iVar4 = (o1->orientMat).m[5];
+
+  if (iVar4 < 0) {
+
+    iVar4 = iVar4 + 0xff;
+
+  }
+
+  basisDots[1] = (iVar6 >> 8) * (iVar2 >> 8) + (iVar7 >> 8) * (iVar3 >> 8) +
+
+                 (iVar8 >> 8) * (iVar4 >> 8);
+
+  iVar6 = (o0->orientMat).m[0];
+
+  if (iVar6 < 0) {
+
+    iVar6 = iVar6 + 0xff;
+
+  }
+
+  iVar2 = (o1->orientMat).m[6];
+
+  if (iVar2 < 0) {
+
+    iVar2 = iVar2 + 0xff;
+
+  }
+
+  iVar7 = (o0->orientMat).m[1];
+
+  if (iVar7 < 0) {
+
+    iVar7 = iVar7 + 0xff;
+
+  }
+
+  iVar3 = (o1->orientMat).m[7];
+
+  if (iVar3 < 0) {
+
+    iVar3 = iVar3 + 0xff;
+
+  }
+
+  iVar8 = (o0->orientMat).m[2];
+
+  if (iVar8 < 0) {
+
+    iVar8 = iVar8 + 0xff;
+
+  }
+
+  iVar4 = (o1->orientMat).m[8];
+
+  if (iVar4 < 0) {
+
+    iVar4 = iVar4 + 0xff;
+
+  }
+
+  basisDots[2] = (iVar6 >> 8) * (iVar2 >> 8) + (iVar7 >> 8) * (iVar3 >> 8) +
+
+                 (iVar8 >> 8) * (iVar4 >> 8);
+
+  iVar6 = (o0->orientMat).m[3];
+
+  if (iVar6 < 0) {
+
+    iVar6 = iVar6 + 0xff;
+
+  }
+
+  iVar2 = (o1->orientMat).m[0];
+
+  if (iVar2 < 0) {
+
+    iVar2 = iVar2 + 0xff;
+
+  }
+
+  iVar7 = (o0->orientMat).m[4];
+
+  if (iVar7 < 0) {
+
+    iVar7 = iVar7 + 0xff;
+
+  }
+
+  iVar3 = (o1->orientMat).m[1];
+
+  if (iVar3 < 0) {
+
+    iVar3 = iVar3 + 0xff;
+
+  }
+
+  iVar8 = (o0->orientMat).m[5];
+
+  if (iVar8 < 0) {
+
+    iVar8 = iVar8 + 0xff;
+
+  }
+
+  iVar4 = (o1->orientMat).m[2];
+
+  if (iVar4 < 0) {
+
+    iVar4 = iVar4 + 0xff;
+
+  }
+
+  basisDots[3] = (iVar6 >> 8) * (iVar2 >> 8) + (iVar7 >> 8) * (iVar3 >> 8) +
+
+                 (iVar8 >> 8) * (iVar4 >> 8);
+
+  iVar6 = (o0->orientMat).m[3];
+
+  if (iVar6 < 0) {
+
+    iVar6 = iVar6 + 0xff;
+
+  }
+
+  iVar2 = (o1->orientMat).m[3];
+
+  if (iVar2 < 0) {
+
+    iVar2 = iVar2 + 0xff;
+
+  }
+
+  iVar7 = (o0->orientMat).m[4];
+
+  if (iVar7 < 0) {
+
+    iVar7 = iVar7 + 0xff;
+
+  }
+
+  iVar3 = (o1->orientMat).m[4];
+
+  if (iVar3 < 0) {
+
+    iVar3 = iVar3 + 0xff;
+
+  }
+
+  iVar8 = (o0->orientMat).m[5];
+
+  if (iVar8 < 0) {
+
+    iVar8 = iVar8 + 0xff;
+
+  }
+
+  iVar4 = (o1->orientMat).m[5];
+
+  if (iVar4 < 0) {
+
+    iVar4 = iVar4 + 0xff;
+
+  }
+
+  basisDots[4] = (iVar6 >> 8) * (iVar2 >> 8) + (iVar7 >> 8) * (iVar3 >> 8) +
+
+                 (iVar8 >> 8) * (iVar4 >> 8);
+
+  iVar6 = (o0->orientMat).m[3];
+
+  if (iVar6 < 0) {
+
+    iVar6 = iVar6 + 0xff;
+
+  }
+
+  iVar2 = (o1->orientMat).m[6];
+
+  if (iVar2 < 0) {
+
+    iVar2 = iVar2 + 0xff;
+
+  }
+
+  iVar7 = (o0->orientMat).m[4];
+
+  if (iVar7 < 0) {
+
+    iVar7 = iVar7 + 0xff;
+
+  }
+
+  iVar3 = (o1->orientMat).m[7];
+
+  if (iVar3 < 0) {
+
+    iVar3 = iVar3 + 0xff;
+
+  }
+
+  iVar8 = (o0->orientMat).m[5];
+
+  if (iVar8 < 0) {
+
+    iVar8 = iVar8 + 0xff;
+
+  }
+
+  iVar4 = (o1->orientMat).m[8];
+
+  if (iVar4 < 0) {
+
+    iVar4 = iVar4 + 0xff;
+
+  }
+
+  basisDots[5] = (iVar6 >> 8) * (iVar2 >> 8) + (iVar7 >> 8) * (iVar3 >> 8) +
+
+                 (iVar8 >> 8) * (iVar4 >> 8);
+
+  iVar6 = (o0->orientMat).m[6];
+
+  if (iVar6 < 0) {
+
+    iVar6 = iVar6 + 0xff;
+
+  }
+
+  iVar2 = (o1->orientMat).m[0];
+
+  if (iVar2 < 0) {
+
+    iVar2 = iVar2 + 0xff;
+
+  }
+
+  iVar7 = (o0->orientMat).m[7];
+
+  if (iVar7 < 0) {
+
+    iVar7 = iVar7 + 0xff;
+
+  }
+
+  iVar3 = (o1->orientMat).m[1];
+
+  if (iVar3 < 0) {
+
+    iVar3 = iVar3 + 0xff;
+
+  }
+
+  iVar8 = (o0->orientMat).m[8];
+
+  if (iVar8 < 0) {
+
+    iVar8 = iVar8 + 0xff;
+
+  }
+
+  iVar4 = (o1->orientMat).m[2];
+
+  if (iVar4 < 0) {
+
+    iVar4 = iVar4 + 0xff;
+
+  }
+
+  basisDots[6] = (iVar6 >> 8) * (iVar2 >> 8) + (iVar7 >> 8) * (iVar3 >> 8) +
+
+                 (iVar8 >> 8) * (iVar4 >> 8);
+
+  iVar6 = (o0->orientMat).m[6];
+
+  if (iVar6 < 0) {
+
+    iVar6 = iVar6 + 0xff;
+
+  }
+
+  iVar2 = (o1->orientMat).m[3];
+
+  if (iVar2 < 0) {
+
+    iVar2 = iVar2 + 0xff;
+
+  }
+
+  iVar7 = (o0->orientMat).m[7];
+
+  if (iVar7 < 0) {
+
+    iVar7 = iVar7 + 0xff;
+
+  }
+
+  iVar3 = (o1->orientMat).m[4];
+
+  if (iVar3 < 0) {
+
+    iVar3 = iVar3 + 0xff;
+
+  }
+
+  iVar8 = (o0->orientMat).m[8];
+
+  if (iVar8 < 0) {
+
+    iVar8 = iVar8 + 0xff;
+
+  }
+
+  iVar4 = (o1->orientMat).m[5];
+
+  if (iVar4 < 0) {
+
+    iVar4 = iVar4 + 0xff;
+
+  }
+
+  basisDots[7] = (iVar6 >> 8) * (iVar2 >> 8) + (iVar7 >> 8) * (iVar3 >> 8) +
+
+                 (iVar8 >> 8) * (iVar4 >> 8);
+
+  iVar6 = (o0->orientMat).m[6];
+
+  if (iVar6 < 0) {
+
+    iVar6 = iVar6 + 0xff;
+
+  }
+
+  iVar2 = (o1->orientMat).m[6];
+
+  if (iVar2 < 0) {
+
+    iVar2 = iVar2 + 0xff;
+
+  }
+
+  iVar7 = (o0->orientMat).m[7];
+
+  if (iVar7 < 0) {
+
+    iVar7 = iVar7 + 0xff;
+
+  }
+
+  iVar3 = (o1->orientMat).m[7];
+
+  if (iVar3 < 0) {
+
+    iVar3 = iVar3 + 0xff;
+
+  }
+
+  iVar8 = (o0->orientMat).m[8];
+
+  if (iVar8 < 0) {
+
+    iVar8 = iVar8 + 0xff;
+
+  }
+
+  iVar4 = (o1->orientMat).m[8];
+
+  if (iVar4 < 0) {
+
+    iVar4 = iVar4 + 0xff;
+
+  }
+
+  basisDots[8] = (iVar6 >> 8) * (iVar2 >> 8) + (iVar7 >> 8) * (iVar3 >> 8) +
+
+                 (iVar8 >> 8) * (iVar4 >> 8);
+
+  iVar6 = basisDots[0];
+
+  if (basisDots[0] < 0) {
+
+    iVar6 = basisDots[0] + 0xff;
+
+  }
+
+  iVar2 = (o1->dimension).x;
+
+  if (iVar2 < 0) {
+
+    iVar2 = iVar2 + 0xff;
+
+  }
+
+  scaledBasisDots[0] = (iVar6 >> 8) * (iVar2 >> 8);
+
+  iVar6 = basisDots[1];
+
+  if (basisDots[1] < 0) {
+
+    iVar6 = basisDots[1] + 0xff;
+
+  }
+
+  iVar2 = (o1->dimension).y;
+
+  if (iVar2 < 0) {
+
+    iVar2 = iVar2 + 0xff;
+
+  }
+
+  scaledBasisDots[1] = (iVar6 >> 8) * (iVar2 >> 8);
+
+  iVar6 = basisDots[2];
+
+  if (basisDots[2] < 0) {
+
+    iVar6 = basisDots[2] + 0xff;
+
+  }
+
+  iVar2 = (o1->dimension).z;
+
+  if (iVar2 < 0) {
+
+    iVar2 = iVar2 + 0xff;
+
+  }
+
+  scaledBasisDots[2] = (iVar6 >> 8) * (iVar2 >> 8);
+
+  iVar6 = basisDots[3];
+
+  if (basisDots[3] < 0) {
+
+    iVar6 = basisDots[3] + 0xff;
+
+  }
+
+  iVar2 = (o1->dimension).x;
+
+  if (iVar2 < 0) {
+
+    iVar2 = iVar2 + 0xff;
+
+  }
+
+  scaledBasisDots[3] = (iVar6 >> 8) * (iVar2 >> 8);
+
+  iVar6 = basisDots[4];
+
+  if (basisDots[4] < 0) {
+
+    iVar6 = basisDots[4] + 0xff;
+
+  }
+
+  iVar2 = (o1->dimension).y;
+
+  if (iVar2 < 0) {
+
+    iVar2 = iVar2 + 0xff;
+
+  }
+
+  scaledBasisDots[4] = (iVar6 >> 8) * (iVar2 >> 8);
+
+  iVar6 = basisDots[5];
+
+  if (basisDots[5] < 0) {
+
+    iVar6 = basisDots[5] + 0xff;
+
+  }
+
+  iVar2 = (o1->dimension).z;
+
+  if (iVar2 < 0) {
+
+    iVar2 = iVar2 + 0xff;
+
+  }
+
+  scaledBasisDots[5] = (iVar6 >> 8) * (iVar2 >> 8);
+
+  iVar6 = basisDots[6];
+
+  if (basisDots[6] < 0) {
+
+    iVar6 = basisDots[6] + 0xff;
+
+  }
+
+  iVar2 = (o1->dimension).x;
+
+  if (iVar2 < 0) {
+
+    iVar2 = iVar2 + 0xff;
+
+  }
+
+  scaledBasisDots[6] = (iVar6 >> 8) * (iVar2 >> 8);
+
+  iVar6 = basisDots[7];
+
+  if (basisDots[7] < 0) {
+
+    iVar6 = basisDots[7] + 0xff;
+
+  }
+
+  iVar2 = (o1->dimension).y;
+
+  if (iVar2 < 0) {
+
+    iVar2 = iVar2 + 0xff;
+
+  }
+
+  scaledBasisDots[7] = (iVar6 >> 8) * (iVar2 >> 8);
+
+  iVar6 = basisDots[8];
+
+  if (basisDots[8] < 0) {
+
+    iVar6 = basisDots[8] + 0xff;
+
+  }
+
+  iVar2 = (o1->dimension).z;
+
+  if (iVar2 < 0) {
+
+    iVar2 = iVar2 + 0xff;
+
+  }
+
+  scaledBasisDots[8] = (iVar6 >> 8) * (iVar2 >> 8);
+
+  iVar6 = basisDots[0];
+
+  if (basisDots[0] < 0) {
+
+    iVar6 = basisDots[0] + 0xff;
+
+  }
+
+  iVar2 = (o0->dimension).x;
+
+  if (iVar2 < 0) {
+
+    iVar2 = iVar2 + 0xff;
+
+  }
+
+  scaledBasisDotsOther[0] = (iVar6 >> 8) * (iVar2 >> 8);
+
+  iVar6 = basisDots[1];
+
+  if (basisDots[1] < 0) {
+
+    iVar6 = basisDots[1] + 0xff;
+
+  }
+
+  iVar2 = (o0->dimension).x;
+
+  if (iVar2 < 0) {
+
+    iVar2 = iVar2 + 0xff;
+
+  }
+
+  scaledBasisDotsOther[1] = (iVar6 >> 8) * (iVar2 >> 8);
+
+  iVar6 = basisDots[2];
+
+  if (basisDots[2] < 0) {
+
+    iVar6 = basisDots[2] + 0xff;
+
+  }
+
+  iVar2 = (o0->dimension).x;
+
+  if (iVar2 < 0) {
+
+    iVar2 = iVar2 + 0xff;
+
+  }
+
+  scaledBasisDotsOther[2] = (iVar6 >> 8) * (iVar2 >> 8);
+
+  iVar6 = basisDots[3];
+
+  if (basisDots[3] < 0) {
+
+    iVar6 = basisDots[3] + 0xff;
+
+  }
+
+  iVar2 = (o0->dimension).y;
+
+  if (iVar2 < 0) {
+
+    iVar2 = iVar2 + 0xff;
+
+  }
+
+  scaledBasisDotsOther[3] = (iVar6 >> 8) * (iVar2 >> 8);
+
+  iVar6 = basisDots[4];
+
+  if (basisDots[4] < 0) {
+
+    iVar6 = basisDots[4] + 0xff;
+
+  }
+
+  iVar2 = (o0->dimension).y;
+
+  if (iVar2 < 0) {
+
+    iVar2 = iVar2 + 0xff;
+
+  }
+
+  scaledBasisDotsOther[4] = (iVar6 >> 8) * (iVar2 >> 8);
+
+  iVar6 = basisDots[5];
+
+  if (basisDots[5] < 0) {
+
+    iVar6 = basisDots[5] + 0xff;
+
+  }
+
+  iVar2 = (o0->dimension).y;
+
+  if (iVar2 < 0) {
+
+    iVar2 = iVar2 + 0xff;
+
+  }
+
+  scaledBasisDotsOther[5] = (iVar6 >> 8) * (iVar2 >> 8);
+
+  iVar6 = basisDots[6];
+
+  if (basisDots[6] < 0) {
+
+    iVar6 = basisDots[6] + 0xff;
+
+  }
+
+  iVar2 = (o0->dimension).z;
+
+  if (iVar2 < 0) {
+
+    iVar2 = iVar2 + 0xff;
+
+  }
+
+  scaledBasisDotsOther[6] = (iVar6 >> 8) * (iVar2 >> 8);
+
+  iVar6 = basisDots[7];
+
+  if (basisDots[7] < 0) {
+
+    iVar6 = basisDots[7] + 0xff;
+
+  }
+
+  iVar2 = (o0->dimension).z;
+
+  if (iVar2 < 0) {
+
+    iVar2 = iVar2 + 0xff;
+
+  }
+
+  scaledBasisDotsOther[7] = (iVar6 >> 8) * (iVar2 >> 8);
+
+  iVar6 = basisDots[8];
+
+  if (basisDots[8] < 0) {
+
+    iVar6 = basisDots[8] + 0xff;
+
+  }
+
+  iVar2 = (o0->dimension).z;
+
+  if (iVar2 < 0) {
+
+    iVar2 = iVar2 + 0xff;
+
+  }
+
+  scaledBasisDotsOther[8] = (iVar6 >> 8) * (iVar2 >> 8);
+
+  iVar6 = 0;
+
+  local_30 = &local_70;
+
+  do {
+
+    if (0x1f < iVar6) {
+
+      return iVar12;
+
+    }
+
+    iVar3 = (o1->position).x - (o0->position).x;
+
+    iVar8 = (o1->position).y - (o0->position).y;
+
+    iVar2 = (o1->position).z - (o0->position).z;
+
+    iVar7 = (o0->orientMat).m[0];
+
+    if (iVar7 < 0) {
+
+      iVar7 = iVar7 + 0xff;
+
+    }
+
+    iVar4 = iVar3;
+
+    if (iVar3 < 0) {
+
+      iVar4 = iVar3 + 0xff;
+
+    }
+
+    iVar9 = (o0->orientMat).m[1];
+
+    if (iVar9 < 0) {
+
+      iVar9 = iVar9 + 0xff;
+
+    }
+
+    iVar11 = iVar8;
+
+    if (iVar8 < 0) {
+
+      iVar11 = iVar8 + 0xff;
+
+    }
+
+    iVar10 = (o0->orientMat).m[2];
+
+    if (iVar10 < 0) {
+
+      iVar10 = iVar10 + 0xff;
+
+    }
+
+    iVar5 = iVar2;
+
+    if (iVar2 < 0) {
+
+      iVar5 = iVar2 + 0xff;
+
+    }
+
+    basisDotRelative[0] =
+
+         (iVar7 >> 8) * (iVar4 >> 8) + (iVar9 >> 8) * (iVar11 >> 8) + (iVar10 >> 8) * (iVar5 >> 8);
+
+    iVar7 = (o0->orientMat).m[3];
+
+    if (iVar7 < 0) {
+
+      iVar7 = iVar7 + 0xff;
+
+    }
+
+    iVar9 = (o0->orientMat).m[4];
+
+    if (iVar9 < 0) {
+
+      iVar9 = iVar9 + 0xff;
+
+    }
+
+    iVar10 = (o0->orientMat).m[5];
+
+    if (iVar10 < 0) {
+
+      iVar10 = iVar10 + 0xff;
+
+    }
+
+    iVar5 = iVar2;
+
+    if (iVar2 < 0) {
+
+      iVar5 = iVar2 + 0xff;
+
+    }
+
+    basisDotRelative[1] =
+
+         (iVar7 >> 8) * (iVar4 >> 8) + (iVar9 >> 8) * (iVar11 >> 8) + (iVar10 >> 8) * (iVar5 >> 8);
+
+    iVar7 = (o0->orientMat).m[6];
+
+    if (iVar7 < 0) {
+
+      iVar7 = iVar7 + 0xff;
+
+    }
+
+    iVar4 = iVar3;
+
+    if (iVar3 < 0) {
+
+      iVar4 = iVar3 + 0xff;
+
+    }
+
+    iVar9 = (o0->orientMat).m[7];
+
+    if (iVar9 < 0) {
+
+      iVar9 = iVar9 + 0xff;
+
+    }
+
+    iVar11 = iVar8;
+
+    if (iVar8 < 0) {
+
+      iVar11 = iVar8 + 0xff;
+
+    }
+
+    iVar10 = (o0->orientMat).m[8];
+
+    if (iVar10 < 0) {
+
+      iVar10 = iVar10 + 0xff;
+
+    }
+
+    iVar5 = iVar2;
+
+    if (iVar2 < 0) {
+
+      iVar5 = iVar2 + 0xff;
+
+    }
+
+    basisDotRelative[2] =
+
+         (iVar7 >> 8) * (iVar4 >> 8) + (iVar9 >> 8) * (iVar11 >> 8) + (iVar10 >> 8) * (iVar5 >> 8);
+
+    iVar7 = (o1->orientMat).m[0];
+
+    if (iVar7 < 0) {
+
+      iVar7 = iVar7 + 0xff;
+
+    }
+
+    iVar9 = (o1->orientMat).m[1];
+
+    if (iVar9 < 0) {
+
+      iVar9 = iVar9 + 0xff;
+
+    }
+
+    iVar10 = (o1->orientMat).m[2];
+
+    if (iVar10 < 0) {
+
+      iVar10 = iVar10 + 0xff;
+
+    }
+
+    iVar5 = iVar2;
+
+    if (iVar2 < 0) {
+
+      iVar5 = iVar2 + 0xff;
+
+    }
+
+    basisDotRelative[3] =
+
+         (iVar7 >> 8) * (iVar4 >> 8) + (iVar9 >> 8) * (iVar11 >> 8) + (iVar10 >> 8) * (iVar5 >> 8);
+
+    iVar7 = (o1->orientMat).m[3];
+
+    if (iVar7 < 0) {
+
+      iVar7 = iVar7 + 0xff;
+
+    }
+
+    iVar4 = iVar3;
+
+    if (iVar3 < 0) {
+
+      iVar4 = iVar3 + 0xff;
+
+    }
+
+    iVar9 = (o1->orientMat).m[4];
+
+    if (iVar9 < 0) {
+
+      iVar9 = iVar9 + 0xff;
+
+    }
+
+    iVar11 = iVar8;
+
+    if (iVar8 < 0) {
+
+      iVar11 = iVar8 + 0xff;
+
+    }
+
+    iVar10 = (o1->orientMat).m[5];
+
+    if (iVar10 < 0) {
+
+      iVar10 = iVar10 + 0xff;
+
+    }
+
+    iVar5 = iVar2;
+
+    if (iVar2 < 0) {
+
+      iVar5 = iVar2 + 0xff;
+
+    }
+
+    basisDotRelative[4] =
+
+         (iVar7 >> 8) * (iVar4 >> 8) + (iVar9 >> 8) * (iVar11 >> 8) + (iVar10 >> 8) * (iVar5 >> 8);
+
+    iVar7 = (o1->orientMat).m[6];
+
+    if (iVar7 < 0) {
+
+      iVar7 = iVar7 + 0xff;
+
+    }
+
+    iVar9 = (o1->orientMat).m[7];
+
+    if (iVar9 < 0) {
+
+      iVar9 = iVar9 + 0xff;
+
+    }
+
+    iVar10 = (o1->orientMat).m[8];
+
+    if (iVar10 < 0) {
+
+      iVar10 = iVar10 + 0xff;
+
+    }
+
+    iVar5 = iVar2;
+
+    if (iVar2 < 0) {
+
+      iVar5 = iVar2 + 0xff;
+
+    }
+
+    basisDotRelative[5] =
+
+         (iVar7 >> 8) * (iVar4 >> 8) + (iVar9 >> 8) * (iVar11 >> 8) + (iVar10 >> 8) * (iVar5 >> 8);
+
+    iVar7 = Collide_DoActualObjectCollisionCheck(o0,o1,p,normal);
+
+    if (iVar7 == 0) {
+
+      return iVar12;
+
+    }
+
+    if (iVar12 == 0) {
+
+      bVar1 = false;
+
+      local_70.x = (o0->linearVel).x - (o1->linearVel).x;
+
+      iVar12 = 0;
+
+      local_70.y = (o0->linearVel).y - (o1->linearVel).y;
+
+      local_70.z = (o0->linearVel).z - (o1->linearVel).z;
+
+      iVar7 = local_70.x;
+
+      if (local_70.x < 0) {
+
+        iVar7 = local_70.x + 0xff;
+
+      }
+
+      iVar4 = local_70.z;
+
+      if (local_70.z < 0) {
+
+        iVar4 = local_70.z + 0xff;
+
+      }
+
+      if (0xe100000 < (iVar7 >> 8) * (iVar7 >> 8) + (iVar4 >> 8) * (iVar4 >> 8)) {
+
+        iVar7 = iVar3;
+
+        if (iVar3 < 0) {
+
+          iVar7 = iVar3 + 0xff;
+
+        }
+
+        iVar4 = iVar2;
+
+        if (iVar2 < 0) {
+
+          iVar4 = iVar2 + 0xff;
+
+        }
+
+        if ((iVar7 >> 8) * (iVar7 >> 8) + (iVar4 >> 8) * (iVar4 >> 8) < 0xccc) {
+
+          iVar7 = Math_VectorLength(&local_70);
+
+          iVar7 = iVar7 / 2;
+
+          iVar12 = 0x10000;
+
+          if (iVar7 == 0) {
+
+            bVar1 = true;
+
+          }
+
+          else {
+
+LAB_80091008:
+
+            iVar12 = fixeddiv(0x8000,iVar7);
+
+LAB_80091014:
+
+            bVar1 = true;
+
+          }
+
+        }
+
+        else {
+
+          local_50.x = local_70.x;
+
+          local_50.y = local_70.y;
+
+          local_50.z = local_70.z;
+
+          Math_NormalizeVector(&local_50);
+
+          local_40.x = iVar3;
+
+          local_40.y = iVar8;
+
+          local_40.z = iVar2;
+
+          Math_NormalizeShortVector(&local_40);
+
+          iVar7 = local_50.x;
+
+          if (local_50.x < 0) {
+
+            iVar7 = local_50.x + 0xff;
+
+          }
+
+          iVar4 = local_40.x;
+
+          if (local_40.x < 0) {
+
+            iVar4 = local_40.x + 0xff;
+
+          }
+
+          iVar9 = local_50.y;
+
+          if (local_50.y < 0) {
+
+            iVar9 = local_50.y + 0xff;
+
+          }
+
+          iVar11 = local_40.y;
+
+          if (local_40.y < 0) {
+
+            iVar11 = local_40.y + 0xff;
+
+          }
+
+          iVar10 = local_50.z;
+
+          if (local_50.z < 0) {
+
+            iVar10 = local_50.z + 0xff;
+
+          }
+
+          iVar5 = local_40.z;
+
+          if (local_40.z < 0) {
+
+            iVar5 = local_40.z + 0xff;
+
+          }
+
+          if (0xd999 < (iVar7 >> 8) * (iVar4 >> 8) + (iVar9 >> 8) * (iVar11 >> 8) +
+
+                       (iVar10 >> 8) * (iVar5 >> 8)) {
+
+            iVar7 = Math_VectorLength(local_30);
+
+            iVar7 = iVar7 / 2;
+
+            iVar12 = 0x10000;
+
+            if (iVar7 != 0) goto LAB_80091008;
+
+            goto LAB_80091014;
+
+          }
+
+        }
+
+      }
+
+      if (bVar1) {
+
+        iVar2 = -iVar12;
+
+        if (o0->objID < 0x200) {
+
+          iVar7 = fixedmult(iVar2,(o0->linearVel).x);
+
+          iVar3 = fixedmult(iVar2,(o0->linearVel).y);
+
+          iVar2 = fixedmult(iVar2,(o0->linearVel).z);
+
+          local_98 = iVar2 >> 5;
+
+          local_a0 = iVar7 >> 5;
+
+          local_9c = iVar3 >> 5;
+
+        }
+
+        else {
+
+          local_a0 = 0;
+
+          local_9c = 0;
+
+          local_98 = 0;
+
+        }
+
+        iVar12 = -iVar12;
+
+        if (o1->objID < 0x200) {
+
+          iVar2 = fixedmult(iVar12,(o1->linearVel).x);
+
+          iVar7 = fixedmult(iVar12,(o1->linearVel).y);
+
+          iVar12 = fixedmult(iVar12,(o1->linearVel).z);
+
+          local_88 = iVar12 >> 5;
+
+          local_90 = iVar2 >> 5;
+
+          local_8c = iVar7 >> 5;
+
+        }
+
+        else {
+
+          local_90 = 0;
+
+          local_8c = 0;
+
+          local_88 = 0;
+
+        }
+
+      }
+
+      else {
+
+        local_60.x = iVar3;
+
+        local_60.y = iVar8;
+
+        local_60.z = iVar2;
+
+        Math_NormalizeShortVector(&local_60);
+
+        iVar2 = o0->mass + o1->mass;
+
+        iVar12 = fixeddiv(o0->mass,iVar2);
+
+        iVar2 = fixeddiv(o1->mass,iVar2);
+
+        if (iVar2 < 0) {
+
+          iVar2 = iVar2 + 3;
+
+        }
+
+        iVar2 = iVar2 >> 2;
+
+        iVar7 = local_60.x * iVar2;
+
+        if (iVar7 < 0) {
+
+          iVar7 = iVar7 + 0x3fff;
+
+        }
+
+        iVar3 = local_60.y * iVar2;
+
+        local_a0 = -(iVar7 >> 0xe) >> 5;
+
+        if (iVar3 < 0) {
+
+          iVar3 = iVar3 + 0x3fff;
+
+        }
+
+        local_9c = -(iVar3 >> 0xe) >> 5;
+
+        iVar2 = local_60.z * iVar2;
+
+        if (iVar2 < 0) {
+
+          iVar2 = iVar2 + 0x3fff;
+
+        }
+
+        local_98 = -(iVar2 >> 0xe) >> 5;
+
+        if (iVar12 < 0) {
+
+          iVar12 = iVar12 + 3;
+
+        }
+
+        iVar12 = iVar12 >> 2;
+
+        iVar8 = local_60.x * iVar12;
+
+        iVar4 = local_60.y * iVar12;
+
+        if (iVar8 < 0) {
+
+          iVar8 = iVar8 + 0x3fff;
+
+        }
+
+        local_90 = iVar8 >> 0x13;
+
+        if (iVar4 < 0) {
+
+          iVar4 = iVar4 + 0x3fff;
+
+        }
+
+        local_8c = iVar4 >> 0x13;
+
+        iVar12 = local_60.z * iVar12;
+
+        if (iVar12 < 0) {
+
+          iVar12 = iVar12 + 0x3fff;
+
+        }
+
+        local_88 = iVar12 >> 0x13;
+
+        if (0x1ff < o0->objID) {
+
+          local_90 = local_90 - (iVar8 >> 0x1f) >> 1;
+
+          local_8c = local_8c - (iVar4 >> 0x1f) >> 1;
+
+          local_88 = local_88 - (iVar12 >> 0x1f) >> 1;
+
+        }
+
+        iVar12 = 1;
+
+        if (o1->objID < 0x200) goto LAB_800912c8;
+
+        local_a0 = local_a0 - (-(iVar7 >> 0xe) >> 0x1f) >> 1;
+
+        local_9c = local_9c - (-(iVar3 >> 0xe) >> 0x1f) >> 1;
+
+        local_98 = local_98 - (-(iVar2 >> 0xe) >> 0x1f) >> 1;
+
+      }
+
+      iVar12 = 1;
+
+    }
+
+LAB_800912c8:
+
+    (o0->position).x = (o0->position).x + local_a0;
+
+    (o0->position).y = (o0->position).y + local_9c;
+
+    (o0->position).z = (o0->position).z + local_98;
+
+    (o1->position).x = (o1->position).x + local_90;
+
+    (o1->position).y = (o1->position).y + local_8c;
+
+    iVar6 = iVar6 + 1;
+
+    (o1->position).z = (o1->position).z + local_88;
+
+  } while( true );
+
 }
 
 /* ---- Collide_CheckForCollisionBetween__FP13BO_tNewtonObjT0  [@0x80091374] ---- */
@@ -1667,398 +5994,725 @@ int Collide_CheckForCollisionBetween(BO_tNewtonObj *o0,BO_tNewtonObj *o1)
 
 
 {
-  coorddef *new_var;
+  coorddef p;
+  coorddef normal;
+  int count;
 
-  int speedThresh;
+  bool bVar1;
 
   int iVar2;
 
   int iVar3;
 
-  int count;
+  int iVar4;
 
-  coorddef p;
+  coorddef cStack_38;
 
-  coorddef normal;
+  coorddef cStack_28;
 
-
+  
 
   (o0->collision).impulse = 0;
 
   (o1->collision).impulse = 0;
 
-  iVar2 = Collide_TestObjectVertices(o0,o1,&p,&normal);
+  iVar2 = Collide_TestObjectVertices(o0,o1,&cStack_38,&cStack_28);
 
   if (iVar2 == 0) {
 
-    return 0;
+    iVar2 = 0;
 
   }
 
-  Collide_DoObjectObjectCollision(o0,o1,&p,&normal);
+  else {
 
-  count = 8;
+    Collide_DoObjectObjectCollision(o0,o1,&cStack_38,&cStack_28);
 
-  Physics_TestForBarrierCollision((Car_tObj *)o0);
-
-  Physics_TestForBarrierCollision((Car_tObj *)o1);
-
-  new_var = &normal;
-
-  speedThresh = 0xf0000;
-
-  while( true ) {
-
-    iVar3 = Collide_TestObjectVertices(o0,o1,&p,new_var);
-
-    if (iVar3 == 0) {
-
-      return 1;
-
-    }
-
-    if (count <= 0) {
-
-      return 1;
-
-    }
-
-    count = count - 1;
-
-    iVar2 = Collide_DoObjectObjectCollision(o0,o1,&p,new_var);
-
-    if (iVar2 == 0) {
-
-      return 1;
-
-    }
+    iVar4 = 8;
 
     Physics_TestForBarrierCollision((Car_tObj *)o0);
 
     Physics_TestForBarrierCollision((Car_tObj *)o1);
 
-    if (count == 0) {
+    while( true ) {
 
-      if ((o0[1].collision.lastCollision != 0) && (speedThresh < o0->speedXZ)) {
+      iVar3 = Collide_TestObjectVertices(o0,o1,&cStack_38,&cStack_28);
 
-        Newton_AddDamageZone(o0,0x640000,8,2);
+      iVar2 = 1;
+
+      if ((iVar3 == 0) || (bVar1 = iVar4 < 1, iVar4 = iVar4 + -1, bVar1)) break;
+
+      iVar2 = Collide_DoObjectObjectCollision(o0,o1,&cStack_38,&cStack_28);
+
+      if (iVar2 == 0) {
+
+        return 1;
 
       }
 
-      if ((o1[1].collision.lastCollision != 0) && (speedThresh < o1->speedXZ)) {
+      Physics_TestForBarrierCollision((Car_tObj *)o0);
 
-        Newton_AddDamageZone(o1,0x640000,8,2);
+      Physics_TestForBarrierCollision((Car_tObj *)o1);
+
+      if (iVar4 == 0) {
+
+        if ((((Car_tObj *)o0)->crash != 0) && (0xf0000 < o0->speedXZ)) {
+
+          Newton_AddDamageZone(o0,0x640000,8,2);
+
+        }
+
+        if ((((Car_tObj *)o1)->crash != 0) && (0xf0000 < o1->speedXZ)) {
+
+          Newton_AddDamageZone(o1,0x640000,8,2);
+
+        }
 
       }
 
     }
 
   }
+
+  return iVar2;
 
 }
 
 /* ---- Collide_ClearCollisionRegistry__Fv  [@0x800914d4] ---- */
 void Collide_ClearCollisionRegistry(void)
 {
-  int carLoop;
-  coorddef relVec;
-  coorddef rightVec;
-  int i;
-  int slice;
+  int objIndex;
 
-  /* MATCH: SYM rule-8 - locals are exactly {carLoop REG, relVec AUTO, rightVec AUTO, i REG,
-     slice REG}; plain InfiniteMassNewton[i].field indexing lets gcc strength-reduce the
-     walking s-reg givs itself (no hand pointer locals). relVec/rightVec are REAL stack
-     structs (oracle spills all six words to 0x10-0x28(sp)). NOTE: all three relVec
-     components subtract center[0] - faithful to retail (looks like an original bug). */
   Collide_gNumRegistered = 0;
-  for (i = 0; i < Object_GetNumIMassObjects(); i = i + 1) {
-    Object_GetIMassObjectMotion(i,&InfiniteMassNewton[i].position,&InfiniteMassNewton[i].orientMat,
-                                 &InfiniteMassNewton[i].linearVel);
-    InfiniteMassNewton[i].angularVel.x = 0;
-    InfiniteMassNewton[i].angularVel.y = 0;
-    InfiniteMassNewton[i].angularVel.z = 0;
-    Collide_gRegistry[i] = &InfiniteMassNewton[i];
-    Collide_gNumRegistered = Collide_gNumRegistered + 1;
-    BWorldSm_FindClosestSlice(&InfiniteMassNewton[i].position,&InfiniteMassNewton[i].simRoadInfo);
-    slice = InfiniteMassNewton[i].simRoadInfo.slice;
-    relVec.x = InfiniteMassNewton[i].position.x - COLLIDE_SLICE_CENTER0(slice);
-    relVec.y = InfiniteMassNewton[i].position.y - COLLIDE_SLICE_CENTER0(slice);
-    relVec.z = InfiniteMassNewton[i].position.z - COLLIDE_SLICE_CENTER0(slice);
-    rightVec.x = COLLIDE_SLICE_RIGHT(slice,0) * 0x200;
-    rightVec.y = COLLIDE_SLICE_RIGHT(slice,1) * 0x200;
-    rightVec.z = COLLIDE_SLICE_RIGHT(slice,2) * 0x200;
-    InfiniteMassNewton[i].xRelRoadCenter =
-        (relVec.x / 256) * (rightVec.x / 256) + (relVec.y / 256) * (rightVec.y / 256) +
-        (relVec.z / 256) * (rightVec.z / 256);
-  }
-  carLoop = 0;
-  {
-    int n = Cars_gNumCars;
-carloop_top:
-    if (carLoop < n) {
-      carLoop = carLoop + 1;
-      goto carloop_top;
-    }
-  }
-  return;
-}
+  for (objIndex = 0; objIndex < Object_GetNumIMassObjects(); ++objIndex) {
+    BO_tNewtonObj *obj = &InfiniteMassNewton[objIndex];
+    Trk_NewSlice *trackSlice;
+    int dx, dy, dz;
+    int rx, ry, rz;
+    int dot;
 
+    Object_GetIMassObjectMotion(objIndex, &obj->position, &obj->orientMat,
+                                &obj->linearVel);
+    obj->angularVel.x = 0;
+    obj->angularVel.y = 0;
+    obj->angularVel.z = 0;
+    Collide_gRegistry[Collide_gNumRegistered] = obj;
+    Collide_gNumRegistered = Collide_gNumRegistered + 1;
+    BWorldSm_FindClosestSlice(&obj->position, &obj->simRoadInfo);
+
+    trackSlice = &BWorldSm_slices[obj->simRoadInfo.slice];
+    /* Retail 0x80091590/15A4/15B8 deliberately reloads center[0] for all axes. */
+    dx = nfs4_mips_subu_s32(obj->position.x, trackSlice->center[0]);
+    dy = nfs4_mips_subu_s32(obj->position.y, trackSlice->center[0]);
+    dz = nfs4_mips_subu_s32(obj->position.z, trackSlice->center[0]);
+    rx = nfs4_mips_sll_s32((int)trackSlice->right[0], 9);
+    ry = nfs4_mips_sll_s32((int)trackSlice->right[1], 9);
+    rz = nfs4_mips_sll_s32((int)trackSlice->right[2], 9);
+
+    if (dx < 0) dx = nfs4_mips_addu_s32(dx, 0xff);
+    if (dy < 0) dy = nfs4_mips_addu_s32(dy, 0xff);
+    if (dz < 0) dz = nfs4_mips_addu_s32(dz, 0xff);
+    if (rx < 0) rx = nfs4_mips_addu_s32(rx, 0xff);
+    if (ry < 0) ry = nfs4_mips_addu_s32(ry, 0xff);
+    if (rz < 0) rz = nfs4_mips_addu_s32(rz, 0xff);
+
+    dot = nfs4_mips_mult_s32(nfs4_mips_sra_s32(dx, 8),
+                             nfs4_mips_sra_s32(rx, 8));
+    dot = nfs4_mips_addu_s32(dot,
+          nfs4_mips_mult_s32(nfs4_mips_sra_s32(dy, 8),
+                             nfs4_mips_sra_s32(ry, 8)));
+    obj->xRelRoadCenter = nfs4_mips_addu_s32(dot,
+          nfs4_mips_mult_s32(nfs4_mips_sra_s32(dz, 8),
+                             nfs4_mips_sra_s32(rz, 8)));
+  }
+
+  /* The retail tail is an intentional no-op count loop. */
+  for (objIndex = 0; objIndex <= Cars_gNumCars; ++objIndex) {}
+}
 
 /* ---- Collide_CheckAccuratePointRadiusCollision__FP13BO_tNewtonObjP8coorddefi  [@0x800916d4] ---- */
 int Collide_CheckAccuratePointRadiusCollision(BO_tNewtonObj *newObj,coorddef *point,int radius)
+
+
+
 {
   coorddef d;
   int temp;
 
-  d.x = point->x - (newObj->position).x;
-  d.z = point->z - (newObj->position).z;
-  d.y = 0;
-  /* MATCH: SYM rule-8 - single named 'temp' accumulator; one-expression sums let gcc
-     capture each fixedmult result in the NEXT jal's delay slot (3-var form scheduled early) */
-  temp = fixedmult(d.x,(newObj->orientMat).m[0]) + fixedmult(d.y,(newObj->orientMat).m[1]) +
-         fixedmult(d.z,(newObj->orientMat).m[2]);
-  if (temp > 0) {
-    temp = fixedmult(d.x,(newObj->orientMat).m[0]) + fixedmult(d.y,(newObj->orientMat).m[1]) +
-           fixedmult(d.z,(newObj->orientMat).m[2]);
-  }
-  else {
-    temp = -(fixedmult(d.x,(newObj->orientMat).m[0]) + fixedmult(d.y,(newObj->orientMat).m[1]) +
-             fixedmult(d.z,(newObj->orientMat).m[2]));
-  }
-  /* MATCH: direct returns stage 0 / xori result straight into $v0 (funnel var was v1+move) */
-  if ((newObj->dimension).x + radius < temp) return 0;
-  temp = fixedmult(d.x,(newObj->orientMat).m[6]) + fixedmult(d.y,(newObj->orientMat).m[7]) +
-         fixedmult(d.z,(newObj->orientMat).m[8]);
-  if (temp > 0) {
-    temp = fixedmult(d.x,(newObj->orientMat).m[6]) + fixedmult(d.y,(newObj->orientMat).m[7]) +
-           fixedmult(d.z,(newObj->orientMat).m[8]);
-  }
-  else {
-    temp = -(fixedmult(d.x,(newObj->orientMat).m[6]) + fixedmult(d.y,(newObj->orientMat).m[7]) +
-             fixedmult(d.z,(newObj->orientMat).m[8]));
-  }
-  return ((newObj->dimension).z + radius < temp) ^ 1;
-}
+  int iVar1;
 
+  int iVar2;
+
+  int iVar3;
+
+  int iVar4;
+
+  u_int uVar5;
+
+  int a;
+
+  
+
+  a = point->x - (newObj->position).x;
+
+  iVar1 = point->z - (newObj->position).z;
+
+  iVar2 = fixedmult(a,(newObj->orientMat).m[0]);
+
+  iVar3 = fixedmult(0,(newObj->orientMat).m[1]);
+
+  iVar4 = fixedmult(iVar1,(newObj->orientMat).m[2]);
+
+  if (iVar2 + iVar3 + iVar4 < 1) {
+
+    iVar2 = fixedmult(a,(newObj->orientMat).m[0]);
+
+    iVar3 = fixedmult(0,(newObj->orientMat).m[1]);
+
+    iVar4 = fixedmult(iVar1,(newObj->orientMat).m[2]);
+
+    iVar2 = -(iVar2 + iVar3 + iVar4);
+
+  }
+
+  else {
+
+    iVar3 = fixedmult(a,(newObj->orientMat).m[0]);
+
+    iVar4 = fixedmult(0,(newObj->orientMat).m[1]);
+
+    iVar2 = fixedmult(iVar1,(newObj->orientMat).m[2]);
+
+    iVar2 = iVar3 + iVar4 + iVar2;
+
+  }
+
+  uVar5 = 0;
+
+  if (iVar2 <= (newObj->dimension).x + radius) {
+
+    iVar2 = fixedmult(a,(newObj->orientMat).m[6]);
+
+    iVar3 = fixedmult(0,(newObj->orientMat).m[7]);
+
+    iVar4 = fixedmult(iVar1,(newObj->orientMat).m[8]);
+
+    if (iVar2 + iVar3 + iVar4 < 1) {
+
+      iVar2 = fixedmult(a,(newObj->orientMat).m[6]);
+
+      iVar3 = fixedmult(0,(newObj->orientMat).m[7]);
+
+      iVar1 = fixedmult(iVar1,(newObj->orientMat).m[8]);
+
+      iVar1 = -(iVar2 + iVar3 + iVar1);
+
+    }
+
+    else {
+
+      iVar2 = fixedmult(a,(newObj->orientMat).m[6]);
+
+      iVar3 = fixedmult(0,(newObj->orientMat).m[7]);
+
+      iVar1 = fixedmult(iVar1,(newObj->orientMat).m[8]);
+
+      iVar1 = iVar2 + iVar3 + iVar1;
+
+    }
+
+    uVar5 = (newObj->dimension).z + radius < iVar1 ^ 1;
+
+  }
+
+  return uVar5;
+
+}
 
 /* ---- Collide_CheckMeForCollisions__FP13BO_tNewtonObj  [@0x800918cc] ---- */
 void Collide_CheckMeForCollisions(BO_tNewtonObj *newObj)
+
+
+
 {
   int i;
-  BO_tNewtonObj *otherObj;
+  BO_tNewtonObj*otherObj;
+  coorddef normal;
+  coorddef samplePoint;
+  int impulse;
 
-  /* MATCH: full SYM rule-8 rebuild - block scopes + names straight from the SYM 8c block
-     (outer {i s1, otherObj s0}; collision-loop block {i s5, numObjs, fixedRadius, objList,
-     pos, dist}; per-object block {pointList, closestDist s4, closestPoint s3, numPoints};
-     {j s0}; {signCase s1}; {normal, samplePoint, impulse s0}).
-     CORRECTNESS fixes vs old recon (both oracle-evidenced):
-     (1) samplePoint: ALL THREE components = pos + normal*(fixedRadius/256)/256 - old code
-         computed only .x (Ghidra-split auStack_58/velocityUnit stack aliasing);
-     (2) Newton_DoPostBarrierCollisionHandling is passed NORMAL by value - old code passed
-         the first 12 bytes of objList (wrong struct entirely).
-     MATCH (2026-08-13): the retail/SYM statement order initializes closestDist before
-     closestPoint.  That deliberately moved the function 39 -> 225 while entering the right
-     allocation basin.  allocsim then proved newObj needed +9 refs and the registry index +1;
-     the two tail read-only fences implement those exact zero-insn dials, fixing both saved-reg
-     webs.  The minImpulse identity fence preserves retail's direct `slt impulse,min` clamp
-     (removes the 0x1dffff compare and one instruction).  Result is count-exact 381 and 2 diffs;
-     MATCH (W61-A13, 2026-08-15): SEALED 2 -> PASS 381/381 by a PURE SOURCE lever; the
-     previously-specified PER_FN_TEXT_MOVES wiring is WITHDRAWN (no longer needed).
-     The 2-diff residual was a delay-slot COMPETITION, not a text relocation: `j = 0;` sat
-     INSIDE `if (0 < numPoints)`, so the `blez numPoints` slot had no nearby eligible insn and
-     reorg's backward scan reached back past both Object_Get*CollisionData calls and stole
-     `li $s3,-1` (closestPoint = -1) into the slot -- which simultaneously emptied the oracle's
-     slot content AND sank the -1 out of the loop-top group.
-     FIX = hoist `j = 0;` ABOVE the guard (`j = 0; if (0 < numPoints) { do {...} while ... }`),
-     the natural rotated-for shape.  j=0 is then the NEAREST eligible insn, reorg fills the blez
-     slot with it (= oracle), and `li $s3,-1` stays directly after closestDist's `lui $s4,10`.
-     FALSIFIED en route: a void-tail scheduling fence __asm__ __volatile__("" : : "i"(0)) after
-     the two initializers DOES pin `li $s3,-1` to the oracle position (2 -> 1) but leaves the
-     blez slot a bare nop (382/381) -- it blocks the backward scan without supplying the
-     oracle's slot insn.  Not retained; the j=0 hoist subsumes it (PASS with the fence removed). */
-  if (newObj->active != 0) {
-    if (newObj->simOptz != 0) {
-      Physics_TestForBarrierCollision((Car_tObj *)newObj);
-    }
-    else {
-      if (0 < (newObj->collision).disableCollisionTimer) {
-        (newObj->collision).disableCollisionTimer = (newObj->collision).disableCollisionTimer - 1;
+  bool bVar1;
+
+  int maxrp;
+
+  int iVar2;
+
+  int iVar3;
+
+  int slice;
+
+  int r0;
+
+  BO_tNewtonObj **ppBVar4;
+
+  int dist;
+
+  int dotx;
+
+  int xDir;
+
+  int zDir;
+
+  int j;
+
+  int iVar5;
+
+  BO_tNewtonObj *o1;
+
+  int signCase;
+
+  coorddef *a;
+
+  int numerator;
+
+  int closestPoint;
+
+  int iVar6;
+
+  int closestDist;
+
+  int iVar7;
+
+  int ctr;
+
+  Object_tSimObjList objList;
+
+  coorddef pos;
+
+  coorddef pointList [3];
+
+  int numObjs;
+
+  int fixedRadius;
+
+  int numPoints;
+
+  coorddef d;
+
+  
+
+  if (newObj->active != '\0') {
+
+    if (newObj->simOptz == '\0') {
+
+      iVar2 = (newObj->collision).disableCollisionTimer;
+
+      if (0 < iVar2) {
+
+        (newObj->collision).disableCollisionTimer = iVar2 + -1;
+
       }
+
       if (((newObj->collision).disableCollisionTimer == 0) &&
-          ((newObj->groundSurfaceType & 0x40) != 0)) {
-        int i;
-        int numObjs;
-        int fixedRadius;
-        Object_tSimObjList objList;
-        coorddef pos;
-        int dist;
 
-        Object_InitCollisionCheckLoop(&newObj->simRoadInfo,&objList,&numObjs);
-        i = 0;
-        while (i < numObjs) {
-          coorddef pointList[3];
-          int closestDist = 0xA0000;
-          int closestPoint = -1;
-          int numPoints;
+         ((newObj->groundSurfaceType & 0x40U) != 0)) {
 
-          /* MATCH: SYM opens the j block BEFORE the two Get*CollisionData calls (block note =
-             scheduling barrier; keeps closestPoint=-1 at loop top, s2/s3 assignment correct) */
-          {
-            int j;
-            numPoints = 1;
-            Object_GetRadiusCollisionData(&objList,i,&pos,&fixedRadius);
-            Object_GetPointsCollisionData(&objList,i,&numPoints,pointList);
-            j = 0;
-            if (0 < numPoints) {
-              do {
-                dist = Math_DistXZ(&pointList[j],&newObj->position);
-                if ((dist < fixedRadius + newObj->dimensionRadius) && (dist < closestDist)) {
-                  closestDist = dist;
-                  closestPoint = j;
-                }
-                j = j + 1;
-              } while (j < numPoints);
-            }
+        Object_InitCollisionCheckLoop(&newObj->simRoadInfo,(Object_tSimObjList *)&objList,&numObjs);
+
+        iVar2 = 0;
+
+        while (iVar7 = 0xa0000, iVar2 < numObjs) {
+
+          iVar6 = -1;
+
+          numPoints = 1;
+
+          Object_GetRadiusCollisionData((Object_tSimObjList *)&objList,iVar2,(coorddef *)&pos,&fixedRadius);
+
+          Object_GetPointsCollisionData((Object_tSimObjList *)&objList,iVar2,&numPoints,(coorddef *)pointList);
+
+          iVar5 = 0;
+
+          a = (coorddef *)pointList;
+
+          if (0 < numPoints) {
+
+            do {
+
+              iVar3 = Math_DistXZ(a,&newObj->position);
+
+              if ((iVar3 < fixedRadius + newObj->dimensionRadius) && (iVar3 < iVar7)) {
+
+                iVar6 = iVar5;
+
+                iVar7 = iVar3;
+
+              }
+
+              iVar5 = iVar5 + 1;
+
+              a = a + 1;
+
+            } while (iVar5 < numPoints);
+
           }
-          if (closestPoint < 0) goto nextObj;
-          if (Collide_CheckAccuratePointRadiusCollision(newObj,&pointList[closestPoint],fixedRadius) == 0)
-            goto nextObj;
-          {
-            int signCase;
-            signCase = Object_CheckCollisionResults(&objList,i,newObj);
-            if (signCase == 0) goto nextObj;
-            Object_GetRadiusCollisionData(&objList,i,&pos,&fixedRadius);
-            if (signCase == 1) {
-              coorddef normal;
-              coorddef samplePoint;
-              int impulse;
 
-              normal.y = 0;
-              normal.x = (newObj->position).x - pos.x;
-              normal.z = (newObj->position).z - pos.z;
-              Math_NormalizeShortVector(&normal);
-              impulse = 0;
-              samplePoint.x = ((fixedRadius / 256) * normal.x) / 256;
-              samplePoint.y = ((fixedRadius / 256) * normal.y) / 256;
-              samplePoint.z = ((fixedRadius / 256) * normal.z) / 256;
-              samplePoint.x = samplePoint.x + pos.x;
-              samplePoint.z = samplePoint.z + pos.z;
-              samplePoint.y = samplePoint.y + pos.y;
-              if (0x280000 < newObj->speedXZ) {
-                /* MATCH: double-compute CSE keeps the sll in a temp + copy (oracle shape) */
-                if (0x960000 < newObj->speedXZ << 1) {
-                  impulse = 0x960000;
-                }
-                else {
-                  impulse = newObj->speedXZ << 1;
-                }
-              }
-              else if (0x190000 < newObj->speedXZ) {
-                int minImpulse;
+          if (iVar6 < 0) {
 
-                impulse = newObj->speedXZ;
-                minImpulse = 0x1E0000;
-                __asm__("" : "=r"(minImpulse) : "0"(minImpulse));
-                if (impulse < minImpulse) {
-                  impulse = 0x1E0000;
+LAB_80091c7c:
+
+            iVar2 = iVar2 + 1;
+
+          }
+
+          else {
+
+            iVar7 = Collide_CheckAccuratePointRadiusCollision(newObj,(coorddef *)pointList + iVar6,fixedRadius);
+
+            if (iVar7 == 0) goto LAB_80091c7c;
+
+            iVar7 = Object_CheckCollisionResults((Object_tSimObjList *)&objList,iVar2,newObj);
+
+            if (iVar7 == 0) goto LAB_80091c7c;
+
+            Object_GetRadiusCollisionData((Object_tSimObjList *)&objList,iVar2,(coorddef *)&pos,&fixedRadius);
+
+            if (iVar7 != 1) {
+
+              if (iVar7 == 2) {
+
+                if (0x20000 < newObj->speedXZ) {
+
+                  iVar7 = 0x60006;
+
+LAB_80091c3c:
+
+                  (newObj->collision).impulse = 0xf0000;
+
+                  (newObj->collision).sfxType = iVar7;
+
+                  (newObj->collision).otherObj = (BO_tNewtonObj *)0x0;
+
+                  iVar7 = (newObj->position).y;
+
+                  iVar6 = (newObj->position).z;
+
+                  (newObj->collision).collisionPoint.x = (newObj->position).x;
+
+                  (newObj->collision).collisionPoint.y = iVar7;
+
+                  (newObj->collision).collisionPoint.z = iVar6;
+
+                  iVar7 = Force_IsForceOn((Car_tObj *)newObj);
+
+                  if (iVar7 != 0) {
+
+                    Force_HitSign((Car_tObj *)newObj);
+
+                  }
+
                 }
+
               }
+
+              else if (iVar7 == -1) {
+
+                iVar7 = 0x60005;
+
+                goto LAB_80091c3c;
+
+              }
+
+              goto LAB_80091c7c;
+
+            }
+
+            normal.y = 0;
+
+            normal.x = nfs4_mips_subu_s32((newObj->position).x,pos.x);
+
+            normal.z = nfs4_mips_subu_s32((newObj->position).z,pos.z);
+
+            Math_NormalizeShortVector(&normal);
+
+            iVar6 = 0;
+
+            iVar7 = fixedRadius;
+
+            if (fixedRadius < 0) {
+
+              iVar7 = nfs4_mips_addu_s32(fixedRadius,0xff);
+
+            }
+
+            iVar7 = nfs4_mips_mult_s32(nfs4_mips_sra_s32(iVar7,8),normal.x);
+
+            if (iVar7 < 0) {
+
+              iVar7 = nfs4_mips_addu_s32(iVar7,0xff);
+
+            }
+
+            samplePoint.x = nfs4_mips_addu_s32(nfs4_mips_sra_s32(iVar7,8),pos.x);
+
+            iVar7 = fixedRadius;
+
+            if (iVar7 < 0) {
+
+              iVar7 = nfs4_mips_addu_s32(iVar7,0xff);
+
+            }
+
+            iVar7 = nfs4_mips_mult_s32(nfs4_mips_sra_s32(iVar7,8),normal.y);
+
+            if (iVar7 < 0) {
+
+              iVar7 = nfs4_mips_addu_s32(iVar7,0xff);
+
+            }
+
+            samplePoint.y = nfs4_mips_addu_s32(nfs4_mips_sra_s32(iVar7,8),pos.y);
+
+            iVar7 = fixedRadius;
+
+            if (iVar7 < 0) {
+
+              iVar7 = nfs4_mips_addu_s32(iVar7,0xff);
+
+            }
+
+            iVar7 = nfs4_mips_mult_s32(nfs4_mips_sra_s32(iVar7,8),normal.z);
+
+            if (iVar7 < 0) {
+
+              iVar7 = nfs4_mips_addu_s32(iVar7,0xff);
+
+            }
+
+            samplePoint.z = nfs4_mips_addu_s32(nfs4_mips_sra_s32(iVar7,8),pos.z);
+
+            iVar7 = newObj->speedXZ;
+
+            if (iVar7 < 0x280001) {
+
+              if (iVar7 < 0x190001) {
+
+                frictionLess = 1;
+
+              }
+
               else {
-                /* MATCH: oracle stores the signCase register (sw s1) - value is 1 on this path */
-                frictionLess = signCase;
-              }
-              Collide_TestWithPlane(newObj,&normal,&samplePoint);
-              frictionLess = 0;
-              Newton_DoPostBarrierCollisionHandling(newObj,normal);
-              (newObj->collision).impulse = impulse;
-              (newObj->collision).collided = 1;
-              (newObj->collision).otherObj = (BO_tNewtonObj *)0x0;
-              if ((newObj->collision).impulse == 0) goto nextObj; /* MATCH: read-back CSEs to reg copy */
-              (newObj->collision).sfxType = 0x50001;
-              (newObj->collision).collisionPoint = newObj->position;
-              i = i + 1;
-              continue;
-            }
-            if (signCase == 2) {
-              if (0x20000 < newObj->speedXZ) {
-                (newObj->collision).impulse = 0xF0000;
-                (newObj->collision).sfxType = 0x60006;
-                (newObj->collision).otherObj = (BO_tNewtonObj *)0x0;
-                (newObj->collision).collisionPoint = newObj->position;
-                if (Force_IsForceOn((Car_tObj *)newObj) != 0) {
-                  Force_HitSign((Car_tObj *)newObj);
+
+                iVar6 = iVar7;
+
+                if (iVar7 < 0x1e0000) {
+
+                  iVar6 = 0x1e0000;
+
                 }
+
               }
+
             }
-            else if (signCase == -1) {
-              (newObj->collision).impulse = 0xF0000;
-              (newObj->collision).sfxType = 0x60005;
-              (newObj->collision).otherObj = (BO_tNewtonObj *)0x0;
-              (newObj->collision).collisionPoint = newObj->position;
-              if (Force_IsForceOn((Car_tObj *)newObj) != 0) {
-                Force_HitSign((Car_tObj *)newObj);
+
+            else {
+
+              iVar6 = nfs4_mips_sll_s32(iVar7,1);
+
+              if (0x960000 < iVar6) {
+
+                iVar6 = 0x960000;
+
               }
+
             }
+
+            Collide_TestWithPlane(newObj,&normal,&samplePoint);
+
+            frictionLess = 0;
+
+            Newton_DoPostBarrierCollisionHandling(newObj,normal);
+
+            (newObj->collision).impulse = iVar6;
+
+            (newObj->collision).collided = 1;
+
+            (newObj->collision).otherObj = (BO_tNewtonObj *)0x0;
+
+            if (iVar6 == 0) goto LAB_80091c7c;
+
+            (newObj->collision).sfxType = 0x50001;
+
+            iVar7 = (newObj->position).y;
+
+            iVar6 = (newObj->position).z;
+
+            (newObj->collision).collisionPoint.x = (newObj->position).x;
+
+            (newObj->collision).collisionPoint.y = iVar7;
+
+            (newObj->collision).collisionPoint.z = iVar6;
+
+            iVar2 = iVar2 + 1;
+
           }
-nextObj:
-          i = i + 1;
+
         }
+
       }
-      if ((newObj->groundSurfaceType & 0x80) != 0) {
+
+      if ((newObj->groundSurfaceType & 0x80U) != 0) {
+
         Newton_TestForUndrivableSurfaces(newObj);
+
       }
+
       if (newObj->flightTime != 0) {
+
         Physics_TestForBarrierCollision((Car_tObj *)newObj);
+
       }
+
+      iVar2 = 0;
+
       if ((newObj->collision).disableCollisionTimer == 0) {
-        i = 0;
+
+        ppBVar4 = Collide_gRegistry;
+
+        bVar1 = 0 < Collide_gNumRegistered;
+
         Collide_gRegistry[Collide_gNumRegistered] = newObj;
-        if (0 < Collide_gNumRegistered) {
+
+        if (bVar1) {
+
           do {
-            otherObj = Collide_gRegistry[i];
-            /* MATCH: ABS-macro-in-compare (no diff local, per SYM): sum > ((d>0)?d:-d);
-               fold turns -(a-b) into b-a giving the oracle's reversed subu */
-            if (newObj->dimensionRadius + otherObj->dimensionRadius >
-                (((newObj->position).z - (otherObj->position).z > 0) ?
-                 (newObj->position).z - (otherObj->position).z :
-                 -((newObj->position).z - (otherObj->position).z))) {
-              if (newObj->dimensionRadius + otherObj->dimensionRadius >
-                  (((newObj->position).x - (otherObj->position).x > 0) ?
-                   (newObj->position).x - (otherObj->position).x :
-                   -((newObj->position).x - (otherObj->position).x))) {
-                if (newObj->dimensionRadius + otherObj->dimensionRadius >
-                    (((newObj->position).y - (otherObj->position).y > 0) ?
-                     (newObj->position).y - (otherObj->position).y :
-                     -((newObj->position).y - (otherObj->position).y))) {
-                  (newObj->angularVel).x = fixedmult(0x6487e,(newObj->angularVel).x);
-                  (newObj->angularVel).y = fixedmult(0x6487e,(newObj->angularVel).y);
-                  (newObj->angularVel).z = fixedmult(0x6487e,(newObj->angularVel).z);
-                  (otherObj->angularVel).x = fixedmult(0x6487e,(otherObj->angularVel).x);
-                  (otherObj->angularVel).y = fixedmult(0x6487e,(otherObj->angularVel).y);
-                  (otherObj->angularVel).z = fixedmult(0x6487e,(otherObj->angularVel).z);
-                  Collide_CheckForCollisionBetween(newObj,otherObj);
-                  (newObj->angularVel).x = fixedmult(0x28be,(newObj->angularVel).x);
-                  (newObj->angularVel).y = fixedmult(0x28be,(newObj->angularVel).y);
-                  (newObj->angularVel).z = fixedmult(0x28be,(newObj->angularVel).z);
-                  (otherObj->angularVel).x = fixedmult(0x28be,(otherObj->angularVel).x);
-                  (otherObj->angularVel).y = fixedmult(0x28be,(otherObj->angularVel).y);
-                  (otherObj->angularVel).z = fixedmult(0x28be,(otherObj->angularVel).z);
-                  Collide_LimitAngularVel(newObj);
-                  Collide_LimitAngularVel(otherObj);
-                }
-              }
+
+            o1 = *ppBVar4;
+
+            iVar5 = (newObj->position).z;
+
+            iVar6 = (o1->position).z;
+
+            iVar7 = iVar5 - iVar6;
+
+            if (iVar7 < 1) {
+
+              iVar7 = iVar6 - iVar5;
+
             }
-            i = i + 1;
-          } while (i < Collide_gNumRegistered);
+
+            if (iVar7 < newObj->dimensionRadius + o1->dimensionRadius) {
+
+              iVar5 = (newObj->position).x;
+
+              iVar6 = (o1->position).x;
+
+              iVar7 = iVar5 - iVar6;
+
+              if (iVar7 < 1) {
+
+                iVar7 = iVar6 - iVar5;
+
+              }
+
+              if (iVar7 < newObj->dimensionRadius + o1->dimensionRadius) {
+
+                iVar5 = (newObj->position).y;
+
+                iVar6 = (o1->position).y;
+
+                iVar7 = iVar5 - iVar6;
+
+                if (iVar7 < 1) {
+
+                  iVar7 = iVar6 - iVar5;
+
+                }
+
+                if (iVar7 < newObj->dimensionRadius + o1->dimensionRadius) {
+
+                  iVar7 = fixedmult(0x6487e,(newObj->angularVel).x);
+
+                  (newObj->angularVel).x = iVar7;
+
+                  iVar7 = fixedmult(0x6487e,(newObj->angularVel).y);
+
+                  (newObj->angularVel).y = iVar7;
+
+                  iVar7 = fixedmult(0x6487e,(newObj->angularVel).z);
+
+                  (newObj->angularVel).z = iVar7;
+
+                  iVar7 = fixedmult(0x6487e,(o1->angularVel).x);
+
+                  (o1->angularVel).x = iVar7;
+
+                  iVar7 = fixedmult(0x6487e,(o1->angularVel).y);
+
+                  (o1->angularVel).y = iVar7;
+
+                  iVar7 = fixedmult(0x6487e,(o1->angularVel).z);
+
+                  (o1->angularVel).z = iVar7;
+
+                  Collide_CheckForCollisionBetween(newObj,o1);
+
+                  iVar7 = fixedmult(0x28be,(newObj->angularVel).x);
+
+                  (newObj->angularVel).x = iVar7;
+
+                  iVar7 = fixedmult(0x28be,(newObj->angularVel).y);
+
+                  (newObj->angularVel).y = iVar7;
+
+                  iVar7 = fixedmult(0x28be,(newObj->angularVel).z);
+
+                  (newObj->angularVel).z = iVar7;
+
+                  iVar7 = fixedmult(0x28be,(o1->angularVel).x);
+
+                  (o1->angularVel).x = iVar7;
+
+                  iVar7 = fixedmult(0x28be,(o1->angularVel).y);
+
+                  (o1->angularVel).y = iVar7;
+
+                  iVar7 = fixedmult(0x28be,(o1->angularVel).z);
+
+                  (o1->angularVel).z = iVar7;
+
+                  Collide_LimitAngularVel(newObj);
+
+                  Collide_LimitAngularVel(o1);
+
+                }
+
+              }
+
+            }
+
+            iVar2 = iVar2 + 1;
+
+            ppBVar4 = ppBVar4 + 1;
+
+          } while (iVar2 < Collide_gNumRegistered);
+
         }
-        __asm__("" : : "r"(i));
+
         Collide_gNumRegistered = Collide_gNumRegistered + 1;
+
       }
+
     }
+
+    else {
+
+      Physics_TestForBarrierCollision((Car_tObj *)newObj);
+
+    }
+
   }
-  __asm__("" : : "r"(newObj), "r"(newObj), "r"(newObj),
-                 "r"(newObj), "r"(newObj), "r"(newObj),
-                 "r"(newObj), "r"(newObj), "r"(newObj));
+
   return;
+
 }

@@ -11,6 +11,8 @@ void __builtin_vec_delete(void *deleteMe);   /* :51 */
 /* placement new: construct an object into already-allocated storage.
  * Freestanding PSX target has no <new>; this is the standard placement operator.
  * Used where the decompiler split alloc (__builtin_new) and ctor across branches. */
+#if !defined(AP_WIN)
 inline void *operator new(unsigned int, void *p) { return p; }
+#endif
 
 #endif /* _GAME_COMMON_NEW_H_ */

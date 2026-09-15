@@ -20,40 +20,20 @@
 void FeDraw_SetABRMode(int abr)
 
 {
-  /* SYM 8c: named locals are EXACTLY abr (REGPARM int) + dr_mode (REG DR_MODE*).
-   * SLD: 0x8004D708..0x8004D740 -- the WHOLE OT-link block -- is ONE source line
-   * (236); the SetDrawMode call is line 237.  So retail wrote line 236 as a single
-   * OT-link MACRO, and `linkWord` below is that macro's internal temp (it holds no
-   * value across a statement boundary in the original, which is why the SYM has no
-   * Def record for it -- cf. psxfront.cpp's `linkAddr`, the same house idiom).
-   *
-   * MATCH (the lever, cracked 2026-08-02): SPLIT the palette read-modify-write into
-   * a VALUE statement + a STORE statement, and put the packet-cursor bump BETWEEN
-   * them.  That makes the palette store the LAST insn before `jal GetTPage`, so
-   * dbr's backward `fill_simple_delay_slots` scan takes IT into the call's delay
-   * slot (the oracle's pick) while the cursor store keeps its position ahead of the
-   * OR chain.  The un-split form leaves the cursor store last -> dbr steals THAT.
-   * FALSIFIED (all gated): bump-before-pal (40) incl. a `next` cursor temp (40) and
-   * a swapped pal-OR (40); psxfront's own `prevPrim` scratchpad-pointer cache -- this
-   * fn is straight-line, so re-reading the slot IS right here and the cache costs
-   * diffs (the full psxfront `prevPrim`+`linkAddr` spelling measured 30, `linkAddr`
-   * alone 30, vs PASS for the value/store split with no pointer cache); the
-   * Draw_PrimStruct struct-field view of the cursor for
-   * both orders (17 / 19); volatile on the palette store (8); psxfront's exact
-   * `prevPrim`+`linkAddr` spelling (30) and `linkAddr` alone (30); linkWord with the
-   * OR operands swapped (26); and the -G / -mno-split-addresses axis (gprobe: all
-   * four settings == baseline). */
+  short tpage;
+  int linkAddr;
   DR_MODE *dr_mode;
-  u_long linkWord; /* SYM-CODEGEN-CARRIER: linkWord -- SLD proves this is the
-                      one-line OT-link macro's internal value; direct forms are
-                      measured 17-40 diffs in the receipt above */
+  u_char *prevPrim;
 
   dr_mode = (DR_MODE *)Render_gPacketPtr;
-  dr_mode->tag = dr_mode->tag & 0xff000000 | *(u_long *)Render_gPalettePtr & 0xffffff;
-  linkWord = *(u_long *)Render_gPalettePtr & 0xff000000 | (u_long)dr_mode & 0xffffff;
-  Render_gPacketPtr = (u_char *)dr_mode + 0xc;
-  *(u_long *)Render_gPalettePtr = linkWord;
-  SetDrawMode(dr_mode,0,0,(u_short)GetTPage(2,abr,0,0x100),(RECT *)0x0);
+  prevPrim = Render_gPalettePtr;
+  *(uint *)Render_gPacketPtr =
+       *(uint *)Render_gPacketPtr & 0xff000000 | *(uint *)Render_gPalettePtr & 0xffffff;
+  linkAddr = (uint)Render_gPacketPtr & 0xffffff;
+  Render_gPacketPtr = Render_gPacketPtr + 0xc;
+  *(uint *)prevPrim = *(uint *)prevPrim & 0xff000000 | linkAddr;
+  tpage = GetTPage(2,abr,0,0x100);
+  SetDrawMode(dr_mode,0,0,(u_long)(u_short)tpage,(RECT *)0x0);
   return;
 }
 

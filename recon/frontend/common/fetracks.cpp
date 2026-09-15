@@ -6,6 +6,8 @@
 #include "fetracks.h"
 
 /* FETracks.obj-OWNED globals -- DEFINED here (self-contained; .data=real EXE bytes) */
+tTrackInformation gTrackInfo_FETrackList = {102, 101u, 116u, 114u, 107u, 46u, 116u, 114u, 107, 107, 0, 0, 0, 0, 0, 0, 7596, -32766, 0, 0, 0, -2147336244};   /* @0x80010fd0 */
+tTrackInformation gTrackInfo_Tourney = {116, 111u, 117u, 114u, 110u, 46u, 116u, 114u, 110, 110, 30, 5, 0, 0, 30, 0, 1310, 0, 1310, 0, 0, 1310};   /* @0x8001159c */
 short        CountryMeasurement[8] = { 0, 1, 0, 1, 1, 0, 1, 1 };   /* @0x80051610 */
 int          tracks_maxTrackIndex;   /* @0x80051620  (bss(zero)) */
 
@@ -16,10 +18,10 @@ void tTrackManager::Initialize()
 
 {
   short i;
-  
-  i = 0;
+
   this->fNumTracks = 0;
   this->fTracks = (tTrackInformation *)0x0;
+  i = 0;
   do {
     this->fAvailableTracks[i] = 0;
     this->fViewableTracks[i] = 0;
@@ -46,7 +48,7 @@ void tTrackManager::LoadTracks(tSaveTrackInfo &load)
 /* ---- tTrackManager::SaveTracks  [FETRACKS.CPP:65-77] SLD-VERIFIED ---- */
 void tTrackManager::SaveTracks(tSaveTrackInfo &save)
 {
-  u_long i;
+  u_int i;
 
   i = 0;
   do {
@@ -63,7 +65,7 @@ void tTrackManager::GetTrack(short trackNumber,tTrackInformation &trackInfo)
 {
   
   blockmove(this->fTracks + trackNumber,&trackInfo,0x30);
-  trackInfo.fAvailable = (uchar)this->fAvailableTracks[(signed char)trackInfo.fTrackID];
+  trackInfo.fAvailable = (uchar)this->fAvailableTracks[trackInfo.fTrackID];
   return;
 }
 
@@ -71,39 +73,51 @@ void tTrackManager::GetTrack(short trackNumber,tTrackInformation &trackInfo)
 
 /* ---- tTrackManager::LoadDescription  [FETRACKS.CPP:94-139] SLD-VERIFIED ---- */
 
-/* MATCH: the SYM-authenticated source has only `input`, `data`, `filename`,
-   and `i`.  As in tCarManager::LoadDescription, `input` owns the loaded file,
-   `data` owns the allocation result, and the indexed record loop is strength-
-   reduced to retail's byte-offset induction variable.  The named record
-   fields replace all decompiler offset aliases. 78/78 instructions. */
-
 void tTrackManager::LoadDescription()
 
 {
-  char *input;
+  u_long *addr;
+  u_long uVar1;
+  tTrackInformation *dst;
+  char *pcVar2;
   char *data;
-  char filename [80];
+  int iVar3;
   u_long i;
+  u_int uVar4;
+  char *input;
+  char filename [80];
   
-  sprintf(filename,"%s%s",Paths_Paths[0x25],"fetrk.trk");
+  data = filename;
+  sprintf(data,"%s%s",Paths_Paths[0x25],"fetrk.trk");
   this->ReleaseDescription();
-  input = (char *)loadfileadr(filename,0x10);
-  this->fNumTracks = *(u_long *)input;
-  data = (char *)reservememadr("Track List",this->fNumTracks * 0x30,0);
-  this->fTracks = (tTrackInformation *)data;
-  blockmove(input + 4,data,this->fNumTracks * 0x30);
-  i = 0;
-  if (this->fNumTracks != 0) {
-    do {
-      if (this->fTracks[i].fAvailable != '\0') {
-        this->fAvailableTracks[(signed char)this->fTracks[i].fTrackID] = true;
-      }
-      if (this->fTracks[i].fIsEgg == '\0') {
-        this->fViewableTracks[(signed char)this->fTracks[i].fTrackID] = true;
-      }
-    } while (++i < this->fNumTracks);
+  addr = (u_long *)loadfileadr(filename,0x10);
+  if (addr == 0) {
+    this->fNumTracks = 0;
+    this->fTracks = 0;
+    return;
   }
-  purgememadr(input);
+  uVar1 = *addr;
+  this->fNumTracks = uVar1;
+  dst = (tTrackInformation *)reservememadr("Track List",uVar1 * 0x30,0);
+  this->fTracks = dst;
+  blockmove(addr + 1,dst,this->fNumTracks * 0x30);
+  uVar4 = 0;
+  if (this->fNumTracks != 0) {
+    iVar3 = 0;
+    do {
+      pcVar2 = this->fTracks->fShapeName + iVar3 + -8;
+      if (pcVar2[3] != '\0') {
+        this->fAvailableTracks[*pcVar2] = 1;
+      }
+      pcVar2 = this->fTracks->fShapeName + iVar3 + -8;
+      if (pcVar2[4] == '\0') {
+        this->fViewableTracks[*pcVar2] = 1;
+      }
+      uVar4 = uVar4 + 1;
+      iVar3 = iVar3 + 0x30;
+    } while (uVar4 < this->fNumTracks);
+  }
+  purgememadr(addr);
   return;
 }
 
@@ -130,7 +144,7 @@ void tTrackManager::ReleaseDescription()
 void tTrackManager::SetTrackAvailable(short track,bool avail)
 
 {
-  
+
   this->fAvailableTracks[track] = avail;
   return;
 }
@@ -142,16 +156,22 @@ void tTrackManager::SetTrackAvailable(short track,bool avail)
 void tTrackManager::SetClassAvailable(tTrackClassType trackClass,bool avail)
 
 {
-  /* MATCH: the source-level array-index loop lets GCC strength-reduce the
-     48-byte record stride while retaining `i` in its SLD register ($a3).
-     The track id is explicitly signed because this build defaults plain
-     char to unsigned, while retail uses `lb` for the availability index. */
+  char *pcVar1;
+  u_int uVar2;
   u_long i;
+  int iVar3;
   
-  for (i = 0; i < this->fNumTracks; i++) {
-    if (this->fTracks[i].fTrackDifficulty == trackClass) {
-      this->fAvailableTracks[(signed char)this->fTracks[i].fTrackID] = avail;
-    }
+  uVar2 = 0;
+  if (this->fNumTracks != 0) {
+    iVar3 = 0;
+    do {
+      pcVar1 = this->fTracks->fShapeName + iVar3 + -8;
+      if ((u_char)pcVar1[2] == trackClass) {
+        this->fAvailableTracks[*pcVar1] = avail;
+      }
+      uVar2 = uVar2 + 1;
+      iVar3 = iVar3 + 0x30;
+    } while (uVar2 < this->fNumTracks);
   }
   return;
 }
@@ -163,12 +183,20 @@ void tTrackManager::SetClassAvailable(tTrackClassType trackClass,bool avail)
 tTrackInformation * tTrackManager::GetTrackByID(short track)
 
 {
+  tTrackInformation *ptVar1;
+  u_int uVar2;
   u_long i;
   
-  for (i = 0; i < this->fNumTracks; i = i + 1) {
-    if ((int)(signed char)this->fTracks[i].fTrackID == (int)track) {
-      return &this->fTracks[i];
-    }
+  uVar2 = 0;
+  if (this->fNumTracks != 0) {
+    ptVar1 = this->fTracks;
+    do {
+      uVar2 = uVar2 + 1;
+      if ((int)ptVar1->fTrackID == (int)track) {
+        return ptVar1;
+      }
+      ptVar1 = ptVar1 + 1;
+    } while (uVar2 < this->fNumTracks);
   }
   return this->fTracks;
 }
@@ -177,10 +205,10 @@ tTrackInformation * tTrackManager::GetTrackByID(short track)
 
 /* ---- tListIteratorTrack::ctor  [FETRACKS.CPP:233-235] SLD-VERIFIED ---- */
 tListIteratorTrack::tListIteratorTrack(char *valPtr,char *index,tTrackManager *trackManager)
-  : tListIteratorIndexed((short *)0x0,valPtr,index)
+  : _base_tListIteratorIndexed((short *)0x0,valPtr,index)
 {
   
-  *(void **)&(this->_vf) = (void *)tListIteratorTrack_vtable;
+  *(void **)&((this->_base_tListIteratorIndexed)._base_tListIterator._vf) = (void *)tListIteratorTrack_vtable;
   this->fTrackManager = trackManager;
   return;
 }
@@ -192,7 +220,7 @@ tListIteratorTrack::tListIteratorTrack(char *valPtr,char *index,tTrackManager *t
 tListIteratorTrack::~tListIteratorTrack()
 
 {
-  *(void **)&(this->_vf) = (void *)tListIteratorTrack_vtable;
+  *(void **)&((this->_base_tListIteratorIndexed)._base_tListIterator._vf) = (void *)tListIteratorTrack_vtable;
   return;
 }
 
@@ -204,16 +232,11 @@ short tListIteratorTrack::TextValue(tPlayer atIndex)
 
 {
   tTrackInformation *trackInfo;
-  /* SYM-CODEGEN-CARRIER: trackEntry -- collapsing the nested lookup is measured
-     FAIL 10 (16/16) and swaps the index/base arithmetic registers. */
-  tTrackInformation *trackEntry;
-  /* SYM-CODEGEN-CARRIER: uVar1 -- paired index carrier in that receipt. */
-  u_int uVar1;
-
-  trackInfo = (tTrackInformation *)this->fIndex;
-  uVar1 = (u_char)this->fValue[(u_char)trackInfo->fTrackID];
-  trackEntry = &this->fTrackManager->fTracks[uVar1];
-  return (signed char)trackEntry->fTrackID + 0xd5;
+  
+  trackInfo = (tTrackInformation *)(this->_base_tListIteratorIndexed).fIndex;
+  return this->fTrackManager->fTracks
+         [(u_char)(this->_base_tListIteratorIndexed)._base_tListIterator.fValue[(u_char)trackInfo->fTrackID]].
+         fTrackID + 0xd5;
 }
 
 
@@ -223,13 +246,22 @@ short tListIteratorTrack::TextValue(tPlayer atIndex)
 void tListIteratorTrack::Increment(tPlayer atIndex)
 
 {
+  void *pvVar1;
+  char *pcVar2;
+  u_char *pbVar3;
+  
   do {
-    this->fValue[(u_char)*this->fIndex]++;
-    if (this->fValue[(u_char)*this->fIndex] >=
-        this->fTrackManager->fNumTracks) {
-      this->fValue[(u_char)*this->fIndex] = 0;
+    pcVar2 = (this->_base_tListIteratorIndexed)._base_tListIterator.fValue +
+             (u_char)*(this->_base_tListIteratorIndexed).fIndex;
+    *pcVar2 = *pcVar2 + '\x01';
+    pbVar3 = (u_char *)((this->_base_tListIteratorIndexed)._base_tListIterator.fValue +
+                     (u_char)*(this->_base_tListIteratorIndexed).fIndex);
+    if (this->fTrackManager->fNumTracks <= (u_int)*pbVar3) {
+      *pbVar3 = 0;
     }
-  } while (!this->ValidTrack(this->fValue[(u_char)*this->fIndex]));
+    pvVar1 = this->ValidTrack((this->_base_tListIteratorIndexed)._base_tListIterator.fValue
+                             [(u_char)*(this->_base_tListIteratorIndexed).fIndex]);
+  } while (pvVar1 != (void *)0x1);
   return;
 }
 
@@ -240,46 +272,57 @@ void tListIteratorTrack::Increment(tPlayer atIndex)
 void tListIteratorTrack::Decrement(tPlayer atIndex)
 
 {
+  char cVar1;
+  void *pvVar2;
+  char *pcVar3;
+  
   do {
-    this->fValue[(u_char)*this->fIndex] =
-      (this->fValue[(u_char)*this->fIndex] == 0 ?
-       this->fTrackManager->fNumTracks :
-       this->fValue[(u_char)*this->fIndex]) - 1;
-  } while (!this->ValidTrack(this->fValue[(u_char)*this->fIndex]));
+    pcVar3 = (this->_base_tListIteratorIndexed)._base_tListIterator.fValue +
+             (u_char)*(this->_base_tListIteratorIndexed).fIndex;
+    cVar1 = *pcVar3;
+    if (cVar1 == '\0') {
+      cVar1 = (char)this->fTrackManager->fNumTracks;
+    }
+    *pcVar3 = cVar1 + -1;
+    pvVar2 = this->ValidTrack((this->_base_tListIteratorIndexed)._base_tListIterator.fValue
+                             [(u_char)*(this->_base_tListIteratorIndexed).fIndex]);
+  } while (pvVar2 != (void *)0x1);
   return;
 }
 
 
 
 /* ---- tListIteratorTrack::ValidTrack  [FETRACKS.CPP:269-288] SLD-VERIFIED ---- */
-/* SYM-CONFORM: the retail block names exactly `tTrackInformation *trackInfo`
-   and native C++ `bool result`.  CC1PLPSX represents bool as four bytes; the
-   BOOL spelling in dumpsym is the compiler's boolean base type, not the
-   reconstruction's `typedef int BOOL`. */
 
-bool tListIteratorTrack::ValidTrack(char track)
+void * tListIteratorTrack::ValidTrack(char track)
 
 {
+  char cVar1;
   tTrackInformation *trackInfo;
-  bool result;
+  tTrackInformation *ptVar2;
+  tTrackManager *ptVar3;
+  u_char result;
+  void *pvVar4;
+  char *input;
+  char filename [80];
   
-  trackInfo = this->fTrackManager->fTracks + (u_char)track;
-  result = this->fTrackManager->fAvailableTracks[(signed char)trackInfo->fTrackID];
-  switch (frontEnd.raceType) {
-  case 0:
-    result = (result | this->fTrackManager->fViewableTracks[(signed char)trackInfo->fTrackID]) != 0;
-    break;
-  case 1:
-    result = (result | this->fTrackManager->fViewableTracks[(signed char)trackInfo->fTrackID]) != 0;
-    if (trackInfo->fIsEgg != '\0') {
-      result = 0;
-    }
-    if (2 < trackInfo->fTrackDifficulty) {
-      result = 0;
-    }
-    break;
+  ptVar3 = this->fTrackManager;
+  ptVar2 = ptVar3->fTracks + (u_char)track;
+  cVar1 = ptVar2->fTrackID;
+  pvVar4 = (void *)ptVar3->fAvailableTracks[cVar1];
+  if (frontEnd.raceType == '\0') {
+    pvVar4 = (void *)(u_int)(pvVar4 != (void *)0x0 || ptVar3->fViewableTracks[cVar1] != 0);
   }
-  return result;
+  else if (frontEnd.raceType == '\x01') {
+    pvVar4 = (void *)(u_int)(pvVar4 != (void *)0x0 || ptVar3->fViewableTracks[cVar1] != 0);
+    if (ptVar2->fIsEgg != '\0') {
+      pvVar4 = (void *)0x0;
+    }
+    if (2 < ptVar2->fTrackDifficulty) {
+      pvVar4 = (void *)0x0;
+    }
+  }
+  return pvVar4;
 }
 
 

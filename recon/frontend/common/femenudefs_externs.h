@@ -1,21 +1,20 @@
 /* frontend/common/femenudefs_externs.h - reconstructed externs. NOT original. */
 #ifndef _FE_FEMENUDEFS_EXTERNS_H_
 #define _FE_FEMENUDEFS_EXTERNS_H_
-#include "femenudefs_types.h"
+#include "../../nfs4_types.h"
+#include "../../lib/libfns.h"
 
-extern "C" int sprintf(char *, const char *, ...);
-
-extern int          ticks;
-extern tfrontEnd    frontEnd;
+extern "C" int          ticks;
+extern "C" extern tfrontEnd    frontEnd;
 extern tFEApplication *FEApp;
-extern tGlobalMenuDefs *menuDefs[];
-extern char        *Paths_Paths[];
+extern tGlobalMenuDefs *menuDefs;
+extern "C" extern char        *Paths_Paths[];
 extern tCarManager  carManager;
 extern tTournamentManager tournamentManager;
 extern tTrackManager trackManager;
 /* screen pointer globals */
-extern tScreenMain     *screenMain[];
-extern tScreenCarSelect *screenCarSelect[];
+extern "C" tScreenMain     *screenMain;
+extern tScreenCarSelect *screenCarSelect;
 extern tScreenUserName *screenUserName;
 extern tAllScreens     *gAllScreens;
 /* menu-option select lists */
@@ -26,35 +25,52 @@ extern short SelectListSplitDisplay[3], SelectListUpgrades[4], SelectListControl
 
 
 /* ===== auto-generated stubs ===== */
-/* W58-A1 (08A phantom fix): the entry points below were free `int f(...)` decls, which
- * mangle EVERY call site to `f__Fe` -- a symbol the link can never resolve.  They are
- * MEMBERS of tCarManager / tTournamentManager / tTrackManager / tScreenMain /
- * tScreenCarSelect / tDialogBase / tDialogInteractive / tFEApplication / tListIteratorCar /
- * tMenuItemLeftRightSlider (decls in nfs4_types.h); the call sites now use the
- * obj->Method(...) form.  Byte-neutral: `this` rides $a0 like the old explicit receiver.
- * Removed: AddToPinkSlipsList, AddUpgradesToPinkSlipsList, CalcUsedPrice,
- * CheapestCarStockPrice, Decrement, Display, GetAwardInformation, GetCarFromID,
- * GetGarageCar, GetNumOwnedCars, GetNumTourneyCars, GetPinkSlipsCar, GetStockCar,
- * GetTrack, Hide, Increment, IsTournamentFinished, PurchaseCar, PurchaseUpgrade,
- * Redraw, Run, SellCar, SetCarAvailable, SetDimensions, SetState, StartNewTournament,
- * SwapBackground. */
-void AudioCmn_PlayFESFX(int);   /* SYM Def class EXT type FCN */
-void DeInit_Memcard(void);   /* SYM Def class EXT type FCN */
-bool FECheat_IsTheUserACryBabyCheater(void);   /* SYM: FCN bool */
-void Init_Memcard(bool, bool);   /* SYM Def class EXT type FCN */
-short LoadGame(short, bool, bool);
-char *PlayerName(int);   /* SYM Def class EXT type FCN */
-bool SaveGame(short);   /* SYM: Def class EXT type FCN bool @0x80034988 */
-int SavePinkSlipsCarsWithErrorDialogs(short, short, short);
-void StatChk_ClearNewRecords(void);   /* SYM Def class EXT type FCN */
-bool StatChk_IsRecordLapTime(Car_tStats *, short, short *);   /* SYM Def class EXT type FCN */
-short StatChk_IsTopTime(Car_tStats *, short);   /* SYM Def class EXT type FCN */
-void StatChk_SaveRecordLapTime(Car_tStats *, short, short);   /* SYM Def class EXT type FCN */
-void StatChk_SaveTopTime(Car_tStats *, short);   /* SYM Def class EXT type FCN */
-char *TextSys_Word(int);   /* SYM Def class EXT type FCN */
-int __builtin_delete(...);
-tDialogYesNo *tDialogYesNo_ctor(...);
-extern "C" tInsideBoxLeftRightSlider *tInsideBoxLeftRightSlider_ctor(...) __asm__("__25tInsideBoxLeftRightSliderUiP13tListIterator");  /* real ctor symbol */
+int AddToPinkSlipsList(...);
+int AddUpgradesToPinkSlipsList(...);
+void AudioCmn_PlayFESFX(int);
+long CalcUsedPrice(tCarManager *, short);
+long CheapestCarStockPrice(tCarManager *);
+extern "C" { void DeInit_Memcard(void); }
+extern "C" { int Decrement(...); }
+extern "C" { int Display(...); }
+extern "C" { int FECheat_IsTheUserACryBabyCheater(...); }
+extern "C" { int GetAwardInformation(...); }
+tCarInfo *GetCarFromID(tCarManager *, short);
+void GetGarageCar(tCarManager *, unsigned short, tCarInfo *, int);
+short GetNumOwnedCars(tCarManager *, short);
+short GetNumTourneyCars(tCarManager *, short);
+extern "C" { int GetPinkSlipsCar(...); }
+void GetStockCar(tCarManager *, unsigned short, tCarInfo *);
+void GetTrack(tTrackManager *, unsigned short, tTrackInformation *);
+extern "C" { int Hide(...); }
+int Increment(...);
+extern "C" { void Init_Memcard(bool redraw, bool pinkslips); }
+short IsTournamentFinished(tTournamentManager *);
+short LoadGame(short player, bool PinkSlips, bool WithDialogs);
+extern "C" { char *PlayerName(int player); }
+long PurchaseCar(tCarManager *, short, short, short);
+long PurchaseUpgrade(tCarManager *, short, short, short);
+extern "C" { int Redraw(...); }
+extern "C" { int Run(...); }
+extern "C" { int SaveGame(...); }
+PinkSlipsErrorCode SavePinkSlipsCarsWithErrorDialogs(short player,
+                                                     short WillLoseCar,
+                                                     short withoutCarInGarageNumber);
+int SellCar(...);
+void SetCarAvailable(tCarManager *, int, bool);
+void SetDimensions(tMenuItemLeftRightSlider *, short, short, short, short);
+void SetState(tScreenCarSelect *, int);
+int StartNewTournament(...);
+extern "C" { int StatChk_ClearNewRecords(...); }
+extern "C" { int StatChk_IsRecordLapTime(...); }
+extern "C" { int StatChk_IsTopTime(...); }
+extern "C" { int StatChk_SaveRecordLapTime(...); }
+extern "C" { int StatChk_SaveTopTime(...); }
+void SwapBackground(tScreenMain *, int);
+extern "C" { char *TextSys_Word(int); }
+void __builtin_delete(void *deleteMe);
+void tDialogYesNo_ctor(tDialogYesNo *);
+tInsideBoxLeftRightSlider *tInsideBoxLeftRightSlider_ctor(...);
 tInsideBoxLeftRightSlider *tInsideBoxLeftRightSlider_dtor(...);
 tInsideBoxMenu *tInsideBoxMenu_ctor(...);
 tInsideBoxMenu *tInsideBoxMenu_dtor(...);
@@ -62,22 +78,22 @@ tInsideBoxSongMenu *tInsideBoxSongMenu_ctor(...);
 tInsideBoxSongMenu *tInsideBoxSongMenu_dtor(...);
 tInsideBoxTwoWaySlider *tInsideBoxTwoWaySlider_ctor(...);
 tInsideBoxTwoWaySlider *tInsideBoxTwoWaySlider_dtor(...);
-extern "C" tListIteratorCarColor *tListIteratorCarColor_ctor(...) __asm__("__21tListIteratorCarColorPcN21iP11tCarManager");  /* real ctor symbol */
+tListIteratorCarColor *tListIteratorCarColor_ctor(...);
 tListIteratorCarColor *tListIteratorCarColor_dtor(...);
-extern "C" tListIteratorCar *tListIteratorCar_ctor(...) __asm__("__16tListIteratorCarPcP11tCarManager");  /* real ctor symbol */
+tListIteratorCar *tListIteratorCar_ctor(...);
 tListIteratorCar *tListIteratorCar_dtor(...);
-extern "C" tListIteratorIndexed *tListIteratorIndexed_ctor(...) __asm__("__20tListIteratorIndexedPsPcT2");  /* real ctor symbol */
+tListIteratorIndexed *tListIteratorIndexed_ctor(...);
 tListIteratorIndexed *tListIteratorIndexed_dtor(...);
-extern "C" tListIteratorRangeIndexed *tListIteratorRangeIndexed_ctor(...) __asm__("__25tListIteratorRangeIndexedccPcT3");  /* real ctor symbol */
+tListIteratorRangeIndexed *tListIteratorRangeIndexed_ctor(...);
 tListIteratorRangeIndexed *tListIteratorRangeIndexed_dtor(...);
-extern "C" tListIteratorRange *tListIteratorRange_ctor(...) __asm__("__18tListIteratorRangeccPc");  /* real ctor symbol */
+tListIteratorRange *tListIteratorRange_ctor(...);
 tListIteratorRange *tListIteratorRange_dtor(...);
-extern "C" tListIteratorTournament *tListIteratorTournament_ctor(...) __asm__("__23tListIteratorTournamentPcP18tTournamentManager");  /* real ctor symbol */
+tListIteratorTournament *tListIteratorTournament_ctor(...);
 tListIteratorTournament *tListIteratorTournament_dtor(...);
-extern "C" tListIteratorTrack *tListIteratorTrack_ctor(...) __asm__("__18tListIteratorTrackPcT1P13tTrackManager");  /* real ctor symbol */
+tListIteratorTrack *tListIteratorTrack_ctor(...);
 tListIteratorTrack *tListIteratorTrack_dtor(...);
-extern "C" tListIterator *tListIterator_ctor(...) __asm__("__13tListIteratorPsPc");  /* real ctor symbol */
-tListIterator *tListIterator_dtor(...);
+tListIterator *tListIterator_ctor(...);
+extern "C" { tListIterator *tListIterator_dtor(...); }
 tMenuBlank *tMenuBlank_ctor(...);
 tMenuBlank *tMenuBlank_dtor(...);
 tMenuItemGoToMenuButton *tMenuItemGoToMenuButton_ctor(...);
@@ -98,61 +114,55 @@ tMenuNFS4Bottom *tMenuNFS4Bottom_ctor(...);
 tMenuNFS4Bottom *tMenuNFS4Bottom_dtor(...);
 tMenuNFS4TwoPlayer *tMenuNFS4TwoPlayer_ctor(...);
 tMenuNFS4TwoPlayer *tMenuNFS4TwoPlayer_dtor(...);
-tMenuNFS4 *tMenuNFS4_ctor(...);
+extern "C" { tMenuNFS4 *tMenuNFS4_ctor(...); }
 tMenuNFS4 *tMenuNFS4_dtor(...);
 tMenuOptions *tMenuOptions_ctor(...);
 tMenuOptions *tMenuOptions_dtor(...);
 tOptionsMenu *tOptionsMenu_ctor(...);
 tOptionsMenu *tOptionsMenu_dtor(...);
-tScreen *tScreen_dtor(...);
+void tScreen_dtor(tScreen *, int);
 tUserNameMenuItem *tUserNameMenuItem_ctor(...);
-extern bool CURRENTLYUSINGMEMCARD;
-extern Car_tStats Cars_gNewCarStatsList[];   /* was stale scalar int; owner cars.cpp
-                                     Car_tStats Cars_gNewCarStatsList[9] (array of value structs) --
-                                     passed bare to StatChk_IsRecordLapTime/StatChk_SaveTopTime etc
-                                     (Car_tStats* param); the scalar decl loaded the VALUE at that
-                                     address instead of computing the array's own address */
+extern "C" int CURRENTLYUSINGMEMCARD;
+extern "C" int Cars_gNewCarStatsList;
 extern int Cars_gNumRaceCars;
-extern GameSetup_tData GameSetup_gData;
-extern bool MEMCARD_INITIALIZED;
+extern "C" extern "C" GameSetup_tData GameSetup_gData;
+extern "C" int MEMCARD_INITIALIZED;
 
 
-extern tPadModuleState gPadinfo;
+extern int gCarActivation[6][5];
+extern "C" tPadModuleState gPadinfo;
 extern tScreenAudio *screenAudio;
 extern tScreenBeTheCopCongrats *screenBeTheCopCongrats;
-extern tScreenCarSelectDuel *screenCarSelectDuel;
-extern tScreenCarSelectTwoPlayer *screenCarSelectPlayerTwo;
-extern tScreenCarSelectTwoPlayer *screenCarSelectTwoPlayer;
+extern "C" tScreenCarSelectDuel *screenCarSelectDuel;
+extern "C" tScreenCarSelectTwoPlayer *screenCarSelectPlayerTwo;
+extern "C" tScreenCarSelectTwoPlayer *screenCarSelectTwoPlayer;
 extern tScreenControllerConfig *screenControllerConfig;
 extern tScreenDisplay *screenDisplay;
-extern tScreenMemcard *screenMemcard;
+extern "C" tScreenMemcard *screenMemcard;
 extern tScreenPinkSlipCongrats *screenPinkSlipCongrats;
 extern tScreenPinkSlipStandings *screenPinkSlipStandings;
 extern tScreenPinkSlips *screenPinkSlips;
-extern tScreenPinkSlipsCarSelect *screenPinkSlipsCarSelectPlayerTwo;
-extern tScreenPinkSlipsCarSelect *screenPinkSlipsCarSelectTwoPlayer;
+extern "C" tScreenPinkSlipsCarSelect *screenPinkSlipsCarSelectPlayerTwo;
+extern "C" tScreenPinkSlipsCarSelect *screenPinkSlipsCarSelectTwoPlayer;
 extern tScreenTournSelect *screenTournSelect;
 extern tScreenTournamentCongrats *screenTournamentCongrats;
 extern tScreenTournamentStandings *screenTournamentStandings;
 extern tScreenTournamentStandings3item *screenTournamentStandings3item;
 extern tScreenTournamentTrophy *screenTournamentTrophy;
 extern tScreenTrackInfo *screenTrackInfo;
-extern tScreenTrackRecords *screenTrackRecords;
+extern "C" tScreenTrackRecords *screenTrackRecords;
 extern tScreenTrackSelect *screenTrackSelect;
 extern tScreenTrophyInfo *screenTrophyInfo;
 extern tScreenTrophyRoom *screenTrophyRoom;
 extern __vtbl_ptr_type tBlankMenuItemGoToMenuNFS4Button_vtable[];   /* real def in game/common/vtables_tmenu.cpp */
 extern __vtbl_ptr_type tBlankMenuItemNFS4LeftRightChoice_vtable[];   /* real def in game/common/vtables_tmenu.cpp */
-/* SEVERE BUG FIXED (extern-audit): same class as front_externs.h -- these 9 were
-   `extern int X_vtable;` (SCALAR) vs the real owner def `__vtbl_ptr_type X_vtable[N]`
-   (ARRAY, vtables_t*.cpp), corrupting the vptr-init cast to `(void*)X_vtable`. */
-extern __vtbl_ptr_type tDialogYesNoTri_vtable[];
-extern __vtbl_ptr_type tInsideBoxControllerLeftRightSlider_vtable[];
-extern __vtbl_ptr_type tMemoryCardMenuItem_vtable[];
-extern __vtbl_ptr_type tMenuItemControllerLeftRightChoice_vtable[];
-extern __vtbl_ptr_type tMenuItemDisplayLeftRightChoice_vtable[];
-extern __vtbl_ptr_type tMenuItemOnOffLeftRightChoice_vtable[];
-extern __vtbl_ptr_type tMenuItemOptionsLeftRightChoice_vtable[];
-extern __vtbl_ptr_type tMenuItemOptionsTwoItemChoice_vtable[];
-extern __vtbl_ptr_type tMenuItemSlidingActivated_vtable[];
+extern __vtbl_ptr_type tDialogYesNoTri_vtable[12];
+extern "C" int tInsideBoxControllerLeftRightSlider_vtable;
+extern "C" int tMemoryCardMenuItem_vtable;
+extern "C" int tMenuItemControllerLeftRightChoice_vtable;
+extern "C" int tMenuItemDisplayLeftRightChoice_vtable;
+extern "C" int tMenuItemOnOffLeftRightChoice_vtable;
+extern "C" int tMenuItemOptionsLeftRightChoice_vtable;
+extern "C" int tMenuItemOptionsTwoItemChoice_vtable;
+extern "C" int tMenuItemSlidingActivated_vtable;
 #endif

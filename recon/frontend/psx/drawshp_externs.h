@@ -2,24 +2,20 @@
  * FETextRender game fns + render cursors). NOT an original header; for standalone C++ compile. */
 #ifndef _FRONTEND_PSX_DRAWSHP_EXTERNS_H_
 #define _FRONTEND_PSX_DRAWSHP_EXTERNS_H_
-#include "drawshp_types.h"
+#include "../../nfs4_types.h"
+#include "../../lib/libfns.h"
 
-extern "C" int GetTPage(...);
-extern "C" void SetDrawMode(...);
-
-extern tTexture_ShapeInfo *gHelpShapes_v[] asm("gHelpShapes");   /* unsized array VIEW: forces the
- * separate-scratch  lui vN,%hi; lw dest,%lo(vN)  address materialization the oracle uses
- * (a scalar extern compiles to the single unschedulable `lw dest,sym` macro = self-temp) */
-extern tTexture_ShapeInfo *gHelpShapes;   /* shape table (PSXFront) */
+extern "C" u_char *&Render_gPacketPtr;    /* GPU packet build cursor (byte-arith) */
+extern "C" u_char *&Render_gPalettePtr;   /* GPU packet build cursor (byte-arith) */
+extern "C" tTexture_ShapeInfo *gHelpShapes;   /* shape table (PSXFront) */
 
 extern "C" {  /* PsyQ libgpu */
 }
 
 /* game-side C++ helpers (cfront-mangled in originals; normal C++ linkage) */
 void FETextRender_MenuTextPositionedJustify(short id, short x, short y, short j,
-                                            tMenuTextState st, tMenuTextType ty)
-  asm("FETextRender_MenuTextPositionedJustify__Fssss14tMenuTextState13tMenuTextType");
-void DrawShapeExtended(int index, int flags, int x, int y, int fade, int abr, tDrawShapeExtended *extra);
+                                            tMenuTextState st, tMenuTextType ty);
+extern "C" { void DrawShapeExtended(int index, int flags, int x, int y, int fade, int abr, tDrawShapeExtended *extra); }
 void PSXDrawSquare(int col, int x, int y, int w, int h);
 void PSXDrawTransSquare(int col, int x, int y, int w, int h, short opacity);
 void PSXDrawTransGouraudSquare(int x, int y, int w, int h, int opacity, int c1, int c2, int c3, int c4);

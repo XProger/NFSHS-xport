@@ -8,12 +8,12 @@
 
 /* ---- MinFront_ParseOptions  [MINFRONT.CPP:781-805] SLD-VERIFIED ---- */
 
-int * MinFront_ParseOptions(void)
+extern "C" int * MinFront_ParseOptions(void)
 
 {
   int *stream;
   
-  stream = reservememadr((char *)(bigBuf + 0xc),0x2000,0x10);
+  stream = (int *)reservememadr((char *)(bigBuf + 0xc),0x2000,0x10);
   *stream = 0;
   resizememadr(stream,4);
   return stream;

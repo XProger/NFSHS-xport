@@ -1,62 +1,54 @@
 /* frontend/screens/screenpinkslips_externs.h - reconstructed externs. NOT original. */
 #ifndef _FE_SCREENS_SCREENPINKSLIPS_EXTERNS_H_
 #define _FE_SCREENS_SCREENPINKSLIPS_EXTERNS_H_
-#include "screenpinkslips_types.h"
-
-extern "C" {
-int GetTPage(int, int, int, int);
-int sprintf(char *, const char *, ...);
-int ClearImage(RECT *, u_char, u_char, u_char);
-long DrawSync(long);
-int purgememadr(void *);
-}
+#include "../../nfs4_types.h"
+#include "../../lib/libfns.h"
 
 /* ===== globals ===== */
-extern tfrontEnd          frontEnd;
+extern "C" extern tfrontEnd          frontEnd;
 extern tTrackManager      trackManager;
 extern tGlobalMenuDefs   *menuDefs;
 extern tFEApplication    *FEApp;
-extern int                ticks;
-extern char              *Paths_Paths[];
+extern "C" int                ticks;
+extern "C" extern char              *Paths_Paths[];
 
 /* ===== statics owned by ScreenPinkSlips.obj ===== */
 tScreenPinkSlips         *screenPinkSlips = 0;        /* @0x80051E64 bss(zero), owned here; referenced cross-TU (front.cpp/femenudefs) as pointer */
 static char  imageTVOrder[4] = {1,2,0,3};             /* STAT @0x80051E60 - TV reveal order */
 static char  gSwapFileName[20];                       /* STAT @0x80052C00 */
+static int   flareextra_248 = 0;                      /* @0x80052bf0 fn-static, real bytes=00000000 (flare ramp counter) */
 
 /* ===== free helpers (member fns rendered free by Ghidra; tScreen* first arg where applicable) ===== */
-bool IsShapeFileLoaded(tScreen*, tShapeInformation*) asm("IsShapeFileLoaded__7tScreenR17tShapeInformation");
-void  UploadSwapShapes(tScreen*, int) asm("UploadSwapShapes__7tScreeni");
-void  AsyncLoadSwapShapeFile(tScreen*, char*) asm("AsyncLoadSwapShapeFile__7tScreenPc");
-short TextValue(void*, tPlayer) asm("TextValue__18tListIteratorTrack7tPlayer");
-void  Increment(void*, tPlayer) asm("Increment__18tListIteratorTrack7tPlayer");
-void  Decrement(void*, tPlayer) asm("Decrement__18tListIteratorTrack7tPlayer");
-void  GetTrack(tTrackManager*, unsigned short, void*) asm("GetTrack__13tTrackManagersR17tTrackInformation");
+extern "C" { void *IsShapeFileLoaded(tScreen*, tShapeInformation*); }
+extern "C" { void  UploadSwapShapes(tScreen*, int); }
+void  AsyncLoadSwapShapeFile(tScreen*, char*);
+short TextValue(tListIteratorTrack *, tPlayer);
+void  Increment(void*, tPlayer);
+extern "C" { void  Decrement(void*, tPlayer); }
+void GetTrack(tTrackManager *, unsigned short, tTrackInformation *);
 
 /* drawing / text */
-void  DrawShapeExtended(int, int, int, int, int, int, tDrawShapeExtended*);
-void  DrawShape_NFS4RoundRectangle(int, RECT*, short) asm("DrawShape_NFS4RoundRectangle__FiR4RECTs");
-void  FETextRender_MenuTextPositionedJustify(short, short, short, short,
-                                              tMenuTextState, tMenuTextType)
-    asm("FETextRender_MenuTextPositionedJustify__Fssss14tMenuTextState13tMenuTextType");
+extern "C" { void  DrawShapeExtended(int, int, int, int, int, int, tDrawShapeExtended*); }
+extern "C" { void  DrawShape_NFS4RoundRectangle(int, RECT*, short); }
+void  FETextRender_MenuTextPositionedJustify(short, short, short, short, tMenuTextState, tMenuTextType);
 void  Flare_2DHalo(int, int, int, int, int);
 void  PSXDrawTransSquare(int, int, int, int, int, short);
 void  FeDraw_SetABRMode(int);
 
 /* TV tiles (FETv) */
-void  DrawTV(tTVConfig*) asm("DrawTV__FR9tTVConfig");
-void  InitTV(tTVConfig*, tTexture_ShapeInfo*, short) asm("InitTV__FR9tTVConfigP18tTexture_ShapeInfos");
-void  TurnOnTV(tTVConfig*) asm("TurnOnTV__FR9tTVConfig");
-void  TurnOffTV(tTVConfig*) asm("TurnOffTV__FR9tTVConfig");
+extern "C" { void  DrawTV(tTVConfig*); }
+extern "C" { void  InitTV(tTVConfig*, tTexture_ShapeInfo*, short); }
+extern "C" { void  TurnOnTV(tTVConfig*); }
+extern "C" { void  TurnOffTV(tTVConfig*); }
 
 /* video (FRONTEND::PSX::video) */
-int   VIDEO_create(int, int, int, int, int);
-void  VIDEO_spoolfile(int, char*);
-void  VIDEO_startplayback(int);
-void  VIDEO_abortplayback(int);
-void  VIDEO_destroy(int);
-int   VIDEO_state(int);
-int   VIDEO_updateframexy(int, int, int);
+intptr_t VIDEO_create(int, int, int, int, int);
+void  VIDEO_spoolfile(intptr_t, char*);
+void  VIDEO_startplayback(intptr_t);
+void  VIDEO_abortplayback(intptr_t);
+void  VIDEO_destroy(intptr_t);
+extern "C" { int   VIDEO_state(intptr_t); }
+int   VIDEO_updateframexy(intptr_t, int, int);
 
 /* libgpu / libc / eaclib */
 

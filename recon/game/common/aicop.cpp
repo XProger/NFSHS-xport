@@ -2,34 +2,25 @@
  *   Player-action submission + reaction-table processing. SYM-v3 locals; vs disasm-v2.txt.
  *   NOT original source; SYM-faithful, recompilable C++.
  */
-#include "aicop_types.h"
+#include "../../nfs4_types.h"
 #include "aicop_externs.h"
 
 
-/* ---- aicop.obj-owned globals ----
- * copLevel_t IS A NESTED STRUCT (copChasers[2], numBlockaders, copBlockaders[2],
- * spikeBelt, copAggression[2], then copsPerLap/engagementLapFraction/warningTicks/
- * beatingTicks/numWarningsAdded) = 13 words / 52 bytes.  These six tables were
- * written as FLAT 10-value initialisers, so brace elision assigned the values to
- * the WRONG fields from copBlockaders[1] onward and left 3 words zero -- a real
- * RUNTIME BUG (every cop chase level had the wrong spikeBelt / copAggression /
- * copsPerLap / lap-fraction / warning+beating ticks), and 301 of the window's
- * 1420 bytes differed from retail (w64-a18 ownmap2 E5).
- * REWRITTEN with explicit nested braces, values decoded WORD-FOR-WORD from
- * rom/nfs4-f.exe at each table's VA.  Do NOT flatten these braces again. */
-copLevel_t   twoLapCopGame[4] = { { {2, 0}, 0, {0, 0}, 0, {0, 0}, 16, 19660, 512, 128, 2 }, { {0, 1}, 2, {2, 0}, 0, {0, 0}, 32, 26214, 0, 192, 0 }, { {2, 1}, 0, {0, 0}, 0, {1, 1}, 32, 19660, 0, 192, 0 }, { {0, 0}, 3, {2, 1}, 1, {1, 1}, 32, 26214, 0, 192, 0 } };   /* @0x8010cfd4 */
-copLevel_t   fourLapCopGame[5] = { { {2, 0}, 0, {0, 0}, 0, {0, 0}, 16, 45875, 512, 128, 2 }, { {0, 0}, 2, {2, 0}, 0, {0, 0}, 16, 45875, 512, 192, 0 }, { {0, 1}, 0, {0, 0}, 0, {0, 0}, 32, 45875, 256, 192, 0 }, { {2, 1}, 0, {0, 0}, 0, {1, 1}, 32, 45875, 0, 224, 0 }, { {0, 0}, 3, {2, 1}, 1, {1, 1}, 32, 45875, 0, 256, 0 } };   /* @0x8010d0a4 */
-copLevel_t   twoLapCopGameSplit[4] = { { {0, 1}, 0, {0, 0}, 0, {2, 2}, 16, 32768, 512, 128, 2 }, { {0, 0}, 1, {0, 1}, 0, {2, 2}, 32, 32768, 0, 192, 0 }, { {0, 1}, 0, {0, 0}, 0, {2, 2}, 32, 32768, 0, 192, 0 }, { {0, 0}, 1, {0, 1}, 1, {2, 2}, 32, 32768, 0, 192, 0 } };   /* @0x8010d1a8 */
-copLevel_t   fourLapCopGameSplit[4] = { { {0, 1}, 0, {0, 0}, 0, {2, 2}, 16, 45875, 512, 128, 2 }, { {0, 0}, 1, {0, 1}, 0, {2, 2}, 16, 45875, 512, 192, 0 }, { {0, 1}, 0, {0, 0}, 0, {2, 2}, 32, 45875, 256, 192, 0 }, { {0, 0}, 1, {0, 1}, 1, {2, 2}, 32, 45875, 0, 256, 0 } };   /* @0x8010d278 */
-copLevel_t   twoLapCopGame1H1AI[4] = { { {2, 0}, 0, {0, 0}, 0, {0, 0}, 16, 19660, 512, 128, 2 }, { {0, 0}, 2, {2, 0}, 0, {0, 0}, 32, 19660, 0, 192, 0 }, { {2, 0}, 0, {0, 0}, 0, {1, 1}, 32, 19660, 0, 192, 0 }, { {0, 0}, 2, {2, 0}, 1, {1, 1}, 32, 19660, 0, 192, 0 } };   /* @0x8010d348 */
-copLevel_t   fourLapCopGame1H1AI[5] = { { {1, 0}, 0, {0, 0}, 0, {0, 0}, 16, 45875, 512, 128, 2 }, { {0, 0}, 2, {2, 0}, 0, {0, 0}, 16, 45875, 512, 192, 0 }, { {2, 0}, 0, {0, 0}, 0, {0, 0}, 32, 45875, 256, 192, 0 }, { {2, 0}, 0, {0, 0}, 0, {1, 1}, 32, 45875, 0, 224, 0 }, { {0, 0}, 2, {2, 0}, 1, {1, 1}, 32, 45875, 0, 256, 0 } };   /* @0x8010d418 */
-/* DISGUISED BARE-VA FIX (w14-a2): the 6 `.levels` pointers were fabricated negative-int literals
- * (e.g. -2146381868 == 0x8010CFD4) instead of real symbol refs -- they decode EXACTLY to the 6
- * sibling arrays declared just above (offset 0 each), so this is a plain array-of-pointers table. */
-copGame_t    copGame[6] = { {4, twoLapCopGame}, {5, fourLapCopGame}, {4, twoLapCopGameSplit}, {4, fourLapCopGameSplit}, {4, twoLapCopGame1H1AI}, {5, fourLapCopGame1H1AI} };   /* @0x8010d51c */
+/* ---- aicop.obj-owned globals (.bss zero) ---- */
+copLevel_t   twoLapCopGame[4] = { {2, 0, 0, 0, 0, 16, 19660, 512, 128, 2}, {0, 2, 2, 0, 0, 32, 26214, 0, 192, 0}, {2, 0, 0, 0, 1, 32, 19660, 0, 192, 0}, {0, 3, 2, 1, 1, 32, 26214, 0, 192, 0} };   /* @0x8010cfd4 */
+copLevel_t   fourLapCopGame[5] = { {2, 0, 0, 0, 0, 16, 45875, 512, 128, 2}, {0, 2, 2, 0, 0, 16, 45875, 512, 192, 0}, {0, 0, 0, 0, 0, 32, 45875, 256, 192, 0}, {2, 0, 0, 0, 1, 32, 45875, 0, 224, 0}, {0, 3, 2, 1, 1, 32, 45875, 0, 256, 0} };   /* @0x8010d0a4 */
+copLevel_t   twoLapCopGameSplit[4] = { {0, 0, 0, 0, 2, 16, 32768, 512, 128, 2}, {0, 1, 0, 0, 2, 32, 32768, 0, 192, 0}, {0, 0, 0, 0, 2, 32, 32768, 0, 192, 0}, {0, 1, 0, 1, 2, 32, 32768, 0, 192, 0} };   /* @0x8010d1a8 */
+copLevel_t   fourLapCopGameSplit[4] = { {0, 0, 0, 0, 2, 16, 45875, 512, 128, 2}, {0, 1, 0, 0, 2, 16, 45875, 512, 192, 0}, {0, 0, 0, 0, 2, 32, 45875, 256, 192, 0}, {0, 1, 0, 1, 2, 32, 45875, 0, 256, 0} };   /* @0x8010d278 */
+copLevel_t   twoLapCopGame1H1AI[4] = { {2, 0, 0, 0, 0, 16, 19660, 512, 128, 2}, {0, 2, 2, 0, 0, 32, 19660, 0, 192, 0}, {2, 0, 0, 0, 1, 32, 19660, 0, 192, 0}, {0, 2, 2, 1, 1, 32, 19660, 0, 192, 0} };   /* @0x8010d348 */
+copLevel_t   fourLapCopGame1H1AI[5] = { {1, 0, 0, 0, 0, 16, 45875, 512, 128, 2}, {0, 2, 2, 0, 0, 16, 45875, 512, 192, 0}, {2, 0, 0, 0, 0, 32, 45875, 256, 192, 0}, {2, 0, 0, 0, 1, 32, 45875, 0, 224, 0}, {0, 2, 2, 1, 1, 32, 45875, 0, 256, 0} };   /* @0x8010d418 */
+copGame_t    copGame[6] = {
+  {4, twoLapCopGame}, {5, fourLapCopGame},
+  {4, twoLapCopGameSplit}, {4, fourLapCopGameSplit},
+  {4, twoLapCopGame1H1AI}, {5, fourLapCopGame1H1AI}
+};   /* @0x8010d51c */
 AICop_spikeBelt_t AICop_spikeBelt;   /* @0x8010d54c  (bss(zero)) */
 void         *AICop_rawTriggers;   /* @0x8013c570  (bss(zero)) */
-AICop_RoadBlockState AICop_gRoadBlockState;   /* @0x8013c574  (bss(zero)) */
+int          AICop_gRoadBlockState;   /* @0x8013c574  (bss(zero)) */
 int          AICop_numArrestedHumans;   /* @0x8013c578  (bss(zero)) */
 
 
@@ -44,33 +35,34 @@ int AICop_NoCopsInArea(int slice,int sliceDistance);
 void AICop_StartUp(void)
 {
   char filename[100];
-
-  if (AICOP_COPS != 0) {
+  char *rawTriggers;
+  char acStack_70 [104];
+  
+  if (GameSetup_gData.cops != 0) {
     triggerManagerCops = (AITrigger_TriggerManager *)operator new(0x34c);
-    sprintf(filename,"%sTr%02d.cop",Paths_Paths[22],AICOP_TRACK);
-    AICop_rawTriggers = (u_char *)loadfileadrz(filename,(void *)0x0);
-    if (AICop_rawTriggers != (u_char *)0x0) {
-      AITrigger_Init(triggerManagerCops,(char *)AICop_rawTriggers);
+    sprintf(acStack_70,"%sTr%02d.cop",Paths_Paths[22],GameSetup_gData.track);
+    AICop_rawTriggers = (u_char *)loadfileadrz(acStack_70,0);
+    rawTriggers = (char *)AICop_rawTriggers;
+    if (AICop_rawTriggers == (char *)0x0) {
+      rawTriggers = (char *)0x0;
     }
-    else {
-      AITrigger_Init(triggerManagerCops,(char *)0x0);
-    }
+    triggerManagerCops->Init(rawTriggers);
   }
   AICop_spikeBelt.active_ = 0;
   AICop_numArrestedHumans = 0;
-  AICop_gRoadBlockState = kAICop_RoadBlockState_None;
+  AICop_gRoadBlockState = 0;
   return;
 }
 
 /* ---- AICop_Restart__Fv  [@0x80066a58] ---- */
 void AICop_Restart(void)
 {
-  if ((AICop_rawTriggers != (u_char *)0x0) && (AICOP_COPS != 0)) {
-    AITrigger_Init(triggerManagerCops,(char *)AICop_rawTriggers);
+  if ((AICop_rawTriggers != (u_char *)0x0) && (GameSetup_gData.cops != 0)) {
+    triggerManagerCops->Init((char *)AICop_rawTriggers);
   }
   AICop_spikeBelt.active_ = 0;
   AICop_numArrestedHumans = 0;
-  AICop_gRoadBlockState = kAICop_RoadBlockState_None;
+  AICop_gRoadBlockState = 0;
   return;
 }
 
@@ -81,7 +73,7 @@ void AICop_CleanUp(void)
     operator delete(triggerManagerCops);
     triggerManagerCops = (AITrigger_TriggerManager *)0x0;
   }
-  if ((AICop_rawTriggers != (u_char *)0x0) && (AICOP_COPS != 0)) {
+  if ((AICop_rawTriggers != (u_char *)0x0) && (GameSetup_gData.cops != 0)) {
     purgememadr(AICop_rawTriggers);
     AICop_rawTriggers = (u_char *)0x0;
   }
@@ -96,7 +88,8 @@ int AICop_NoCopsInArea(int slice,int sliceDistance)
   Car_tObj **ppCVar2;
   int copLoop;
   int iVar3;
-
+  char filename [100];
+  
   iVar3 = 0;
   ppCVar2 = Cars_gCopCarList;
   do {

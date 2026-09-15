@@ -10,67 +10,56 @@
  *   -0.078125,...}; the asm starts acc=I and uses only c[1..3] (skips c[0]) -> a quarter-strength
  *   (M^TM)^(-1/2) correction, ~3x orthonormality-error reduction/call on small drift.  Not a one-shot
  *   orthonormalizer; meant to be called every frame on matrices that only drift slightly.
- *   HOST-VERIFIED (_test_matrix.cpp): trnsmult exact + alias-safe; reorthogonalize 3.3x cleanup, det->1.
+ *   HOST-VERIFIED (_test_matrix.c): trnsmult exact + alias-safe; reorthogonalize 3.3x cleanup, det->1.
  */
-extern int  fixedmult(int a, int b);                         /* eacpsxz @0x800E4328 */
-extern void transpose(int *src, int *dst);                  /* eacpsxz @0x800E4358 (trnspos) */
-extern void transmult(int *a, int *b, int *out);            /* eacpsxz @0x80105F40 (trnsmult.obj) C=A*B */
+extern "C" int  fixedmult(int a, int b);                         /* eacpsxz @0x800E4328 */
+extern "C" void transpose(int *src, int *dst);                  /* eacpsxz @0x800E4358 (trnspos) */
+extern "C" int *transmult(int *a, int *b, int *out);            /* eacpsxz @0x80105F40 (trnsmult.obj) C=A*B */
 #define multiplymatrix transmult                                /* reorthogonalize's matmul callee */
 /* @0x801237EC (16.16 identity, shared rodata; byte-exact from NFS4.EXE). matrix.obj is the owner;
  * other TUs (e.g. trnsmult, reorthogonalize callers) reference it extern. */
-extern const int identitymatrix[9] = { 65536,0,0, 0,65536,0, 0,0,65536 };
+extern "C" const int identitymatrix[9] = { 65536,0,0, 0,65536,0, 0,0,65536 };
 
-extern int *addmatrix(int *m1, int *m2, int *out)   /* @0x800F01FC */
+extern "C" int *addmatrix(int *m1, int *m2, int *out)   /* @0x800F01FC */
 {
     int i;
     for (i = 0; i < 9; i++) out[i] = m1[i] + m2[i];
     return out;
 }
 
-extern int *submatrix(int *m1, int *m2, int *out)   /* @0x800F0234 */
+extern "C" int *submatrix(int *m1, int *m2, int *out)   /* @0x800F0234 */
 {
     int i;
     for (i = 0; i < 9; i++) out[i] = m1[i] - m2[i];
     return out;
 }
 
-extern int *scalematrix(int *m, int scalar, int *out)   /* @0x800F026C */
+extern "C" int *scalematrix(int *m, int scalar, int *out)   /* @0x800F026C */
 {
     int i;
     for (i = 0; i < 9; i++) out[i] = fixedmult(m[i], scalar);
     return out;
 }
 
-/* 36-byte matrix as a STRUCT: the oracle's 4-word/iter copy loops (+1-word tail, end-ptr
- * compare vs base+0x20) are gcc's movstrsi block-move expansion of STRUCT ASSIGNMENTS --
- * per-element copy loops do NOT emit this shape. */
-typedef struct { int m[9]; } mtx;
-
-static const int coef[4] = { 16384, -8192, 6144, -5120 };   /* @0x80123810 (coef[0] unused) */
-
-extern int reorthogonalize(int *M)   /* @0x800F02E4 */
+extern "C" int reorthogonalize(int *M)   /* @0x800F02E4 */
 {
-    /* MATCH (197->0): FIVE stack buffers only, decl order = stack order (mtm@sp+0x10,
-     * mt@0x38, A@0x60, S@0x88, acc@0xB0); tmp REUSES mt, tmp2 REUSES mtm, mcopy REUSES mt;
-     * struct-assigns for every 9-word copy; coef accessed by INDEX coef[k] (the giv reduces
-     * to s0=coef+4 walking +4 -- a pointer variable stays un-reduced).  The volatile-qualified
-     * coefficient read keeps it after the S=mt copy tail, recovering the oracle's load-delay nop
-     * and call delay slot.  NO explicit return ($v0 after the last transmult is incidental). */
-    mtx mtm, mt, A, S, acc;
-    register int it, k;
+    static const int coef[4] = { 16384, -8192, 6144, -5120 };   /* @0x80123810 (coef[0] unused) */
+    int it;
     for (it = 0; it < 4; it++) {
-        transpose(M, mt.m);                            /* mt  = M^T            */
-        multiplymatrix(mt.m, M, mtm.m);                /* mtm = M^T M          */
-        submatrix(mtm.m, (int *)identitymatrix, A.m);  /* A   = M^T M - I      */
-        S = *(mtx *)identitymatrix;
-        acc = *(mtx *)identitymatrix;
+        int mt[9], mtm[9], A[9], S[9], acc[9], tmp[9], mcopy[9];
+        int i, k;
+        transpose(M, mt);                          /* mt  = M^T            */
+        multiplymatrix(mt, M, mtm);                /* mtm = M^T M          */
+        submatrix(mtm, (int *)identitymatrix, A);  /* A   = M^T M - I      */
+        for (i = 0; i < 9; i++) { S[i] = identitymatrix[i]; acc[i] = identitymatrix[i]; }
         for (k = 1; k < 4; k++) {
-            multiplymatrix(S.m, A.m, mt.m);            /* mt(tmp) = S * A      */
-            S = mt;
-            scalematrix(S.m, *(volatile const int *)&coef[k], mtm.m); /* mtm(tmp2) = coef[k] * S^k */
-            addmatrix(acc.m, mtm.m, acc.m);            /* acc += tmp2          */
+            multiplymatrix(S, A, tmp);             /* S   = S * A          */
+            for (i = 0; i < 9; i++) S[i] = tmp[i];
+            scalematrix(S, coef[k], tmp);          /* tmp = coef[k] * S^k  */
+            addmatrix(acc, tmp, acc);              /* acc += tmp           */
         }
-        mt = *(mtx *)M;                                /* mcopy reuses mt      */
-        multiplymatrix(mt.m, acc.m, M);                /* M = M * series       */
+        for (i = 0; i < 9; i++) mcopy[i] = M[i];
+        multiplymatrix(mcopy, acc, M);             /* M = M * series       */
     }
+    return 1;
 }

@@ -2,7 +2,7 @@
  *   8 free fns: Input_StartUp/WingCommandMode/Update/Store/Fetch/Gear/Interface/MainExitKey.
  *   Full SYM-locals applied. Device fn-ptr dispatch via Device_gDeviceList[].devicefunc.
  */
-#include "input_types.h"
+#include "../../nfs4_types.h"
 #include "input_externs.h"
 
 /* ---- input.obj OWNED globals (EXT; SYM names already resolved by Ghidra; Globals.jsonl) ---- */
@@ -15,50 +15,62 @@ Input_tResults  Input_gResults[2];
 Input_tResults  Input_gSim;                   /* 0x8013d22c; .flags @+3 = Ghidra bGp00000ce3 */
 int             Input_gLookBehind[2];
 int             Input_gMode[2];
-extern Input_tResults D_8013D228[];
 
 /* ---- intra-TU forward declarations (auto-emitted, signature-exact) ---- */
-int * Input_StartUp(void);
+extern "C" { int * Input_StartUp(void); }
 int Input_WingCommandMode(int player);
 void Input_Update(void);
 void Input_Store(void);
 void Input_Fetch(int humanIndex);
 char Input_Gear(char currentGear,int numGears);
-int Input_Interface(u_long key,int debounce);
-int Input_MainExitKey(void);
-
+extern "C" { int Input_Interface(u_long key,int debounce); }
+extern "C" { u_int Input_MainExitKey(void); }
 
 /* ---- Input_StartUp__Fv  [INPUT.CPP:55-77] SLD-VERIFIED ---- */
-int * Input_StartUp(void)
+extern "C" int * Input_StartUp(void)
 
 {
   int * h;
   int i;
-
+  int j;
+  int *piVar1;
+  int iVar2;
+  int iVar3;
+  int iVar4;
+  u_long *puVar5;
+  int iVar6;
+  
   Device_StartUp();
-  h = Input_gHandler;
-  i = 0xb7;
+  piVar1 = Input_gHandler;
+  iVar4 = 0xb7;
   do {
-    *h = 0;
-    i = i + -1;
-    h = h + 1;
-  } while (-1 < i);
-  for (i = 0; i < 2; i = i + 1) {
-    int j;
-    Input_gDBFlags[i] = 0;
-    Input_gMode[i] = 0;
-    for (j = 0; j < 0x11; j = j + 1) {
-      Input_gPressTime[i][j] = 0;
-    }
+    *piVar1 = 0;
+    iVar4 = iVar4 + -1;
+    piVar1 = piVar1 + 1;
+  } while (-1 < iVar4);
+  iVar6 = 0;
+  piVar1 = Input_gMode;
+  puVar5 = Input_gDBFlags;
+  for (iVar4 = 0; iVar3 = 0, iVar4 < 2; iVar4 = iVar4 + 1) {
+    *puVar5 = 0;
+    *piVar1 = 0;
+    iVar2 = iVar6;
+    do {
+      *(u_int *)((int)Input_gPressTime[0] + iVar2) = 0;
+      iVar3 = iVar3 + 1;
+      iVar2 = iVar2 + 4;
+    } while (iVar3 < 0x11);
+    iVar6 = iVar6 + 0x44;
+    piVar1 = piVar1 + 1;
+    puVar5 = puVar5 + 1;
   }
-  i = 0x1f;
-  h = (int *)Input_gInterfaceResults;
-  h = h + 0x1f;
+  iVar4 = 0x1f;
+  puVar5 = Input_gInterfaceResults + 0x1f;
   do {
-    *h = 0;
-    i = i + -1;
-    h = h + -1;
-  } while (-1 < i);
+    *puVar5 = 0;
+    iVar4 = iVar4 + -1;
+    puVar5 = puVar5 + -1;
+  } while (-1 < iVar4);
   return Input_gHandler;
 }
 
@@ -67,431 +79,472 @@ int Input_WingCommandMode(int player)
 
 {
   int * h;
-  int mode;
-
-  h = Input_gHandler + 0x2d;
+  int *piVar1;
+  
+  piVar1 = Input_gHandler + 0x2d;
   if (player != 0) {
-    h = h + 0x4c;
+    piVar1 = Input_gHandler + 0x79;
   }
-  if (*h != 0) {
-    mode = player & 1;
-    goto checkMode;
+  if ((((*piVar1 != 0) || (piVar1[1] != 0)) || (piVar1[2] != 0)) && (Input_gMode[player & 1] == 1))
+  {
+    return 1;
   }
-  if (h[1] != 0) {
-    mode = player & 1;
-    goto checkMode;
-  }
-  if (h[2] == 0) {
-    goto falseResult;
-  }
-  mode = player & 1;
-checkMode:
-  if (Input_gMode[mode] == 1) {
-    goto trueResult;
-  }
-falseResult:
   return 0;
-
-trueResult:
-  return 1;
 }
 
-/* ---- Input_Update__Fv  [INPUT.CPP:104-430] SLD-VERIFIED ----
- * MATCH RECEIPT: the retail SLD statement order and IDA register map reduced the
- * authoritative residual from 28 to 16: h/r/i/one/menukeys/activeBase initialization,
- * the inner dbFlags pointer, and the post-flags memory reread are source-shape fixes.
- * The interface loop's table-address hoist needs all five zero-insn pressure blockers
- * below (four leaves 18); the void fence restores interfaceActive/left scheduling.
- * One post-use acc reference keeps acc=$s5 and one=$s6, allowing the same `one` value
- * to feed the second active fill and player-count comparison.  Measured path:
- * 28 -> 24 -> 20 -> 18 -> 16 -> 12 -> 10 -> PASS (868/868).
- * qtytrace's instrumented C++ compilers are not byte-faithful for this function, so
- * their QTY handouts were rejected; detailed verify_asm/vdiff is the authority. */
+/* ---- Input_Update__Fv  [INPUT.CPP:104-430] SLD-VERIFIED ---- */
 void Input_Update(void)
 
 {
-  int *h;
-  Input_tResults *r;
-  u_long acc;
-  u_long menukeys;
-  u_long one;
-  int i;
-  int j;
-  int k;
-  int left;
   int right;
-  char iactive[32];
-  char hactive[17];
-  char *activeBase;
-
+  int active;
+  u_char bVar1;
+  u_long *puVar2;
+  u_long *puVar3;
+  u_char bVar4;
+  char *pcVar5;
+  int iVar6;
+  int iVar7;
+  int *piVar8;
+  int k;
+  u_int uVar9;
+  u_int uVar10;
+  int iVar11;
+  int iVar12;
+  u_int *puVar13;
+  int j;
+  int iVar14;
+  int left;
+  int *h;
+  int *piVar15;
+  u_int *puVar16;
+  int m;
+  u_char *puVar17;
+  u_long acc;
+  int mode;
+  int iVar18;
+  int i;
+  int iVar19;
+  char iactive [32];
+  char hactive [17];
+  char acStack_70 [40];
+  Input_tResults *r;
+  u_long menukeys;
+  char *pcStack_40;
+  u_long *puStack_3c;
+  int iStack_38;
+  int iStack_34;
+  int iStack_30;
+  
   Device_Update();
-
-  {
-    char *activePtr;
-    char activeValue;
-
-    activeValue = 1;
-    i = 31;
-    activePtr = &iactive[31];
-    do {
-      *activePtr = activeValue;
-      i--;
-      activePtr--;
-    } while (i >= 0);
-  }
-
-  h = Input_gHandler;
+  iVar19 = 0x1f;
+  pcVar5 = iactive + 0x1f;
+  do {
+    *pcVar5 = '\x01';
+    iVar19 = iVar19 + -1;
+    pcVar5 = pcVar5 + -1;
+  } while (-1 < iVar19);
+  piVar15 = Input_gHandler;
+  iVar19 = 0;
   r = Input_gResults;
-  i = 0;
-  one = 1;
+  puVar17 = &Input_gResults[0].flags;
   menukeys = 0;
-  activeBase = hactive;
-
-  for (; i < 2; i++) {
-    int mode;
-
-    mode = 0;
-    for (j = 0; j < 2; j++) {
-      if ((*h != 0) &&
-          (((Input_tDeviceCall *)Input_DeviceRows[*h & 0xff].PrimPtr)(*h >> 8) >= 65)) {
-        mode = j + 1;
-      }
-      h++;
+  pcStack_40 = hactive;
+  puStack_3c = Input_gDBFlags;
+  iStack_38 = 0;
+  iStack_34 = 0;
+  do {
+    iVar18 = 0;
+    if (1 < iVar19) {
+      uVar9 = 0;
+      do {
+        if (iactive[uVar9] != '\0') {
+          uVar10 = *piVar15;
+          if (uVar10 != 0) {
+            iVar19 = (*(int (*)(...))Device_gDeviceList[uVar10 & 0xff].devicefunc)((int)uVar10 >> 8);
+            if (0x40 < iVar19) {
+              menukeys = menukeys | 1 << (uVar9 & 0x1f);
+            }
+          }
+        }
+        uVar9 = uVar9 + 1;
+        piVar15 = piVar15 + 1;
+      } while ((int)uVar9 < 0x20);
+      uVar10 = Input_gTime + 2;
+      uVar9 = Input_gTime + 3;
+      Input_gTime = uVar10;
+      Input_gInterfaceResults[uVar10 & 0x1f] = menukeys;
+      Input_gInterfaceResults[uVar9 & 0x1f] = menukeys;
+      return;
     }
-    Input_gMode[i] = mode;
-
-    if (mode == 0) {
-      left = ((Input_tDeviceCall *)Input_DeviceRows[*h & 0xff].PrimPtr)(*h >> 8);
-      h++;
-      right = ((Input_tDeviceCall *)Input_DeviceRows[*h & 0xff].PrimPtr)(*h >> 8);
-      h++;
-      r->steering = (char)((right - left) / 2);
-      r->gas = ((Input_tDeviceCall *)Input_DeviceRows[*h & 0xff].PrimPtr)(*h >> 8);
-      h++;
-      r->brake = ((Input_tDeviceCall *)Input_DeviceRows[*h & 0xff].PrimPtr)(*h >> 8);
-      h++;
-
-      for (j = 0; j < 2; j++) {
-        if ((*h != 0) &&
-            (((Input_tDeviceCall *)Input_DeviceRows[*h & 0xff].PrimPtr)(*h >> 8) >= 65)) {
-          r->flags |= (one << j);
-        } else {
-          r->flags &= ~(one << j);
-        }
-        h++;
+    iVar14 = 0;
+    do {
+      puVar16 = (u_int *)piVar15;
+      uVar9 = *puVar16;
+      if ((uVar9 != 0) &&
+         (iVar6 = (*(int (*)(...))Device_gDeviceList[uVar9 & 0xff].devicefunc)((int)uVar9 >> 8),
+         0x40 < iVar6)) {
+        iVar18 = iVar14 + 1;
       }
-
-      acc = 0;
-      r->flags &= 7;
-      {
-        char *activePtr;
-
-        k = 16;
-        activePtr = activeBase + k;
-        for (; k >= 0; k--) {
-          *activePtr = one;
-          activePtr--;
+      iVar14 = iVar14 + 1;
+      piVar15 = (int *)(puVar16 + 1);
+    } while (iVar14 < 2);
+    *(int *)((int)Input_gMode + iStack_38) = iVar18;
+    if (iVar18 == 0) {
+      uVar9 = 0;
+      iVar18 = (*(int (*)(...))Device_gDeviceList[*piVar15 & 0xff].devicefunc)(*piVar15 >> 8);
+      iVar14 = (*(int (*)(...))Device_gDeviceList[puVar16[2] & 0xff].devicefunc)((int)puVar16[2] >> 8);
+      r->steering = (char)((iVar14 - iVar18) / 2);
+      bVar4 = (*(int (*)(...))Device_gDeviceList[puVar16[3] & 0xff].devicefunc)((int)puVar16[3] >> 8);
+      puVar17[-2] = bVar4;
+      piVar15 = (int *)(puVar16 + 5);
+      bVar4 = (*(int (*)(...))Device_gDeviceList[puVar16[4] & 0xff].devicefunc)((int)puVar16[4] >> 8);
+      puVar17[-1] = bVar4;
+      do {
+        uVar10 = *piVar15;
+        if ((uVar10 == 0) ||
+           (iVar18 = (*(int (*)(...))Device_gDeviceList[uVar10 & 0xff].devicefunc)((int)uVar10 >> 8),
+           iVar18 < 0x41)) {
+          *puVar17 = *puVar17 & ~(u_char)(1 << (uVar9 & 0x1f));
         }
-      }
-
-      j = 0;
-      /* MATCH (w55-a12, 36 -> 28): retail's first held-key scan is UN-rotated
-       * (`slti;beqz;nop` at the loop head, `addiu s1,s1,4; j T` back-edge).
-       * `for (;;) { if (j >= 17) break; ... }` lets gcc-2.8 prove j==0 on
-       * entry, peel the head test and rotate; the `while (1) { if (!(j < 17))
-       * break; ... }` spelling keeps the top test + unconditional back-edge.
-       * (The SECOND, near-identical scan below is NOT affected -- probed, no
-       * gate delta -- so leave its `for (;;)` alone.) */
-      while (1) {
-        if (!(j < 17)) {
-          break;
+        else {
+          *puVar17 = *puVar17 | (u_char)(1 << (uVar9 & 0x1f));
         }
-      {
-        if (*h != 0) {
-          if (((Input_tDeviceCall *)Input_DeviceRows[*h & 0xff].PrimPtr)(*h >> 8) >= 65) {
-            Input_gPressTime[i][j]++;
-            if (Input_gPressTime[i][j] >= 6) {
-              if ((Input_gDBFlags[i] & (one << j)) == 0) {
-                acc = j + 1;
-                Input_gDBFlags[i] |= (one << j);
+        iVar18 = iStack_34;
+        puVar2 = puStack_3c;
+        uVar9 = uVar9 + 1;
+        piVar15 = piVar15 + 1;
+      } while ((int)uVar9 < 2);
+      iVar6 = 0;
+      iVar14 = 0x10;
+      pcVar5 = pcStack_40 + 0x10;
+      *puVar17 = *puVar17 & 7;
+      do {
+        *pcVar5 = '\x01';
+        iVar14 = iVar14 + -1;
+        pcVar5 = pcVar5 + -1;
+      } while (-1 < iVar14);
+      iVar14 = iStack_34;
+      for (uVar9 = 0; puVar3 = puStack_3c, (int)uVar9 < 0x11; uVar9 = uVar9 + 1) {
+        uVar10 = *piVar15;
+        if (uVar10 != 0) {
+          iVar7 = (*(int (*)(...))Device_gDeviceList[uVar10 & 0xff].devicefunc)((int)uVar10 >> 8);
+          if (iVar7 < 0x41) {
+            *puVar2 = *puVar2 & ~(1 << (uVar9 & 0x1f));
+            *(u_int *)((int)Input_gPressTime[0] + iVar14) = 0;
+          }
+          else {
+            piVar8 = (int *)((int)Input_gPressTime[0] + iVar14);
+            iVar7 = *piVar8 + 1;
+            *piVar8 = iVar7;
+            if ((5 < iVar7) && (uVar10 = 1 << (uVar9 & 0x1f), (*puVar2 & uVar10) == 0)) {
+              iVar6 = uVar9 + 1;
+              *puVar2 = *puVar2 | uVar10;
+            }
+            iVar11 = 0;
+            iVar7 = iVar18;
+            do {
+              if (piVar15[iVar11 - (uVar9 - 0x11)] == *piVar15) {
+                pcStack_40[iVar11] = '\0';
+                *(u_int *)((int)Input_gPressTime[0] + iVar7) =
+                     *(u_int *)((int)Input_gPressTime[0] + iVar14);
               }
-            }
-            for (k = 0; k < 17; k++) {
-              if (h[k - (j - 17)] == *h) {
-                activeBase[k] = 0;
-                Input_gPressTime[i][k] = Input_gPressTime[i][j];
+              iVar11 = iVar11 + 1;
+              iVar7 = iVar7 + 4;
+            } while (iVar11 < 0x11);
+          }
+        }
+        piVar15 = piVar15 + 1;
+        iVar14 = iVar14 + 4;
+      }
+      uVar9 = 0;
+      do {
+        uVar10 = *piVar15;
+        if (uVar10 != 0) {
+          iVar18 = (*(int (*)(...))Device_gDeviceList[uVar10 & 0xff].devicefunc)((int)uVar10 >> 8);
+          if (iVar18 < 0x41) {
+            piVar8 = (int *)((int)Input_gPressTime[0] + uVar9 * 4 + iStack_34);
+            uVar10 = 1 << (uVar9 & 0x1f);
+            if (*piVar8 - 1U < 5) {
+              if ((*puVar3 & uVar10) == 0) {
+                iVar6 = uVar9 + 1;
+                *puVar3 = *puVar3 | uVar10;
               }
+              *piVar8 = 0;
             }
-          } else {
-            Input_gDBFlags[i] &= ~(one << j);
-            Input_gPressTime[i][j] = 0;
+            else {
+              *puVar3 = *puVar3 & ~(1 << (uVar9 & 0x1f));
+            }
+          }
+          else {
+            uVar10 = 1 << (uVar9 & 0x1f);
+            if ((pcStack_40[uVar9] != '\0') && ((*puVar3 & uVar10) == 0)) {
+              iVar6 = uVar9 + 1;
+              *puVar3 = *puVar3 | uVar10;
+            }
           }
         }
-        h++;
-        j++;
-      }
-      }
-
-      for (j = 0; j < 17; j++) {
-        if (*h != 0) {
-          if (((Input_tDeviceCall *)Input_DeviceRows[*h & 0xff].PrimPtr)(*h >> 8) >= 65) {
-            if ((activeBase[j] != 0) && ((Input_gDBFlags[i] & (one << j)) == 0)) {
-              acc = j + 1;
-              Input_gDBFlags[i] |= (one << j);
+        puVar2 = puStack_3c;
+        uVar9 = uVar9 + 1;
+        piVar15 = piVar15 + 1;
+      } while ((int)uVar9 < 0x11);
+      iVar18 = 0;
+      uVar9 = 0;
+      while( true ) {
+        do {
+          uVar10 = *piVar15;
+          if (uVar10 != 0) {
+            iVar14 = (*(int (*)(...))Device_gDeviceList[uVar10 & 0xff].devicefunc)((int)uVar10 >> 8);
+            uVar10 = 1 << (uVar9 & 0x1f);
+            if (iVar14 < 0x41) {
+              uVar10 = *puVar2 & ~uVar10;
             }
-          } else {
-            if ((u_int)(Input_gPressTime[i][j] - 1) < 5) {
-              if ((Input_gDBFlags[i] & (one << j)) == 0) {
-                acc = j + 1;
-                Input_gDBFlags[i] |= (one << j);
+            else {
+              uVar10 = *puVar2 | uVar10;
+            }
+            *puVar2 = uVar10;
+          }
+          uVar9 = uVar9 + 1;
+          piVar15 = piVar15 + 1;
+        } while ((int)uVar9 < 0x11);
+        iVar18 = iVar18 + 1;
+        if (1 < iVar18) break;
+        uVar9 = 0;
+      }
+    }
+    else {
+      iVar14 = 0x27;
+      pcVar5 = acStack_70 + 0x27;
+      do {
+        *pcVar5 = '\x01';
+        iVar14 = iVar14 + -1;
+        pcVar5 = pcVar5 + -1;
+      } while (-1 < iVar14);
+      iVar14 = 0;
+      puVar13 = (u_int *)piVar15;
+      do {
+        iVar7 = 0;
+        iVar6 = iVar18 * 0x11;
+        do {
+          if (*puVar13 == piVar15[iVar6 + 0x17]) {
+            acStack_70[iVar14] = '\0';
+          }
+          iVar7 = iVar7 + 1;
+          iVar6 = iVar18 * 0x11 + iVar7;
+        } while (iVar7 < 0x11);
+        iVar14 = iVar14 + 1;
+        puVar13 = puVar13 + 1;
+      } while (iVar14 < 0x28);
+      iVar6 = 0;
+      iVar14 = 0x260;
+      do {
+        iVar11 = 0;
+        iVar7 = iVar18 * 0x11;
+        do {
+          if (*(u_int *)((int)Input_gHandler + iVar14) == piVar15[iVar7 + 0x17]) {
+            iactive[iVar6] = '\0';
+          }
+          iVar11 = iVar11 + 1;
+          iVar7 = iVar18 * 0x11 + iVar11;
+        } while (iVar11 < 0x11);
+        iVar6 = iVar6 + 1;
+        iVar14 = iVar14 + 4;
+      } while (iVar6 < 0x20);
+      iVar14 = (*(int (*)(...))Device_gDeviceList[*piVar15 & 0xff].devicefunc)(*piVar15 >> 8);
+      iVar6 = (*(int (*)(...))Device_gDeviceList[puVar16[2] & 0xff].devicefunc)((int)puVar16[2] >> 8);
+      if ((acStack_70[0] != '\0') && (acStack_70[1] != '\0')) {
+        r->steering = (char)((iVar6 - iVar14) / 2);
+      }
+      if (acStack_70[2] != '\0') {
+        bVar4 = (*(int (*)(...))Device_gDeviceList[puVar16[3] & 0xff].devicefunc)((int)puVar16[3] >> 8);
+        puVar17[-2] = bVar4;
+      }
+      if (acStack_70[3] != '\0') {
+        bVar4 = (*(int (*)(...))Device_gDeviceList[puVar16[4] & 0xff].devicefunc)((int)puVar16[4] >> 8);
+        puVar17[-1] = bVar4;
+      }
+      puVar16 = puVar16 + 5;
+      uVar9 = 0;
+      do {
+        if (acStack_70[uVar9 + 4] != '\0') {
+          uVar10 = *puVar16;
+          if ((uVar10 == 0) ||
+             (iVar14 = (*(int (*)(...))Device_gDeviceList[uVar10 & 0xff].devicefunc)((int)uVar10 >> 8),
+             iVar14 < 0x41)) {
+            *puVar17 = *puVar17 & ~(u_char)(1 << (uVar9 & 0x1f));
+          }
+          else {
+            *puVar17 = *puVar17 | (u_char)(1 << (uVar9 & 0x1f));
+          }
+        }
+        puVar2 = puStack_3c;
+        uVar9 = uVar9 + 1;
+        puVar16 = puVar16 + 1;
+      } while ((int)uVar9 < 2);
+      iVar6 = 0;
+      iVar14 = 0x10;
+      pcVar5 = pcStack_40 + 0x10;
+      *puVar17 = *puVar17 & 7;
+      do {
+        *pcVar5 = '\x01';
+        iVar14 = iVar14 + -1;
+        pcVar5 = pcVar5 + -1;
+      } while (-1 < iVar14);
+      iVar14 = iStack_34;
+      iVar7 = iStack_34;
+      for (uVar9 = 0; puVar3 = puStack_3c, (int)uVar9 < 0x11; uVar9 = uVar9 + 1) {
+        uVar10 = *puVar16;
+        if (uVar10 != 0) {
+          if ((acStack_70[uVar9 + 6] == '\0') ||
+             (iStack_30 = iVar14,
+             iVar11 = (*(int (*)(...))Device_gDeviceList[uVar10 & 0xff].devicefunc)((int)uVar10 >> 8),
+             iVar14 = iStack_30, iVar11 < 0x41)) {
+            *puVar2 = *puVar2 & ~(1 << (uVar9 & 0x1f));
+            *(u_int *)((int)Input_gPressTime[0] + iVar7) = 0;
+          }
+          else {
+            piVar15 = (int *)((int)Input_gPressTime[0] + iVar7);
+            iVar11 = *piVar15 + 1;
+            *piVar15 = iVar11;
+            if ((5 < iVar11) && (uVar10 = 1 << (uVar9 & 0x1f), (*puVar2 & uVar10) == 0)) {
+              iVar6 = uVar9 + 1;
+              *puVar2 = *puVar2 | uVar10;
+            }
+            iVar12 = 0;
+            iVar11 = iStack_30;
+            do {
+              if (puVar16[iVar12 - (uVar9 - 0x11)] == *puVar16) {
+                pcStack_40[iVar12] = '\0';
+                *(u_int *)((int)Input_gPressTime[0] + iVar11) =
+                     *(u_int *)((int)Input_gPressTime[0] + iVar7);
               }
-              Input_gPressTime[i][j] = 0;
-            } else {
-              Input_gDBFlags[i] &= ~(one << j);
-            }
+              iVar12 = iVar12 + 1;
+              iVar11 = iVar11 + 4;
+            } while (iVar12 < 0x11);
           }
         }
-        h++;
+        puVar16 = puVar16 + 1;
+        iVar7 = iVar7 + 4;
       }
-
-      {
-        int m;
-        int k;
-        u_long *dbFlags;
-
-        for (m = 0; m < 2; m++) {
-          dbFlags = &Input_gDBFlags[i];
-          for (k = 0; k < 17; k++) {
-            if (*h != 0) {
-              if (((Input_tDeviceCall *)Input_DeviceRows[*h & 0xff].PrimPtr)(*h >> 8) >= 65) {
-                *dbFlags |= (one << k);
-              } else {
-                *dbFlags &= ~(one << k);
+      uVar9 = 0;
+      do {
+        uVar10 = *puVar16;
+        if (uVar10 != 0) {
+          if (acStack_70[uVar9 + 0x17] != '\0') {
+            iVar14 = (*(int (*)(...))Device_gDeviceList[uVar10 & 0xff].devicefunc)((int)uVar10 >> 8);
+            uVar10 = 1 << (uVar9 & 0x1f);
+            if (0x40 < iVar14) {
+              if (((*puVar3 & uVar10) == 0) && (pcStack_40[uVar9] != '\0')) {
+                iVar6 = uVar9 + 1;
+                *puVar3 = *puVar3 | uVar10;
               }
+              goto InputUpd_bitLoopNext;
             }
-            h++;
-          }
-        }
-      }
-    } else {
-      char active[40];
-
-      {
-        char *activePtr;
-
-        j = 39;
-        activePtr = active + j;
-        for (; j >= 0; j--) {
-          *activePtr = one;
-          activePtr--;
-        }
-      }
-
-      for (j = 0; j < 40; j++) {
-        for (k = 0; k < 17; k++) {
-          if (h[j] == h[mode * 17 + k + 23]) {
-            active[j] = 0;
-          }
-        }
-      }
-
-      for (j = 0; j < 32; j++) {
-        for (k = 0; k < 17; k++) {
-          if (Input_gHandler[j + 152] == h[mode * 17 + k + 23]) {
-            iactive[j] = 0;
-          }
-        }
-      }
-
-      left = ((Input_tDeviceCall *)Input_DeviceRows[*h & 0xff].PrimPtr)(*h >> 8);
-      h++;
-      right = ((Input_tDeviceCall *)Input_DeviceRows[*h & 0xff].PrimPtr)(*h >> 8);
-      h++;
-      if ((active[0] != 0) && (active[1] != 0)) {
-        r->steering = (char)((right - left) / 2);
-      }
-      if (active[2] != 0) {
-        r->gas = ((Input_tDeviceCall *)Input_DeviceRows[*h & 0xff].PrimPtr)(*h >> 8);
-      }
-      h++;
-      if (active[3] != 0) {
-        r->brake = ((Input_tDeviceCall *)Input_DeviceRows[*h & 0xff].PrimPtr)(*h >> 8);
-      }
-      h++;
-
-      for (j = 0; j < 2; j++) {
-        if (active[j + 4] != 0) {
-          if ((*h != 0) &&
-              (((Input_tDeviceCall *)Input_DeviceRows[*h & 0xff].PrimPtr)(*h >> 8) >= 65)) {
-            r->flags |= (one << j);
-          } else {
-            r->flags &= ~(one << j);
-          }
-        }
-        h++;
-      }
-
-      {
-        acc = 0;
-        r->flags &= 7;
-        {
-          char *activePtr;
-
-          k = 16;
-          activePtr = activeBase + k;
-          for (; k >= 0; k--) {
-            *activePtr = one;
-            activePtr--;
-          }
-        }
-
-        j = 0;
-        for (;;) {
-          if (j >= 17) {
-            goto secondHeldDone;
-          }
-          if (*h != 0) {
-            if ((active[j + 6] != 0) &&
-                (((Input_tDeviceCall *)Input_DeviceRows[*h & 0xff].PrimPtr)(*h >> 8) >= 65)) {
-              Input_gPressTime[i][j]++;
-              if (Input_gPressTime[i][j] >= 6) {
-                if ((Input_gDBFlags[i] & (one << j)) == 0) {
-                  acc = j + 1;
-                  Input_gDBFlags[i] |= (one << j);
+            if (acStack_70[uVar9 + 0x17] != '\0') {
+              piVar15 = (int *)((int)Input_gPressTime[0] + uVar9 * 4 + iStack_34);
+              iVar14 = *piVar15;
+              if ((0 < iVar14) && (uVar10 = 1 << (uVar9 & 0x1f), iVar14 < 6)) {
+                if ((*puVar3 & uVar10) == 0) {
+                  iVar6 = uVar9 + 1;
+                  *puVar3 = *puVar3 | uVar10;
                 }
+                *piVar15 = 0;
+                goto InputUpd_bitLoopNext;
               }
-              for (k = 0; k < 17; k++) {
-                if (h[k - (j - 17)] == *h) {
-                  activeBase[k] = 0;
-                  Input_gPressTime[i][k] = Input_gPressTime[i][j];
-                }
-              }
-            } else {
-              Input_gDBFlags[i] &= ~(one << j);
-              Input_gPressTime[i][j] = 0;
             }
           }
-          h++;
-          j++;
+          *puVar3 = *puVar3 & ~(1 << (uVar9 & 0x1f));
         }
-secondHeldDone:
-
-        for (j = 0; j < 17; j++) {
-          if (*h != 0) {
-            if ((active[j + 23] != 0) &&
-                (((Input_tDeviceCall *)Input_DeviceRows[*h & 0xff].PrimPtr)(*h >> 8) >= 65)) {
-              if (((Input_gDBFlags[i] & (one << j)) == 0) && (activeBase[j] != 0)) {
-                acc = j + 1;
-                Input_gDBFlags[i] |= (one << j);
-              }
-            } else if ((active[j + 23] != 0) &&
-                       (Input_gPressTime[i][j] > 0) &&
-                       (Input_gPressTime[i][j] < 6)) {
-              if ((Input_gDBFlags[i] & (one << j)) == 0) {
-                acc = j + 1;
-                Input_gDBFlags[i] |= (one << j);
-              }
-              Input_gPressTime[i][j] = 0;
-            } else {
-              Input_gDBFlags[i] &= ~(one << j);
+InputUpd_bitLoopNext:
+        puVar2 = puStack_3c;
+        uVar9 = uVar9 + 1;
+        puVar16 = puVar16 + 1;
+      } while ((int)uVar9 < 0x11);
+      puVar16 = puVar16 + (iVar18 + -1) * 0x11;
+      uVar9 = 0;
+      do {
+        uVar10 = *puVar16;
+        if (uVar10 != 0) {
+          iVar14 = (*(int (*)(...))Device_gDeviceList[uVar10 & 0xff].devicefunc)((int)uVar10 >> 8);
+          if (iVar14 < 0x41) {
+            *puVar2 = *puVar2 & ~(1 << (uVar9 & 0x1f));
+          }
+          else {
+            uVar10 = 1 << (uVar9 & 0x1f);
+            if ((*puVar2 & uVar10) == 0) {
+              iVar6 = uVar9 + 1;
+              *puVar2 = *puVar2 | uVar10;
             }
           }
-          h++;
         }
+        uVar9 = uVar9 + 1;
+        puVar16 = puVar16 + 1;
+      } while ((int)uVar9 < 0x11);
+      piVar15 = (int *)(puVar16 + (2 - iVar18) * 0x11);
+    }
+    *puVar17 = *puVar17 | (u_char)(iVar6 << 3);
+    bVar4 = *puVar17;
+    bVar1 = bVar4 >> 3;
+    if (bVar1 == 0x10) {
+      *puVar17 = bVar4 & 7;
+      uVar9 = iVar19 + 0x1a;
+InputUpd_menukeysShift:
+      uVar9 = 1 << (uVar9 & 0x1f);
+InputUpd_menukeysOr:
+      menukeys = menukeys | uVar9;
+    }
+    else if (bVar1 < 0x11) {
+      if (bVar1 == 0xf) {
+        *puVar17 = bVar4 & 7;
+        uVar9 = 0x200000;
+        goto InputUpd_menukeysOr;
       }
-
-      h += (mode - 1) * 17;
-      for (j = 0; j < 17; j++) {
-        if (*h != 0) {
-          if (((Input_tDeviceCall *)Input_DeviceRows[*h & 0xff].PrimPtr)(*h >> 8) >= 65) {
-            if ((Input_gDBFlags[i] & (one << j)) == 0) {
-              acc = j + 1;
-              Input_gDBFlags[i] |= (one << j);
-            }
-          } else {
-            Input_gDBFlags[i] &= ~(one << j);
-          }
-        }
-        h++;
-      }
-      h += (2 - mode) * 17;
     }
-
-    r->flags |= (acc << 3);
-    __asm__("" : : "r"(acc));                 /* zero instructions: acc=$s5 */
-    __asm__("" : "+m"(r->flags));             /* force retail byte reload */
-    right = (u_char)r->flags;
-    switch (((u_char)right) >> 3) {
-      case 15:
-        r->flags &= 7;
-        menukeys |= 0x200000;
-        break;
-      case 16:
-        r->flags &= 7;
-        menukeys |= (one << (i + 26));
-        break;
-      case 17:
-        r->flags &= 7;
-        menukeys |= (one << (i + 28));
-        break;
+    else if (bVar1 == 0x11) {
+      *puVar17 = bVar4 & 7;
+      uVar9 = iVar19 + 0x1c;
+      goto InputUpd_menukeysShift;
     }
-
-    r++;
-    if (Input_numPlayerRaceCars == one) {
-      h += 76;
-      i++;
+    puVar17 = puVar17 + 4;
+    r = r + 1;
+    if (GameSetup_gData.numPlayerRaceCars == 1) {
+      puStack_3c = puStack_3c + 1;
+      piVar15 = piVar15 + 0x4c;
+      iStack_38 = iStack_38 + 4;
+      iVar19 = iVar19 + 1;
+      iStack_34 = iStack_34 + 0x44;
     }
-  }
-
-  {
-    char *interfaceActive;
-    int addressBlocker;
-    int addressBlocker2;
-    int addressBlocker3;
-    int addressBlocker4;
-    int addressBlocker5;
-
-    i = 0;
-    interfaceActive = iactive;
-    __asm__("" : : "i"(0));                  /* zero-insn scheduling fence */
-    left = 1;
-    __asm__("" : "=r"(addressBlocker));
-    __asm__("" : "=r"(addressBlocker2));
-    __asm__("" : "=r"(addressBlocker3));
-    __asm__("" : "=r"(addressBlocker4));
-    __asm__("" : "=r"(addressBlocker5));
-    for (; i < 32; i++) {
-      if ((interfaceActive[i] != 0) && (*h != 0) &&
-          (((Input_tDeviceCall *)Input_DeviceRows[*h & 0xff].PrimPtr)(*h >> 8) >= 65)) {
-        menukeys |= (left << i);
-      }
-      h++;
-    }
-    __asm__("" : : "r"(addressBlocker));
-    __asm__("" : : "r"(addressBlocker2));
-    __asm__("" : : "r"(addressBlocker3));
-    __asm__("" : : "r"(addressBlocker4));
-    __asm__("" : : "r"(addressBlocker5));
-  }
-
-  Input_gTime += 2;
-  Input_gInterfaceResults[Input_gTime & 0x1f] = menukeys;
-  Input_gInterfaceResults[(Input_gTime + 1) & 0x1f] = menukeys;
+    puStack_3c = puStack_3c + 1;
+    iStack_38 = iStack_38 + 4;
+    iVar19 = iVar19 + 1;
+    iStack_34 = iStack_34 + 0x44;
+  } while( true );
 }
 
 /* ---- Input_Store__Fv  [INPUT.CPP:436-450] SLD-VERIFIED ---- */
 void Input_Store(void)
 
 {
+  int iVar1;
+  Input_tResults *val;
+  
   if (gSimQueue_BlockSelf == 0) {
-    if (1 < Input_numPlayerRaceCars) {
-      if (SimQueue_Put(0,Input_gResults)) {
-        SimQueue_Put(1,&Input_gResults[1]);
+    if (GameSetup_gData.numPlayerRaceCars < 2) {
+      if (GameSetup_gData.commMode != 0) {
+        return;
       }
+      val = Input_gResults;
+      iVar1 = GameSetup_gData.localCar;
     }
-    else if (Input_commMode == 0) {
-      SimQueue_Put(Input_localCar,Input_gResults);
+    else {
+      iVar1 = SimQueue_Put(0,Input_gResults);
+      if (iVar1 == 0) {
+        return;
+      }
+      val = Input_gResults + 1;
+      iVar1 = 1;
     }
+    SimQueue_Put(iVar1,val);
   }
   return;
 }
@@ -512,43 +565,45 @@ char Input_Gear(char currentGear,int numGears)
     if ((int)(u_int)currentGear < numGears + -1) {
       currentGear = currentGear + 1;
     }
-    return currentGear;
   }
-  if (Input_gSim.flags >> 3 == 2) {
+  else {
+    if (Input_gSim.flags >> 3 != 2) {
+      return currentGear;
+    }
     if (currentGear != 0) {
       currentGear = currentGear - 1;
     }
-    return currentGear;
   }
   return currentGear;
 }
 
 /* ---- Input_Interface__FUli  [INPUT.CPP:488-499] SLD-VERIFIED ---- */
-int Input_Interface(u_long key,int debounce)
+extern "C" int Input_Interface(u_long key,int debounce)
 
 {
+  int iVar1;
+  
   if (debounce == 0) {
-    goto no_debounce;
+    iVar1 = 1;
+    if ((Input_gInterfaceResults[simGlobal.time32Hz & 0x1f] & 1 << (key & 0x1f)) == 0) {
+      iVar1 = 0;
+    }
   }
-  if ((Input_gInterfaceResults[Input_time32Hz & 0x1f] & 1 << key &
-       ~Input_gInterfaceResults[Input_time32Hz - 1U & 0x1f]) == 0) {
-    goto return_zero;
+  else {
+    iVar1 = 0;
+    if ((Input_gInterfaceResults[simGlobal.time32Hz & 0x1f] & 1 << (key & 0x1f) &
+        ~Input_gInterfaceResults[simGlobal.time32Hz - 1U & 0x1f]) != 0) {
+      return 1;
+    }
   }
-  return 1;
-
-no_debounce:
-  if ((Input_gInterfaceResults[Input_time32Hz & 0x1f] & 1 << key) != 0) {
-    return 1;
-  }
-return_zero:
-  return 0;
+  return iVar1;
 }
 
 /* ---- Input_MainExitKey__Fv  [INPUT.CPP:543-544] SLD-VERIFIED ---- */
-int Input_MainExitKey(void)
+extern "C" u_int Input_MainExitKey(void)
 
 {
-  return Input_gInterfaceResults[Input_time32Hz & 0x1f] & 1;
+  return Input_gInterfaceResults[simGlobal.time32Hz & 0x1f] & 1;
 }
 
 /* end of input.cpp */

@@ -1,17 +1,16 @@
 /* frontend/screens/screentrackinfo_externs.h - reconstructed externs. NOT original. */
 #ifndef _FE_SCREENS_SCREENTRACKINFO_EXTERNS_H_
 #define _FE_SCREENS_SCREENTRACKINFO_EXTERNS_H_
-#include "screentrackinfo_types.h"
+#include "../../nfs4_types.h"
+#include "../../lib/libfns.h"
 
-extern "C" int sprintf(char *, const char *, ...);
-
-extern tfrontEnd   frontEnd;
-extern int  ticks;
+extern "C" extern tfrontEnd   frontEnd;
+extern "C" int  ticks;
 extern tTournamentManager tournamentManager;
 extern tTrackManager      trackManager;
 extern short SelectListTrackDirection[], SelectListOffOn[];
 extern int  kRGBVals[28];
-extern char textDefinitions[14][6];
+extern "C" char textDefinitions[14][6];
 
 /* --- storage owned by ScreenTrackInfo.obj (SYM STAT/EXT in this obj's block) --- */
 /* SYM STAT ARY SHORT[10] @0x800520b8 - videowall tile display order */
@@ -23,24 +22,22 @@ tScreenTrackInfo *screenTrackInfo;
 
 /* tVideoWall methods (SYM mangled forms confirmed; called on this->fVideoWall).
  * Initialize sig per Initialize__10tVideoWallP9tTVConfigP18tTexture_ShapeInfossPss */
-void Draw(tVideoWall *thisobj) asm("Draw__10tVideoWall");                                 /* Draw__10tVideoWall            */
-void UpdateTransition(tVideoWall *thisobj) asm("UpdateTransition__10tVideoWall");                     /* UpdateTransition__10tVideoWall */
-void TurnOn(tVideoWall *thisobj) asm("TurnOn__10tVideoWall");                               /* TurnOn__10tVideoWall          */
-void TurnOffInstant(tVideoWall *thisobj) asm("TurnOffInstant__10tVideoWall");                       /* TurnOffInstant__10tVideoWall  */
-void UpdateImages(tVideoWall *thisobj) asm("UpdateImages__10tVideoWall");                         /* UpdateImages__10tVideoWall    */
+void Draw(tVideoWall *thisobj);                                 /* Draw__10tVideoWall            */
+void UpdateTransition(tVideoWall *thisobj);                     /* UpdateTransition__10tVideoWall */
+void TurnOn(tVideoWall *thisobj);                               /* TurnOn__10tVideoWall          */
+void TurnOffInstant(tVideoWall *thisobj);                       /* TurnOffInstant__10tVideoWall  */
+void UpdateImages(tVideoWall *thisobj);                         /* UpdateImages__10tVideoWall    */
 void Initialize(tVideoWall *thisobj, tTVConfig *cfgs, tTexture_ShapeInfo *shapes,
-                short a, short b, short *order, short c) asm("Initialize__10tVideoWallP9tTVConfigP18tTexture_ShapeInfossPss");
+                short a, short b, short *order, short c);
 
 /* called game/FE/audio/PsyQ functions (Ghidra-dumped signatures) */
-void FETextRender_MenuTextPositionedJustify(short, short, short, short, int, int)
-    asm("FETextRender_MenuTextPositionedJustify__Fssss14tMenuTextState13tMenuTextType");
-void FETextRender_MenuTextPositioned(short, short, short, int, int)
-    asm("FETextRender_MenuTextPositioned__Fsss14tMenuTextState13tMenuTextType");
-short * GetTrackList(tTournamentManager * thisobj, short tier, short tournament) asm("GetTrackList__18tTournamentManagerss");
-void GetTrackToRace(tTournamentManager * thisobj, tTrackInfo * track) asm("GetTrackToRace__18tTournamentManagerR10tTrackInfo");
-void DrawBackgroundImage(tScreen * thisobj, int startShape, int numShapes, tTexture_ShapeInfo * shapes, int flip_axis) asm("DrawBackgroundImage__7tScreeniiP18tTexture_ShapeInfoi");
+void FETextRender_MenuTextPositionedJustify(short index, short x, short y, short justify, tMenuTextState state, tMenuTextType type);
+extern "C" { void FETextRender_MenuTextPositioned(short index, short x, short y, tMenuTextState textState, tMenuTextType textType); }
+short * GetTrackList(tTournamentManager * thisobj, short tier, short tournament);
+extern "C" { void GetTrackToRace(tTournamentManager * thisobj, tTrackInfo * track); }
+void DrawBackgroundImage(tScreen * thisobj, int startShape, int numShapes, tTexture_ShapeInfo * shapes, int flip_axis);
 void PSXDrawTransSquare(int col, int x, int y, int w, int h, short opacity);
-tTrackInformation * GetTrackByID(tTrackManager * thisobj, short track) asm("GetTrackByID__13tTrackManagers");
+extern "C" { tTrackInformation * GetTrackByID(tTrackManager * thisobj, short track); }
 void FeDraw_SetABRMode(int abr);                                /* FeDraw_SetABRMode__Fi */
 
 #endif

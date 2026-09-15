@@ -8,13 +8,13 @@
  *   iSPCH_BindData's v0 is passed straight back, so the return is int.
  */
 
-extern int iSPCH_BindData(unsigned short *dat);   /* spchrand */
+extern "C" int iSPCH_BindData(unsigned short *dat);   /* spchrand */
 
-extern int SPCH_ResolveData(unsigned short *dat); /* @0x800EBBD4 */
+extern "C" int SPCH_ResolveData(unsigned short *dat); /* @0x800EBBD4 */
 
 /* SPCH_ResolveData @0x800EBBD4 : bind `dat` into the speech event-data table; returns iSPCH_BindData's result
  *   (1 if accepted into a free gEventDats slot, 0 if rejected/full). */
-extern int SPCH_ResolveData(unsigned short *dat)
+extern "C" int SPCH_ResolveData(unsigned short *dat)
 {
     return iSPCH_BindData(dat);
 }

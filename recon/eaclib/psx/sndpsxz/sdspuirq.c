@@ -4,25 +4,22 @@
  *   Ghidra nfs4-f.exe.c (sdspuirq).
  */
 
-extern unsigned char sndpd[];   /* EA sound-driver state base @0x80147918 */
-#define SNDPD_CTRLREG (*(int *)(sndpd + 0x514))
+extern "C" int &DAT_80147e2c;        /* SPU control register base (address) */
 
-extern int iSNDpsxenablespuirq(void);    /* @0x8010BF80 */
+extern "C" int iSNDpsxenablespuirq(void);    /* @0x8010BF80 */
 
-/* iSNDpsxenablespuirq @0x8010BF80 : set the SPU IRQ-enable bit in SPUCNT.  Returns the new SPUCNT value
- *   (the RMW result lands in $v0 and the store fills nothing -> v0 survives as the return; oracle keeps the
- *   base ptr in $v1 and the value in $v0). */
-extern int iSNDpsxenablespuirq(void)
+/* iSNDpsxenablespuirq @0x8010BF80 : set the SPU IRQ-enable bit in SPUCNT. */
+extern "C" int iSNDpsxenablespuirq(void)
 {
-    unsigned short v = *(unsigned short *)(SNDPD_CTRLREG + 0x1aa) | 0x40;
-    *(volatile unsigned short *)(SNDPD_CTRLREG + 0x1aa) = v;
-    return v;
+    *(unsigned short *)(DAT_80147e2c + 0x1aa) =
+        *(unsigned short *)(DAT_80147e2c + 0x1aa) | 0x40;
+    return DAT_80147e2c;
 }
 
 /* iSNDpsxdisablespuirq @0x8010BFA4 : clear the SPU IRQ-enable bit in SPUCNT. */
-extern int iSNDpsxdisablespuirq(void)
+extern "C" int iSNDpsxdisablespuirq(void)
 {
-    unsigned short v = *(unsigned short *)(SNDPD_CTRLREG + 0x1aa) & 0xffbf;
-    *(volatile unsigned short *)(SNDPD_CTRLREG + 0x1aa) = v;
-    return v;
+    *(unsigned short *)(DAT_80147e2c + 0x1aa) =
+        *(unsigned short *)(DAT_80147e2c + 0x1aa) & 0xffbf;
+    return DAT_80147e2c;
 }

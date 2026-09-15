@@ -5,17 +5,12 @@
  *   manual _vf vtable. Faithful C++ (option A). NOT original; SYM-faithful, recompilable. vs disasm-v2.
  */
 #include "../../lib/nfs4_new.h"
-#include "aih_basiccop_types.h"
+#include "../../nfs4_types.h"
 #include "aih_basiccop_externs.h"
 
 /* H18: not in this TU's externs -- needed by the ShouldIPerformCutOffBlock reconstruction */
 extern int AI_elapsedTime;                              /* ai.cpp @0x8013C554 */
 int AIWorld_SplineDistance(Car_tObj *a, Car_tObj *b);   /* AIWORLD.obj */
-extern int D_8011E0B0[];   /* == &simGlobal.gameTicks (a distinct alias symbol the oracle
-                              addresses directly in CheckSpikeBelt's SECOND read, keeping the
-                              two gameTicks reads textually distinct so gcc can't CSE one
-                              %hi/lui base across the intervening AILife_IsSliceInAnyVisibleArea
-                              call -- see aiphysic_externs.h) */
 
 
 /* ---- __15AIHigh_BasicCopP8Car_tObji  AIHigh_BasicCop::ctor  [AIH_BASICCOP.CPP:18-34] SLD-VERIFIED ---- */
@@ -25,17 +20,22 @@ AIHigh_BasicCop::AIHigh_BasicCop(Car_tObj *carObj,int copIndex)
 
 {
 
-  (new((AIHigh_Base *)this) AIHigh_Base(carObj));
+  (new(&this->_base_AIHigh_Base) AIHigh_Base(carObj));
 
-  this->_vf = (__vtbl_ptr_type (*) [3])AIHigh_BasicCop_vtable;
+  (this->_base_AIHigh_Base)._vf = (__vtbl_ptr_type (*) [3])AIHigh_BasicCop_vtable;
 
   this->copIndex_ = copIndex;
 
-  if ((carObj->carFlags & 0x40U) != 0) {
-    this->type_ = 1;
-  }
-  else {
+  if ((carObj->carFlags & 0x40U) == 0) {
+
     this->type_ = 0;
+
+  }
+
+  else {
+
+    this->type_ = 1;
+
   }
 
   (this->blockade_).mode = 0;
@@ -70,25 +70,9 @@ void AIHigh_BasicCop::CheckSpikeBelt()
 
   Car_tObj *pCVar1;
 
-  int freshenElapsed;
+  
 
-
-
-  freshenElapsed = 0;
-
-  if (AICop_spikeBelt.active_ != 0) {
-
-    timeNow = D_8011E0B0[0];
-
-    timeNow -= AICop_spikeBelt.freshenTime_;
-
-    timeNow = timeNow < 0x140;
-
-    freshenElapsed = !timeNow;  /* MATCH: split bool + ! emits slti+sltiu (seq); `> 0x13f` emits slti+xori */
-
-  }
-
-  if (freshenElapsed) {
+  if (AICop_spikeBelt.active_ != 0 && 0x13f < simGlobal.gameTicks - AICop_spikeBelt.freshenTime_) {
 
     pCVar1 = AILife_IsSliceInAnyVisibleArea(AICop_spikeBelt.slice_);
 
@@ -102,13 +86,13 @@ void AIHigh_BasicCop::CheckSpikeBelt()
 
     else {
 
-      AICop_spikeBelt.freshenTime_ = D_8011E0B0[0];
+      AICop_spikeBelt.freshenTime_ = simGlobal.gameTicks;
 
     }
 
   }
 
-  if ((AICop_gRoadBlockState == kAICop_RoadBlockState_PerpPassed) &&
+  if ((AICop_gRoadBlockState == 2) &&
 
      (pCVar1 = AILife_IsSliceInAnyVisibleArea(Object_customSliceNum),
 
@@ -116,7 +100,7 @@ void AIHigh_BasicCop::CheckSpikeBelt()
 
     Object_ClearCustomObjects();
 
-    AICop_gRoadBlockState = kAICop_RoadBlockState_None;
+    AICop_gRoadBlockState = 0;
 
   }
 
@@ -141,16 +125,14 @@ int AIHigh_BasicCop::ShouldIPerformCutOffBlock(int chancePerSecond,Car_tObj *tar
   int chanceForElapsedTime;
   int chanceOutOf1000;
   int random1000;
-  int targetLatPosition;
   int relLatPosition;
   int absRelLatPosition;
   int metersBetween;
   int carLength;
+  Car_tObj *myCar;
 
   /* H18: full body reconstructed from oracle 0x8005C2B4-0x8005C410 (was stubbed `return 0`, so the
-     cut-off block could never fire). this=$s1, target=$s0; cop car = this->carObj_, RE-DERIVED
-     fresh at each use (NOT hoisted into a saved local) -- the oracle re-derefs this->carObj_ both
-     before AND after the AIWorld_SplineDistance call rather than caching it across the call. */
+     cut-off block could never fire). chancePerSecond=$a1, target=$s0, cop car=_base_AIHigh_Base.carObj_. */
   chanceForElapsedTime = (chancePerSecond / 32) * AI_elapsedTime;          /* 0x8005C2DC-E4 */
   chanceOutOf1000 = (chanceForElapsedTime * 1000) / 0x10000;              /* *125<<3 then signed >>16, 0x8005C2E8-F8 / C320 */
 
@@ -159,20 +141,16 @@ int AIHigh_BasicCop::ShouldIPerformCutOffBlock(int chancePerSecond,Car_tObj *tar
   random1000 = (int)((((randtemp >> 8) & 0xffff) * 1000) >> 16);           /* 0x8005C334-358 (randtemp u_int -> logical shifts) */
 
   if (random1000 < chanceOutOf1000) {                                      /* 0x8005C35C/360 */
-    targetLatPosition = *(int *)((char *)target + 1396);
-
-    relLatPosition = *(int *)((char *)this->carObj_ + 1396) - targetLatPosition;   /* 0x8005C36C-378 */
-    absRelLatPosition = __builtin_abs(relLatPosition);
+    myCar = (this->_base_AIHigh_Base).carObj_;                             /* *(int*)this @0x8005C368 */
+    relLatPosition = *(int *)((char *)myCar  + 1396) -
+                     *(int *)((char *)target + 1396);                      /* 0x8005C36C-378 */
+    absRelLatPosition = (relLatPosition < 0) ? -relLatPosition : relLatPosition;   /* 0x8005C37C-384 */
     if ((*(int *)((char *)target + 308) + 0x10000) < absRelLatPosition &&  /* 0x8005C388-398 */
         absRelLatPosition <= 0x3FFFF) {                                    /* 0x8005C39C-3A8 */
-      metersBetween = AIWorld_SplineDistance(this->carObj_, target);      /* 0x8005C3B0 */
-      carLength = metersBetween * *(int *)((char *)this->carObj_ + 1364);  /* 0x8005C3B8-C8/DC */
+      metersBetween = AIWorld_SplineDistance(myCar, target);              /* 0x8005C3B0 */
+      carLength = metersBetween * *(int *)((char *)myCar + 1364);          /* 0x8005C3B8-C8/DC */
       if ((*(int *)((char *)target + 316) * 2 + 0x20000) < carLength &&    /* 0x8005C3CC-E4 */
-          carLength < 0xC0000) {   /* H18-fix: was `0xBFFFF < carLength` (wrong polarity/logic --
-                                       traced the beqz+delay-slot-1 idiom at 0x8005C3F4/F8: branch
-                                       TAKEN (v1==0) skips the v0-reset and returns the delay slot's
-                                       v0=1 -- so it's an UPPER-cap range check, not an open lower
-                                       bound; verify_asm PASS confirms) 0x8005C3E8-F4 */
+          0xBFFFF < carLength) {                                          /* 0x8005C3E8-F4 */
         return 1;                                                          /* 0x8005C3F8 */
       }
     }
@@ -190,7 +168,7 @@ int AIHigh_BasicCop::ShouldIPerformCutOffBlock(int chancePerSecond,Car_tObj *tar
 
 /* ---- Blockade_AddRoadFlare__FP8coorddef  Blockade_AddRoadFlare  [AIH_BASICCOP.CPP:119-193] SLD-VERIFIED ---- */
 
-static void Blockade_AddRoadFlare(coorddef *pos)
+void Blockade_AddRoadFlare(coorddef *pos)
 
 
 
@@ -207,9 +185,7 @@ static void Blockade_AddRoadFlare(coorddef *pos)
 
   pGVar1 = Object_customSFXInst;
 
-  pGVar2 = pGVar1 + 1;
-
-  pGVar2 = pGVar2 + pGVar1->m_num_elements * 4;
+  pGVar2 = Object_customSFXInst + Object_customSFXInst->m_num_elements * 4 + 1;
 
   pGVar2->m_num_elements = pos->x;
 
@@ -238,279 +214,453 @@ static void Blockade_AddRoadFlare(coorddef *pos)
 
 /* ---- Blockade_AddObject__FiP8coorddefi  Blockade_AddObject  [AIH_BASICCOP.CPP:134-193] SLD-VERIFIED ---- */
 
-static void Blockade_AddObject(int slice,coorddef *pos,int objectID)
+void Blockade_AddObject(int slice,coorddef *pos,int objectID)
 
 
 
 {
   SceneElem theObj;
-
   BWorldSm_Pos slicePos;
+  coorddef*rotx;
+  coorddef*roty;
+  coorddef*rotz;
 
-  coorddef *roty;
+  coorddef *pcVar1;
 
-  coorddef *rotz;
+  int iVar2;
 
-  coorddef *rotx;
+  u_char local_100 [32];
 
-  /* H22-a12: rotx/roty/rotz are NOT separate stack locals -- they're pointers straight into
-     theObj.orient's 3 rows (matrixtdef.m[0..2]/[3..5]/[6..8], each a coorddef-shaped row). The
-     oracle builds the object's rotation matrix IN PLACE inside theObj (orient sits at SceneElem
-     +0x20, right after cp; the address arithmetic 0x30/0x3C/0x48 in the raw is exactly
-     &theObj+0x20/0x2C/0x38) -- so orient is NOT left uninitialized (prior comment was wrong): it's
-     row1=UNormal, row2=UForward, row0=row1 x row2 (cross product), then transposed in place. */
-  theObj.type = 0;
+  int local_e0;
 
-  theObj.subType = 1;
+  int local_dc;
 
-  theObj.scalar1 = Object_GetObjDefID(objectID);
+  int local_d8;
 
-  theObj.scalar2 = 0x23916;
+  int local_d4;
 
-  theObj.cp = *pos;
+  int local_d0;
 
-  theObj.subTypeIndex = objectID;
+  int local_cc;
 
-  BWorldSm_SetSlice(slice,&slicePos);
+  int local_c8;
 
-  BWorldSm_FindClosestQuadRez(pos,&slicePos,1);
+  int local_c4;
 
-  roty = BWorldSm_UNormal(&slicePos);
+  int local_c0;
 
-  *(coorddef *)&theObj.orient.m[3] = *roty;
+  int local_bc;
 
-  rotz = BWorldSm_UForward(&slicePos);
+  int local_b8;
 
-  *(coorddef *)&theObj.orient.m[6] = *rotz;
+  int local_b4;
 
-  roty = (coorddef *)&theObj.orient.m[3];
+  int local_b0;
 
-  rotz = (coorddef *)&theObj.orient.m[6];
+  BWorldSm_Pos BStack_a0;
 
-  rotx = (coorddef *)&theObj.orient.m[0];
+  
 
-  rotx->x = fixedmult(roty->y,rotz->z) - fixedmult(roty->z,rotz->y);
+  (*(int *)&(local_100)) = 0;
 
-  rotx->y = fixedmult(roty->z,rotz->x) - fixedmult(roty->x,rotz->z);
+  local_bc = 1;
 
-  rotx->z = fixedmult(roty->x,rotz->y) - fixedmult(roty->y,rotz->x);
+  local_b4 = Object_GetObjDefID(objectID);
 
-  transpose((MATRIX *)rotx,(MATRIX *)rotx);
+  local_b0 = 0x23916;
 
-  Object_AddCustomObject(&theObj,1);
+  (*(int *)((u_char *)&(local_100) + 16)) = pos->x;
+
+  (*(int *)((u_char *)&(local_100) + 20)) = pos->y;
+
+  (*(int *)((u_char *)&(local_100) + 24)) = pos->z;
+
+  local_b8 = objectID;
+
+  BWorldSm_SetSlice(slice,&BStack_a0);
+
+  BWorldSm_FindClosestQuadRez(pos,&BStack_a0,1);
+
+  pcVar1 = (coorddef *)BWorldSm_UNormal(&BStack_a0);
+
+  local_d4 = pcVar1->x;
+
+  local_d0 = pcVar1->y;
+
+  local_cc = pcVar1->z;
+
+  pcVar1 = (coorddef *)BWorldSm_UForward(&BStack_a0);
+
+  local_c8 = pcVar1->x;
+
+  local_c4 = pcVar1->y;
+
+  local_c0 = pcVar1->z;
+
+  iVar2 = fixedmult(local_d0,local_c0);
+
+  local_e0 = fixedmult(local_cc,local_c4);
+
+  local_e0 = iVar2 - local_e0;
+
+  iVar2 = fixedmult(local_cc,local_c8);
+
+  local_dc = fixedmult(local_d4,local_c0);
+
+  local_dc = iVar2 - local_dc;
+
+  iVar2 = fixedmult(local_d4,local_c4);
+
+  local_d8 = fixedmult(local_d0,local_c8);
+
+  local_d8 = iVar2 - local_d8;
+
+  transpose((MATRIX *)&local_e0,(MATRIX *)&local_e0);
+
+  Object_AddCustomObject((SceneElem *)local_100,1);
 
   return;
 
 }
+
+
+
+
+
 
 
 
 /* ---- PlacePointOnRoad__FiP8coorddef  PlacePointOnRoad  [AIH_BASICCOP.CPP:165-193] SLD-VERIFIED ---- */
 
-static void PlacePointOnRoad(int slice,coorddef *offset)
+void PlacePointOnRoad(int slice,coorddef *offset)
 
 
 
 {
   coorddef slicecenter;
-
   BWorldSm_Pos testSimRoadInfo;
-
   coorddef ioff;
-
   int vecXz;
-
   int vecZx;
-
   int vecZz;
 
-  /* H18-a6: full body reconstructed from oracle 0x8005C5E4-0x8005C78C. Was a manual field-by-field
-     unpack (short/masked-word/int stores across a hand-rolled 16-B/iter pointer-walk loop) copying
-     Cars_gHumanRaceCarList[0]+8 into a local BWorldSm_Pos -- the oracle does a PLAIN 132-byte struct
-     assignment (testSimRoadInfo = car->N.simRoadInfo; -- BO_tNewtonObj.simRoadInfo sits at +0x8,
-     which is exactly the pointer-walk's start/end bounds), which gcc lowers to its OWN memcpy-shaped
-     loop; the field-decomposed hand-written form was ~2x oracle size (368B frame vs 208B). The
-     offset->x/y/z arithmetic below was already correct and is kept verbatim. */
-  ioff = *offset;
+  char cVar1;
 
-  testSimRoadInfo = Cars_gHumanRaceCarList[0]->N.simRoadInfo;
+  char cVar2;
 
-  testSimRoadInfo.slice = (short)slice;
+  char cVar3;
 
-  slicecenter = *(coorddef *)BWorldSm_slices[slice].center;
+  int *piVar4;
 
-  vecXz = (int)((signed char *)BWorldSm_slices[slice].right)[2] << 9;
+  coorddef *norm;
 
-  vecZx = (int)((signed char *)BWorldSm_slices[slice].forward)[0] << 9;
+  u_int *puVar5;
 
-  vecZz = (int)((signed char *)BWorldSm_slices[slice].forward)[2] << 9;
+  coorddef *pointOnPlane;
 
-  offset->x =
-      slicecenter.x +
-      fixedmult((int)((signed char *)BWorldSm_slices[slice].right)[0] << 9,
-                ioff.x) +
-      fixedmult(vecZx,ioff.z);
+  BWorldSm_Pos *pBVar6;
 
-  offset->y = slicecenter.y;
+  u_int uVar7;
 
-  offset->z =
-      slicecenter.z + fixedmult(vecXz,ioff.x) + fixedmult(vecZz,ioff.z);
+  int iVar8;
 
-  BWorldSm_FindClosestQuadRez(offset,&testSimRoadInfo,1);
+  u_int uVar9;
 
-  offset->y = GetPlaneY(
-      BWorldSm_UNormal(&testSimRoadInfo),
-      testSimRoadInfo.simQuad != (Trk_NewSimQuad *)0x0
-          ? testSimRoadInfo.quadPts
-          : (coorddef *)((int)BWorldSm_slices + testSimRoadInfo.slice * 0x20),
-      offset);
+  int iVar10;
+
+  int iVar11;
+
+  int iVar12;
+
+  int iVar13;
+
+  BWorldSm_Pos local_b0;
+
+  int local_28;
+
+  int local_24;
+
+  int local_20;
+
+  
+
+  pBVar6 = &local_b0;
+
+  local_28 = offset->x;
+
+  local_24 = offset->y;
+
+  local_20 = offset->z;
+
+  puVar5 = (u_int *)((char *)Cars_gHumanRaceCarList[0] + 8);
+
+  do {
+
+    uVar7 = *puVar5;
+
+    uVar9 = puVar5[1];
+
+    iVar11 = puVar5[2];
+
+    iVar13 = puVar5[3];
+
+    pBVar6->slice = (short)uVar7;
+
+    pBVar6->stripQuadInd = (short)((u_int)uVar7 >> 0x10);
+
+    *(u_int *)&pBVar6->simRotFlag = uVar9;
+
+    pBVar6->quadPts[0].x = iVar11;
+
+    pBVar6->quadPts[0].y = iVar13;
+
+    puVar5 = puVar5 + 4;
+
+    pBVar6 = (BWorldSm_Pos *)&pBVar6->quadPts[0].z;
+
+  } while (puVar5 != (u_int *)((char *)Cars_gHumanRaceCarList[0] + 0x88));
+
+  *(int *)pBVar6 = *(int *)((char *)Cars_gHumanRaceCarList[0] + 0x88);
+
+  local_b0.slice = (short)slice;
+
+  piVar4 = (int *)(slice * 0x20 + (int)BWorldSm_slices);
+
+  iVar8 = *piVar4;
+
+  iVar10 = piVar4[1];
+
+  iVar12 = piVar4[2];
+
+  iVar11 = slice * 0x20 + (int)BWorldSm_slices;
+
+  cVar1 = *(char *)(iVar11 + 0x14);
+
+  cVar2 = *(char *)(iVar11 + 0xf);
+
+  cVar3 = *(char *)(iVar11 + 0x11);
+
+  iVar11 = fixedmult((int)*(char *)(iVar11 + 0x12) << 9,local_28);
+
+  iVar13 = fixedmult((int)cVar2 << 9,local_20);
+
+  offset->x = iVar8 + iVar11 + iVar13;
+
+  offset->y = iVar10;
+
+  iVar11 = fixedmult((int)cVar1 << 9,local_28);
+
+  iVar13 = fixedmult((int)cVar3 << 9,local_20);
+
+  offset->z = iVar12 + iVar11 + iVar13;
+
+  BWorldSm_FindClosestQuadRez(offset,&local_b0,1);
+
+  norm = (coorddef *)BWorldSm_UNormal(&local_b0);
+
+  if (local_b0.simQuad == (Trk_NewSimQuad *)0x0) {
+
+    pointOnPlane = (coorddef *)(BWorldSm_slices + local_b0.slice);
+
+  }
+
+  else {
+
+    pointOnPlane = local_b0.quadPts;
+
+  }
+
+  iVar11 = GetPlaneY(norm,pointOnPlane,offset);
+
+  offset->y = iVar11;
 
   return;
 
 }
+
+
+
+
+
 
 
 
 /* ---- SetupBlockadeElements__15AIHigh_BasicCopP10blockade_t  AIHigh_BasicCop::SetupBlockadeElements  [AIH_BASICCOP.CPP:198-290] SLD-VERIFIED ---- */
 
 void AIHigh_BasicCop::SetupBlockadeElements(blockade_t *blockade)
-{
-  /* H22-a12: full SYM-block-scope rewrite (nfs4-f-v3.txt @0x8005C790). SYM declares a FRESH
-     "coorddef pt" AUTO (same -0x30(fp) slot) per branch and a FRESH "int i" REG per loop --
-     each branch's own pt/i, not one function-scope pt shared across all 4 loops -- so this
-     mirrors that exactly: 1 & 2's flags-branches each get their own pt, and every do-while
-     gets its own block-scoped i (SYM regs $s0/$s2 alternate per loop within a branch). The
-     "skip when i==3" compare constant is loop-invariant-hoisted to match the oracle's
-     `li s5,3` outside the loop. */
-  if (blockade->flags != 0) {
 
-    int slice;
+
+
+{
+  coorddef pt;
+  int i;
+  int objId;
+
+  int iVar1;
+
+  int iVar2;
+
+  int iVar3;
+
+  int slice;
+
+  coorddef local_30;
+
+  
+
+  if (blockade->flags != 0) {
 
     Object_ClearCustomObjects();
 
     slice = blockade->slice;
 
+    iVar1 = 0;
+
     Object_customSliceNum = slice;
 
-    if ((blockade->flags & 1U) != 0) {
+    if ((blockade->flags & 1U) == 0) {
 
-      coorddef pt;
+      iVar1 = -0x60000;
 
-      {
-        int i;
+      if ((blockade->flags & 2U) != 0) {
 
-        for (i = 0; i < 5; i = i + 1) {
+        iVar3 = 0;
 
-          pt.x = i * 0x20000;
+        iVar2 = -0x180000;
 
-          pt.y = 0;
+        do {
 
-          pt.z = blockade->direction * (i * 0x40000 - 0x100000);
+          local_30.y = 0;
 
-          PlacePointOnRoad(slice,&pt);
+          local_30.z = blockade->direction * iVar2;
 
-          Blockade_AddRoadFlare(&pt);
+          iVar3 = iVar3 + 1;
 
-        }
-      }
+          local_30.x = iVar1;
 
-      {
-        int i;
+          PlacePointOnRoad(slice,&local_30);
 
-        for (i = 1; i < 5; i = i + 1) {
+          Blockade_AddRoadFlare(&local_30);
 
-          pt.x = i * -0x20000;
+          iVar2 = iVar2 + 0x40000;
 
-          pt.y = 0;
+          iVar1 = iVar1 + 0x20000;
 
-          pt.z = blockade->direction * (i * 0x40000 - 0x100000);
+        } while (iVar3 < 7);
 
-          PlacePointOnRoad(slice,&pt);
+        iVar1 = 0;
 
-          Blockade_AddRoadFlare(&pt);
+        iVar3 = -0x180000;
 
-        }
-      }
+        iVar2 = 0x60000;
 
-    }
+        do {
 
-    else if ((blockade->flags & 2U) != 0) {
+          if (iVar1 != 3) {
 
-      coorddef pt;
+            local_30.y = 0;
 
-      {
-        int i;
+            local_30.z = blockade->direction * iVar3;
 
-        for (i = 0; i < 7; i = i + 1) {
+            local_30.x = iVar2;
 
-          pt.x = i * 0x20000 - 0x60000;
+            PlacePointOnRoad(slice,&local_30);
 
-          pt.y = 0;
-
-          pt.z = blockade->direction * (i * 0x40000 - 0x180000);
-
-          PlacePointOnRoad(slice,&pt);
-
-          Blockade_AddRoadFlare(&pt);
-
-        }
-      }
-
-      {
-        int i;
-
-        for (i = 0; i < 7; i = i + 1) {
-
-          if (i != 3) {
-
-            pt.x = 0x60000 - i * 0x20000;
-
-            pt.y = 0;
-
-            pt.z = blockade->direction * (i * 0x40000 - 0x180000);
-
-            PlacePointOnRoad(slice,&pt);
-
-            Blockade_AddRoadFlare(&pt);
+            Blockade_AddRoadFlare(&local_30);
 
           }
 
-        }
+          iVar3 = iVar3 + 0x40000;
+
+          iVar2 = iVar2 + -0x20000;
+
+          iVar1 = iVar1 + 1;
+
+        } while (iVar1 < 7);
+
       }
 
     }
 
-    if ((blockade->flags & 4U) != 0) {
+    else {
 
-      int objId;
+      iVar2 = -0x100000;
 
-      objId = Object_FindDefWithThisID(3);
+      local_30.x = 0;
 
-      if (objId != -1) {
+      do {
 
-        coorddef pt;
+        local_30.y = 0;
 
-        pt.x = -0x28000;
+        local_30.z = blockade->direction * iVar2;
 
-        pt.y = 0;
+        iVar1 = iVar1 + 1;
 
-        pt.z = blockade->direction * -0x40000;
+        PlacePointOnRoad(slice,&local_30);
 
-        PlacePointOnRoad(slice,&pt);
+        Blockade_AddRoadFlare(&local_30);
 
-        Blockade_AddObject(slice,&pt,objId);
+        iVar2 = iVar2 + 0x40000;
 
-        pt.x = 0x28000;
+        local_30.x = iVar1 * 0x20000;
 
-        pt.y = 0;
+      } while (iVar1 < 5);
 
-        pt.z = blockade->direction * -0x40000;
+      iVar3 = 1;
 
-        PlacePointOnRoad(slice,&pt);
+      iVar2 = -0xc0000;
 
-        Blockade_AddObject(slice,&pt,objId);
+      local_30.x = -0x20000;
 
-      }
+      iVar1 = local_30.x;
+
+      do {
+
+        local_30.x = iVar1;
+
+        iVar1 = local_30.x;
+
+        local_30.y = 0;
+
+        local_30.z = blockade->direction * iVar2;
+
+        iVar3 = iVar3 + 1;
+
+        PlacePointOnRoad(slice,&local_30);
+
+        Blockade_AddRoadFlare(&local_30);
+
+        iVar2 = iVar2 + 0x40000;
+
+        iVar1 = iVar1 + -0x20000;
+
+      } while (iVar3 < 5);
+
+    }
+
+    if (((blockade->flags & 4U) != 0) &&
+
+       (iVar1 = Object_FindDefWithThisID(3), iVar1 != -1)) {
+
+      local_30.x = -0x28000;
+
+      local_30.y = 0;
+
+      local_30.z = blockade->direction * -0x40000;
+
+      PlacePointOnRoad(slice,&local_30);
+
+      Blockade_AddObject(slice,&local_30,iVar1);
+
+      local_30.x = 0x28000;
+
+      local_30.y = 0;
+
+      local_30.z = blockade->direction * -0x40000;
+
+      PlacePointOnRoad(slice,&local_30);
+
+      Blockade_AddObject(slice,&local_30,iVar1);
 
     }
 
@@ -537,73 +687,71 @@ void AIHigh_BasicCop::HandleBlockadeSpeech()
 
 {
   Car_tObj*theCar;
+  int carSlice;
+  int sliceDiff;
+  int checkSlice;
+
+  u_short uVar1;
+
+  u_short uVar2;
+
+  int iVar3;
 
   Speaker *pSVar4;
 
+  Car_tObj *pCVar5;
+
+  int iVar6;
+
+  
+
+  uVar1 = (this->blockade_).blockadeSpeechFlags;
+
   if ((this->blockade_).blockadeSpeechFlags != 0) {
 
-    theCar = ((this->blockade_).target)->GetCarObj();
+    pCVar5 = (((this->blockade_).target)->_base_AIHigh_BasicPerp)._base_AIHigh_Base.carObj_;
 
-    if (theCar == (Car_tObj *)0x0) {
+    if ((pCVar5 == (Car_tObj *)0x0) ||
+
+       (iVar6 = (pCVar5->stats).slice - (this->blockade_).slice, pCVar5->blowout != 0)) {
 
       (this->blockade_).blockadeSpeechFlags = 0;
 
     }
 
     else {
-      int carSlice;
-      int sliceDiff;
 
-      carSlice = (theCar->stats).slice;
+      iVar3 = iVar6;
 
-      sliceDiff = carSlice - (this->blockade_).slice;
+      if (iVar6 < 0) {
 
-      if (theCar->blowout != 0) {
-
-        (this->blockade_).blockadeSpeechFlags = 0;
+        iVar3 = -iVar6;
 
       }
 
-      else {
+      if (iVar3 < 0x21) {
 
-        if (__builtin_abs(sliceDiff) < 0x21) {
-          int checkSlice;
+        iVar3 = (Cars_topSpeedCap[(pCVar5->render).currentCarType] * 0x1c) / 0x640000;
 
-          checkSlice =
-              (Cars_topSpeedCap[(theCar->render).currentCarType] * 0x1c) /
-              0x640000;
+        uVar2 = uVar1 | 2;
 
-          if (sliceDiff < checkSlice) {
+        if ((iVar6 < iVar3) || (uVar2 = uVar1 | 4, iVar3 < iVar6)) {
 
-            (this->blockade_).blockadeSpeechFlags =
-                (this->blockade_).blockadeSpeechFlags | 2;
+          (this->blockade_).blockadeSpeechFlags = uVar2;
 
-          }
+        }
 
-          else if (checkSlice < sliceDiff) {
+        if (((this->blockade_).blockadeSpeechFlags & 6U) == 6) {
 
-            (this->blockade_).blockadeSpeechFlags =
-                (this->blockade_).blockadeSpeechFlags | 4;
+          pSVar4 = (Speaker *)Speech_Mobile((this->_base_AIHigh_Base).carObj_);
 
-          }
+          (**(int (**)(...))(pSVar4->_vf[1] + 0x1d))
 
-          if (((this->blockade_).blockadeSpeechFlags & 6U) == 6) {
+                    ((int)&(pSVar4->fPosition).flags + (int)*(short *)(pSVar4->_vf[1] + 0x19));
 
-            pSVar4 = (Speaker *)Speech_Mobile(this->carObj_);
+          (this->blockade_).blockadeSpeechFlags = 0;
 
-          /* manual-vtable slot 7 (raw byte offsets from the oracle jalr/lh -- __vtbl_ptr_type
-             is 8 bytes, so a typed _vf[N] index/pointer-add is 8x too large; decay to a byte
-             base and use the RAW displacement, §3.12 lever #10). */
-            (**(int (**)(...))((char *)pSVar4->_vf + 0x3c))
-
-                      ((int)&(pSVar4->fPosition).flags +
-                       (int)*(short *)((char *)pSVar4->_vf + 0x38));
-
-            (this->blockade_).blockadeSpeechFlags = 0;
-
-            AICop_gRoadBlockState = kAICop_RoadBlockState_PerpPassed;
-
-          }
+          AICop_gRoadBlockState = 2;
 
         }
 
@@ -616,24 +764,6 @@ void AIHigh_BasicCop::HandleBlockadeSpeech()
   return;
 
 }
-
-
-
-
-
-
-
-/* ---- ___15AIHigh_BasicCop  AIHigh_BasicCop::dtor  [AIH_BASICCOP.CPP:?] SLD-FLAG:NO_SLD ----
-   W56-A2 (2026-08-09): NOT-IN-OBJECT dtor landed. §3.23 base-forward: empty body -> the
-   compiler emits the implicit AIHigh_Base::~ base-dtor call (jal ___11AIHigh_Base), matching
-   the 8-insn oracle exactly. Mirrors AIHigh_BTC_Cop::~AIHigh_BTC_Cop() at aih_btccop.cpp. */
-
-/* W65-A3 (calltarget): dtor made IMPLICIT (declaration dropped from
- * nfs4_types.h) so every derived dtor and every scope-exit collapses to
- * ___11AIHigh_Base the way retail does; the standalone symbol gcc then stops
- * emitting is supplied here, in place, with C linkage. */
-extern "C" void ___11AIHigh_Base(void *);
-extern "C" void ___15AIHigh_BasicCop(void *thisp) { ___11AIHigh_Base(thisp); }
 
 
 

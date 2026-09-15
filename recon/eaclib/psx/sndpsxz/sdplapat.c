@@ -2,107 +2,96 @@
  *   Source obj : nfs4\eaclib\psx\sdplapat.obj ; archive C:\nfs4\EACLIB\PSX\SNDPSXZ.LIB (xlsx col11)
  *   1 fn @0x8010BA48.  iSNDplatformplay -- the per-voice SPU launcher for a sound patch (the patch-side
  *   twin of sdpacket's iSNDplatformpacketplay): parse the patch's tag stream into the voice-state table and
- *   key the voice.  Ghidra nfs4-f.exe.c (sdplapat) + the call-site oracle establish an 8-arg ABI
- *   (the callee does not read the eighth argument; Ghidra showed only 3 + in_a3/in_stack_*).
+ *   key the voice.  Ghidra nfs4-f.exe.c (sdplapat) + retail caller/callee ABI (8 source words; this body
+ *   consumes through the seventh, while the eighth remains an unused source-level argument).
  *   Tags: 0x82 channel count, 0x84 sample rate, 0x85 loop length, 0x8a sample-data ptr, 0x92 output mode.
- *   iSNDgettag is 4-arg (Ghidra dropped to 2).
+ *   iSNDgettag is 4-arg (Ghidra dropped to 2) and carries both cursor and returned data address natively.
  */
+#include "../../../nfs4_types.h"
+#include "../../../mips_semantics.h"
 
-extern int sndgs[];
-extern unsigned char sndpd[];
-extern unsigned char DAT_801479f0;   /* voice base (+0x00) */
-extern unsigned char DAT_801479f4;   /* +0x04 */
-extern unsigned char DAT_801479fc;   /* +0x0c */
-extern unsigned char DAT_80147a00;   /* +0x10 */
-extern unsigned char DAT_80147a04;   /* +0x14 */
-extern unsigned char DAT_80147a08;   /* +0x18 vol angle */
-extern unsigned char DAT_80147a0a;   /* +0x1a pitch base */
-extern unsigned char DAT_80147a0c;   /* +0x1c playstate */
-extern unsigned char DAT_80147a0e;   /* +0x1e output mode */
-extern unsigned char DAT_80147a0f;   /* +0x1f channels */
-extern unsigned char DAT_80147a10;   /* +0x20 link */
-extern unsigned char DAT_80147a11;   /* +0x21 link flag */
-extern unsigned char DAT_80147a12;   /* +0x22 level */
-extern unsigned char DAT_80147a13;   /* +0x23 fx level */
+extern "C" int sndgs[];
+extern "C" unsigned char &DAT_801479f0;   /* voice base (+0x00) */
+extern "C" unsigned char &DAT_801479f4;   /* +0x04 */
+extern "C" unsigned char &DAT_801479fc;   /* +0x0c */
+extern "C" unsigned char &DAT_80147a00;   /* +0x10 */
+extern "C" unsigned char &DAT_80147a04;   /* +0x14 */
+extern "C" unsigned char &DAT_80147a08;   /* +0x18 vol angle */
+extern "C" unsigned char &DAT_80147a0a;   /* +0x1a pitch base */
+extern "C" unsigned char &DAT_80147a0c;   /* +0x1c playstate */
+extern "C" unsigned char &DAT_80147a0e;   /* +0x1e output mode */
+extern "C" unsigned char &DAT_80147a0f;   /* +0x1f channels */
+extern "C" unsigned char &DAT_80147a10;   /* +0x20 link */
+extern "C" unsigned char &DAT_80147a11;   /* +0x21 link flag */
+extern "C" unsigned char &DAT_80147a12;   /* +0x22 level */
+extern "C" unsigned char &DAT_80147a13;   /* +0x23 fx level */
 
-extern int iSNDgettag(int *cursor, unsigned int *outId, int *outVal, int *outPtr);  /* sgettag */
-extern int iSNDplatformpitch(int chan, int pitch);                                  /* sdriver */
+extern "C" int iSNDgettag(intptr_t *cursor, unsigned int *outId, int *outVal, intptr_t *outPtr); /* sgettag */
+extern "C" int iSNDplatformpitch(int chan, int pitch);                                  /* sdriver */
 
-extern int iSNDplatformplay(int chan, int voice, int level, int pitch, int a5, int fx,
-                            int volAngle, int pitchOffset);
+extern "C" int iSNDplatformplay(intptr_t stream, int voice, int level, int pitch,
+                                 int sampleArg, int fx, int volAngle, int volDelta);
 
-/* iSNDplatformplay @0x8010BA48 : launch `voice` playing the patch whose tag stream starts at `chan`.
- * MATCH (W31, was 32 diffs): (1) the tag parser is a NATURAL `while` loop, not a goto chain -- real
- * loop notes weight the in-loop defs' ref counts, which is what allocates sampleData->s3 / voice->s4
- * in oracle order (goto form left them swapped); (2) plain `slot[0x1f] = 1` + in-loop re-store lets
- * gcc cross-jump the two identical sb's into the oracle's shared store; (3) the 0x1f stores are
- * volatile like the record's other stores, which keeps gcc's reorg from stealing the shared sb into
- * the 0x82 case's j delay slot (oracle has the unfilled nop); (4) `slot[0x20] = -1` needs a signed
- * char store (plain char is unsigned under ccpsx). IDA sub_8010BA48 supplied the loop/store shape. */
-extern int iSNDplatformplay(int chan, int voice, int level, int pitch, int a5, int fx,
-                            int volAngle, int pitchOffset)
+/* iSNDplatformplay @0x8010BA48 : launch `voice` playing the patch whose tag stream starts at `chan`. */
+extern "C" int iSNDplatformplay(intptr_t stream, int voice, int level, int pitch,
+                                 int sampleArg, int fx, int volAngle, int volDelta)
 {
-    int           *sampleData = 0;         /* 0x8a tag -> sample-header ptr */
-    int           vt;
-    unsigned char *slot;
-    int           rate = 0x5622;           /* 0x84 tag (default) */
+    int           vt = voice * 0x2c;
+    intptr_t      sampleData = 0;          /* 0x8a tag -> ptr to the sample header */
     int           loopVal = 0;             /* 0x85 tag */
+    int           rate = 0x5622;           /* 0x84 tag (default) */
+    unsigned char nch = 1;                 /* 0x82 tag */
     unsigned int  id;
-    int           val;
-    int           *ptr;
-    (void)a5;
-    (void)pitchOffset;
+    int           val, r, v;
+    intptr_t      ptr, p;
+    intptr_t      cur;
+    (void)sampleArg; (void)volDelta;
 
-    vt = voice << 1;
-    vt = vt + voice;
-    vt = vt << 2;
-    vt = vt - voice;
-    vt = vt << 2;
-    slot = &DAT_801479f0 + vt;
+    cur = stream;
+    (&DAT_80147a11)[vt] = 0;
+    (&DAT_80147a10)[vt] = 0xff;
+    (&DAT_80147a0e)[vt] = 0;
 
-    *(volatile unsigned char *)(slot + 0x21) = 0;
-    *(volatile signed char *)(slot + 0x20) = -1;
-    slot[0x1e] = 0;
-    *(volatile unsigned char *)(slot + 0x1f) = 1;
-    while (iSNDgettag(&chan, &id, &val, (int *)&ptr) != 0 && id != 0xfe) {
-        if (id == 0x8a) {
-            sampleData = ptr;
-            continue;
+    for (;;) {                                          /* outer: re-armed on a 0x82 channel-count tag */
+        (&DAT_80147a0f)[vt] = nch;
+        r = rate; v = loopVal; p = sampleData;
+        for (;;) {                                      /* inner: breaks on 0x82 */
+            for (;;) {                                  /* innermost: loops on 0x8a / 0x85 */
+                sampleData = p; loopVal = v; rate = r;
+                if (iSNDgettag(&cur, &id, &val, &ptr) == 0 || id == 0xfe)
+                    goto finalize;
+                r = rate; v = loopVal; p = ptr;
+                if (id == 0x8a) continue;               /* p = sample-data ptr */
+                if (id == 0x85) { v = val; p = sampleData; continue; }   /* loop length */
+                break;
+            }
+            nch = (unsigned char)val;
+            if (id == 0x82) break;                      /* channel count -> outer */
+            r = val;                                    /* 0x84 = sample rate */
+            if (id != 0x84 && (r = rate, id == 0x92))
+                (&DAT_80147a0e)[vt] = (unsigned char)val;   /* output mode */
         }
-        if (id == 0x85) {
-            loopVal = val;
-            continue;
-        }
-        if (id == 0x82) {
-            *(volatile unsigned char *)(slot + 0x1f) = *(unsigned char *)&val;
-            continue;
-        }
-        if (id == 0x84) {
-            rate = val;
-            continue;
-        }
-        if (id == 0x92)
-            *(volatile unsigned char *)(slot + 0x1e) = (unsigned char)val;
     }
 
-    *(volatile int *)(slot + 0x04) = loopVal;
-    *(volatile unsigned char *)(slot + 0x22) = (char)level;
-    *(volatile unsigned short *)(slot + 0x18) = (unsigned short)volAngle;
-    *(volatile unsigned char *)(slot + 0x23) = (unsigned char)fx;
-    *(volatile int *)(slot + 0x00) = *sampleData;
-    *(volatile int *)(slot + 0x0c) = 0;
-    *(volatile int *)(slot + 0x10) = 0;
-    *(volatile int *)(slot + 0x14) = loopVal << 0xc;
-    *(volatile short *)(slot + 0x1a) = (short)((rate * 0x17c7) >> 0x10);
-    if (1 < (unsigned char)*(volatile unsigned char *)(slot + 0x1f)) { /* arm linked voice */
-        unsigned char *voiceBase = sndpd;
-        slot[0x20] = *(unsigned char *)(voice * 100 + sndgs[0x25] + 4);
-        voiceBase[(((int)(unsigned)*(volatile unsigned char *)(slot + 0x20) << 24) >> 24) * 0x2c + 0xf9] = 1;
-        *(int *)(voiceBase + (((int)(unsigned)*(volatile unsigned char *)(slot + 0x20) << 24) >> 24) * 0x2c + 0xe4) = 0;
-        *(int *)(voiceBase + (((int)(unsigned)*(volatile unsigned char *)(slot + 0x20) << 24) >> 24) * 0x2c + 0xe8) = 0;
-        *(int *)(voiceBase + (((int)(unsigned)*(volatile unsigned char *)(slot + 0x20) << 24) >> 24) * 0x2c + 0xec) = *(int *)(slot + 0x14);
+finalize:
+    *(int *)(&DAT_801479f4 + vt) = loopVal;
+    (&DAT_80147a12)[vt] = (char)level;
+    *(unsigned short *)(&DAT_80147a08 + vt) = (unsigned short)volAngle;
+    (&DAT_80147a13)[vt] = (unsigned char)fx;
+    *(int *)(&DAT_801479f0 + vt) = *(int *)sampleData;
+    *(int *)(&DAT_801479fc + vt) = 0;
+    (&DAT_80147a00)[voice * 0xb] = 0;
+    *(int *)(&DAT_80147a04 + vt) = nfs4_mips_sll_s32(loopVal, 0xc);
+    *(short *)(&DAT_80147a0a + vt) =
+        (short)((unsigned int)nfs4_mips_mult_s32(rate, 0x17c7) >> 0x10);
+    if (1 < (unsigned char)(&DAT_80147a0f)[vt]) {       /* arm the linked partner voice */
+        (&DAT_80147a10)[vt] = *(unsigned char *)(voice * 100 + sndgs[0x25] + 4);
+        (&DAT_80147a11)[(char)(&DAT_80147a10)[vt] * 0x2c] = 1;
+        *(int *)(&DAT_801479fc + (char)(&DAT_80147a10)[vt] * 0x2c) = 0;
+        (&DAT_80147a00)[(char)(&DAT_80147a10)[vt] * 0xb] = 0;
+        *(int *)(&DAT_80147a04 + (char)(&DAT_80147a10)[vt] * 0x2c) = *(int *)(&DAT_80147a04 + vt);
     }
     iSNDplatformpitch(voice, pitch);
-    slot[0x1c] = 1;                                     /* playstate = playing */
+    (&DAT_80147a0c)[vt] = 1;                             /* playstate = playing */
     return 0;
 }

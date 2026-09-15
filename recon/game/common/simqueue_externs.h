@@ -3,13 +3,13 @@
 #define SIMQUEUE_EXTERNS_H
 
 /* ---- harvested + SYM ---- */
-/* simqueue.obj uses only words +0x0c and +0x3c8 of the external owner. */
-extern int GameSetup_gData[243];
-#define SIMQUEUE_COMMMODE GameSetup_gData[3]
-#define SIMQUEUE_NUM_PLAYER_RACE_CARS GameSetup_gData[242]
+extern "C" extern GameSetup_tData   GameSetup_gData;
 
-extern int   gSimQueue_BlockOther;
-extern int   gSimQueue_BlockSelf;
-extern int   gSimQueue_Ticker;
+extern "C" sim_queue       inputQueue;          /* Validity/Buffer/TailTime */
+extern "C" Input_tResults  output[2];           /* per-player current input */
+extern "C" int   gSimQueue_BlockOther;
+extern "C" int   gSimQueue_BlockSelf;
+extern "C" int   gSimQueue_Ticker;
+extern int   maxTicksPerFrame;
 
 #endif

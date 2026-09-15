@@ -1,165 +1,148 @@
+#include "../../lib/libfns.h"
 /* draww_externs.h -- extern decls for game/psx/draww.cpp (NFS4 PSX world-geometry draw). */
 #ifndef DRAWW_EXTERNS_H
 #define DRAWW_EXTERNS_H
 
-/* ---- GTE intrinsics ---- */
-/* Canonical PsyQ libgte inline COP2 macros (incl. the real gte_ldsxy3 = mtc2 SXY0/1/2)
- * are vendored in psx_gte.h. Kept here: the legacy gte_lwc2 value-form extern (call
- * sites pending conversion to gte_ldv forms per the GTE batch). */
-#include "../../lib/psx_gte.h"
-extern void gte_lwc2(int reg, int data);   /* value-form load (draww calls pending conversion to gte_ldv*) */
+/* ---- GTE intrinsics (no-op symbolic; faithful cop2 source) ---- */
+extern void gte_rtps(void);
+extern void gte_rtpt(void);
+extern void gte_lwc2(int reg, int data);
+extern void gte_swc2(int reg, void *ptr);
+#ifdef AP_WIN
+extern void nfs4_gte_set_rot_matrix(const void *);
+extern void nfs4_gte_set_trans_matrix(const void *);
+extern void nfs4_gte_nclip(void);
+extern void nfs4_gte_avsz4(void);
+extern void nfs4_gte_ldsxy3(int,int,int);
+extern void nfs4_gte_stflg(void *);
+extern void nfs4_gte_ldir0(int);
+extern void nfs4_gte_rt(void);
+extern void nfs4_gte_dpcs(void);
+extern void nfs4_gte_dpct(void);
+extern "C" void NFSHS_HostAddPrim(void *,void *);
+extern "C" void NFSHS_GTE_DebugState(int *,int *,int *);
+extern "C" void NFSHS_HostTraceDrawQuadCandidate(
+    const void *,const void *,const void *,long,long,long,long);
+#define gte_SetRotMatrix(mp)    nfs4_gte_set_rot_matrix(mp)
+#define gte_SetTransMatrix(mp)  nfs4_gte_set_trans_matrix(mp)
+#else
+#define gte_SetRotMatrix(mp)    ((void)(mp))
+#define gte_SetTransMatrix(mp)  ((void)(mp))
+#endif
+#define gte_ldsv(p)             ((void)(p))
+#define gte_stsv(p)             ((void)(p))
+#define gte_stsxy(p)            ((void)(p))
+#define gte_stsz(p)             ((void)(p))
+#ifdef AP_WIN
+#define gte_stflg(p)            nfs4_gte_stflg(p)
+#else
+#define gte_stflg(p)            ((void)(p))
+#endif
+#define gte_rtir(...)           ((void)0)
+#define gte_ldtr(...)           ((void)0)
+#ifdef AP_WIN
+#define gte_rtps_b(...)             gte_rtps()
+#else
+#define gte_rtps_b(...)         ((void)0)
+#endif
+/* GTE ops Ghidra inlines as macro CALLS in draww (nclip/avsz/depth-cue/ldsxy3/ldIR0/rt) */
+#ifdef AP_WIN
+#define gte_nclip(...)              nfs4_gte_nclip()
+#define gte_nclip_b(...)            nfs4_gte_nclip()
+#define gte_avsz4(...)              nfs4_gte_avsz4()
+#define gte_avsz4_b(...)            nfs4_gte_avsz4()
+#else
+#define gte_nclip(...)          ((void)0)
+#define gte_nclip_b(...)        ((void)0)
+#define gte_avsz4(...)          ((void)0)
+#define gte_avsz4_b(...)        ((void)0)
+#endif
+#ifdef AP_WIN
+#define gte_dpcs(...)            nfs4_gte_dpcs()
+#define gte_dpct(...)            nfs4_gte_dpct()
+#define gte_ldsxy3(a,b,c)        nfs4_gte_ldsxy3((int)(a),(int)(b),(int)(c))
+#define gte_ldIR0(p)             nfs4_gte_ldir0((int)(p))
+#define gte_rt(...)              nfs4_gte_rt()
+#else
+#define gte_dpcs(...)        ((void)0)
+#define gte_dpct(...)        ((void)0)
+#define gte_ldsxy3(a,b,c)        ((void)0)
+#define gte_ldIR0(p)             ((void)(p))
+#define gte_rt(...)          ((void)0)
+#endif
 
-/* Narrow declarations formerly supplied by libfns.h.  Keeping them here
- * preserves DrawW.obj's own SYM type graph instead of importing unrelated SDK
- * and game declarations into the translation unit. */
-extern "C" {
-void SetTexWindow(void *, void *);
-void *SetSp(void *);
-void SetFarColor(int, int, int);
-void SetFogNear(int, int);
-void transform(void *, void *, void *);
-int fixedatan(int, int);
-int fixedmult(int, int);
-void fixedxformy(matrixtdef *, int);
-void xformy(matrixtdef *, int);
-}
-
-extern char *Render_gPacketEnd;
+extern "C" char *&Render_gPacketPtr;
+extern "C" char *&Render_gPalettePtr;
+extern "C" char *&Render_gPacketEnd;
 
 /* ---- world/cop/night transform matrices (Ghidra-named; matrixtdef like SYM gWorldMat) ---- */
-extern MATRIX     Render_gWorldMat, Render_gNightMat;
-extern matrixtdef Render_gCopMat;
+extern "C" MATRIX     &Render_gWorldMat, &Render_gNightMat, &Render_gCopMat;
 
 /* ---- PsyQ libgte / libgpu ---- */
 
 /* ---- eaclib / math fixed-point + transform helpers ---- */
 
-/* ---- draww module scratch / state globals (Ghidra-named, not in SYM) ---- */
-extern int    DrawW_gChunkGeomRez, DrawW_gChunkInd, DrawW_gChunkObjFlag, DrawW_gChunkQuadCount;
-extern int    DrawW_gChunkRelX, DrawW_gChunkRelY, DrawW_gChunkRelZ;
-extern int    DrawW_gFog_init, DrawW_gGroupCount, DrawW_gMatID_tmp, DrawW_gNightFlags, DrawW_gNightTmpFlag;
-extern int   *DrawW_gChunkStripBuf;
-extern Group *DrawW_gChunkVtxBuf, *DrawW_gGroupPtr;
-extern Track_tArtresource *DrawW_gInitialArtPtr;
-extern Track_tMaterial    *DrawW_gMaterialLUT;
-extern int    DrawW_gObjScratch_148, DrawWTrough_scratchVec[3];
 extern int    Skid_gCtrlPoint_0, Skid_gCtrlPoint_1, Skid_gCtrlPoint_2, Skid_gCtrlPoint_3;
 extern int    Skid_gCtrlPoint_4, Skid_gCtrlPoint_5, Skid_gCtrlPoint_6;
-extern int    Skid_gCtrlScratch_94, Skid_gCtrlScratch_98, Skid_gScratchPos1, Skid_gScratchPos2;
-extern int    INT_1f800084, INT_1f800088, INT_1f80008c, INT_1f800090;
+extern "C" int    &Skid_gCtrlScratch_94, &Skid_gCtrlScratch_98, Skid_gScratchPos1, Skid_gScratchPos2, &gScratchLastWord;
+extern int    &INT_1f800084, &INT_1f800088, &INT_1f80008c, &INT_1f800090;
 
 /* ---- auto-generated from SYM Globals + Demangled ---- */
-/* DrawW.obj omits these foreign owners from its debug graph even though the
- * retail instructions retain member-shaped accesses.  These layout-locked
- * exact-symbol views expose only the fields this TU consumes.  The canonical
- * audit validates and filters only these exact owner/name/layout tuples. */
-struct DrawW_SliceCodegenView {
-    int center[3];
-    char normal[3], forward[3], right[3];
-    u_char acousticType;
-    short pavedProfile, leftDrive, rightDrive;
-    u_char chunkIndex, laneCount, avgPavedWidthLf, avgPavedWidthRt;
-};
-struct DrawW_CameraCodegenView {
-    BO_tNewtonObj *anchor, *target;
-    u_char remaining[264];
-};
-struct DrawW_GameSetupCodegenView {
-    int raceType, numLaps, skill, commMode;
-    int setup04_10[7];
-    int mirrorTrack, reverseTrack, measurement, sgge, track, trackSegment;
-    int song, Weather, Fog, Damage, Time, randSeed, easter;
-    int controllerWords[22];
-    int pinkSlipsForfeit, checkpointType, checkpointHUD[2];
-    int dispatchSpeech, reverseCallSpeech, languageSpeech;
-    int SceneNumber, SceneStartLap, SceneEndLap;
-    GameSetup_tUserSetting userSetting;
-    int numPerps, stageOffset, perpArrests, finalPerpArrests;
-    GameSetup_tPerpData perpInfo[10];
-    int numCars, numPlayerRaceCars, numOpponentRaceCars, opponentCarType;
-    GameSetup_tCarData carInfo[9];
-};
-struct DrawW_SimGlobalCodegenView {
-    int gameStarted, gameTicks, time32Hz;
-    void *schedule64Hz, *schedule32Hz, *schedule32Hz2;
-};
-struct DrawW_TrackSpecCodegenView {
-    short fogstate, weatherstate, horizonstate, skystate;
-    short nightstate, depthcuestate, worldcolorstate, pad0;
-    CFogSpec fogspec;
-    CWeatherSpec weatherspec;
-    CHorizonSpec horizonspec;
-    CSkySpec skyspec;
-    CNightSpec nightspec;
-    CDepthCueSpec depthcuespec;
-    CWorldColor worldcolorspec;
-};
-
 extern Trk_AnimateInst * Anim_gInstanceFromIndex[8];
 extern Car_tObj * BW_gCopCarObj;
-extern DrawW_SliceCodegenView *DrawW_Slices asm("BWorldSm_slices");
+extern Trk_NewSlice * BWorldSm_slices;
 extern int BWorld_gChunkCount;
-extern u_char CF_DVLC[49096];
-extern DrawW_CameraCodegenView DrawW_Camera[136] asm("Camera_gInfo");
+extern "C" u_char CF_DVLC[49096];
+extern camera_info Camera_gInfo[136];
 extern Car_tObj * Cars_gHumanRaceCarList[2];
 extern Car_tObj * Cars_gList[2];
-extern int Cars_gNumHumanRaceCars;
+extern "C" extern int Cars_gNumHumanRaceCars;
 extern coorddef * Chunk_chunkCenters;
-extern CVECTOR * Chunk_lightTable;
-extern int Draw_gMidGroundOtz;
-extern int Draw_gViewOtSize;
-extern DrawW_GameSetupCodegenView DrawW_GameSetup asm("GameSetup_gData");
+extern "C" CVECTOR * Chunk_lightTable;
+extern "C" int Draw_gMidGroundOtz;
+extern "C" int Draw_gViewOtSize;
+extern "C" extern "C" GameSetup_tData GameSetup_gData;
 extern u_char (* Night_gCopColor[2])[256][8];
-extern u_char (* Night_gCurrentNightColor)[256][16];   /* matches owner def night.cpp @0x8013da48 (was stale u_char***) */
+extern "C" u_char (*Night_gCurrentNightColor)[256][16];
 extern char * Night_gNightTbl;
 extern u_char (* Night_gWeatherLightingTable[2])[256];
 extern Group * Object_customObjInst;
 extern Group * Object_customSimObjs;
-extern DrawW_TrackSpecCodegenView DrawW_TrackSpec asm("TrackSpec_gSpec");
-extern Chunk * Track_chunkList;
-extern short ** Track_gInViewList;
-extern Trk_ObjectDef ** Track_gObjDefs;
-extern Track_tMaterial * Track_materials;
+extern "C" CTrackSpec TrackSpec_gSpec;
+extern "C" Chunk * Track_chunkList;
+extern "C" short * Track_gInViewList;
+extern "C" Trk_ObjectDef ** Track_gObjDefs;
+extern "C" Track_tMaterial * Track_materials;
 // [owned->defined in draww.cpp] extern int animation_timer[12];
 // [owned->defined in draww.cpp] extern ChunkObjectInfo gChunkObjInfo;
-extern short gClutDepth[256][16];   /* FIX: matches owner textureprocess.cpp def [256][16]; the stale [1][4096] gave an 8192-byte row stride (oracle: sll 5 = 32-byte rows) */
+extern "C" short gClutDepth[256][16];
 extern matrixtdef gCopMat;
 extern BW_tContext * gCurrContext;
-extern Draw_tPixMap * gDLPixmap[10];   /* FIX: matches owner genericpmx.cpp def [10] */
+extern Draw_tPixMap * gDLPixmap[2];
 // [owned->defined in draww.cpp] extern Draw_SubdivStruct gDiv;
 // [owned->defined in draww.cpp] extern MATRIX gIdentTemplate;
-extern Track_tArtresource gInitialArt;
+extern "C" Track_tArtresource gInitialArt;
 extern matrixtdef gNightMat;
-extern int gNight_renderNight;
-extern Group * gPersistMidgroundObjInst;
-extern Group * gPersistObjDefBoundingSpheres;
-extern Group * gPersistObjInst;
-/* SYM/owner TRUTH: this is `Draw_tPixMap *gSkidMarkPixmap[2]` (genericpmx.cpp def;
-   SYM nfs4-f-v3.txt:119780 `ARY PTR STRUCT size 8 dims 1 2`).  The `[1]` here is a
-   deliberate STORAGE-SHAPE declaration, NOT a transcription error, and is
-   BEHAVIOURALLY IDENTICAL: element type and index scaling are unchanged, so
-   `gSkidMarkPixmap[i]` emits the same `sll;addu;lw` either way -- only the declared
-   size moves cc1plus's address-materialization/allocno handout.  MEASURED (W70,
-   Draw_kCtrlSkidmark, the only consumer): [1] = 274 diffs; [2] = 326; unsized [] =
-   326 (both rotate the whole callee-saved set s7/s5/s2 -> s6/s3/s1).  Neither form
-   uses %gp_rel here, so this is NOT the -G4 threshold.  Keep [1] until the
-   rotation is understood; the real bound is documented right here. */
+extern "C" extern int gNight_renderNight;
+extern "C" Group * gPersistMidgroundObjInst;
+extern "C" Group * gPersistObjDefBoundingSpheres;
+extern "C" Group * gPersistObjInst;
 extern Draw_tPixMap * gSkidMarkPixmap[1];
 extern int gSpikeBeltSlice;
 extern int gSpikeBeltX;
 // [owned->defined in draww.cpp] extern CCOORD16 gVertex3d[320];
 // [owned->defined in draww.cpp] extern DRender_tView * gVi;
-// [owned->defined in draww.cpp] extern u_long gWSavePtr;
+// [owned->defined in draww.cpp] extern intptr_t gWSavePtr;
 extern matrixtdef gWorldMat;
 // [owned->defined in draww.cpp] extern char goffsets[8];
 // [owned->defined in draww.cpp] extern char offsets[8];
-extern DrawW_SimGlobalCodegenView DrawW_SimGlobal asm("simGlobal");
+extern "C" Sim_tSimGlobalVar simGlobal;
 // [owned->defined in draww.cpp] extern int stackSpeedUpEnbabledFlag;
 // [owned->defined in draww.cpp] extern int trk0[9][2];
 // [owned->defined in draww.cpp] extern int trk4[10][2];
-extern void Anim_GetRotPos(Trk_AnimateInst *, int, int, coorddef *, matrixtdef *);
-extern bool BWorld_IsSliceInBuildList(int);
-extern void Flare_Halo2(DRender_tView *, int, int, coorddef *, coorddef *, struct Draw_FlareCache *);
+extern "C" { extern void Anim_GetRotPos(Trk_AnimateInst *, int, int, coorddef *, matrixtdef *); }
+extern "C" { extern int  BWorld_IsSliceInBuildList(int); }
+extern void Flare_Halo2(DRender_tView *, int, int, coorddef *, coorddef *, Draw_FlareCache *);
 extern void Math_fasttransmult(matrixtdef *, matrixtdef *, matrixtdef *);
 extern ObjectAnim *Object_GetAnim(Trk_SimObject *);
 extern void Quatern_QuatToMat(tQuat *, matrixtdef *);

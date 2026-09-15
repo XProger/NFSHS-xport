@@ -1,4 +1,4 @@
-/* eaclib/psx/eacpsxz/trnspos.cpp -- RECONSTRUCTED from nfs4-f.exe. NOT original source.
+/* eaclib/psx/eacpsxz/trnspos.c -- RECONSTRUCTED from nfs4-f.exe. NOT original source.
  *   Source obj : nfs4\eaclib\psx\trnspos.obj ; archive C:\nfs4\EACLIB\PSX\EACPSXZ.LIB (xlsx col10)
  *   1 fn @0x800E4358 (172 bytes): `transpose` -- 3x3 (matrixtdef = int m[9], 36 B) transpose.
  *   C-linkage symbol in the binary (SYM lists plain `transpose`) -> extern "C".
@@ -8,21 +8,19 @@
  *                    [1]<->[3], [2]<->[6], [5]<->[7]                       @0x800E4358
  *     - src != dst : out-of-place full transpose copy dst[i*3+j] = src[j*3+i]  @0x800E4398
  *   Decoded verbatim from disasm-v3 (m[] index = byte-offset/4). Behavior-faithful; @VA breadcrumb.
- *   Callers resolve to the plain `transpose` symbol via the central extern "C" lib/libfns.h.
+ *   Callers resolve to the plain `transpose` symbol via the central lib/libfns.h.
  */
-typedef struct matrixtdef { int m[9]; } matrixtdef;   /* local C-lane mirror of nfs4_types.h matrixtdef (pad.c precedent) */
+#include "../../../nfs4_types.h"
 
-extern void transpose(matrixtdef *src, matrixtdef *dst)   /* @0x800E4358 */
+extern "C" void transpose(matrixtdef *src, matrixtdef *dst)   /* @0x800E4358 */
 {
     int *s = src->m;
     int *d = dst->m;
     if (src == dst) {                       /* @0x800E4358 in-place */
-        /* MATCH: each swap written HIGH->LOW (t = d[hi]; d[hi] = d[lo]; d[lo] = t) --
-         * the lo->hi direction mirrors every load/store offset pair. */
         int t;
-        t = d[3]; d[3] = d[1]; d[1] = t;    /* off 12 <-> 4 */
-        t = d[6]; d[6] = d[2]; d[2] = t;    /* off 24 <-> 8 */
-        t = d[7]; d[7] = d[5]; d[5] = t;    /* off 28 <-> 20 */
+        t = d[1]; d[1] = d[3]; d[3] = t;    /* off 4 <-> 12 */
+        t = d[2]; d[2] = d[6]; d[6] = t;    /* off 8 <-> 24 */
+        t = d[5]; d[5] = d[7]; d[7] = t;    /* off 20 <-> 28 */
     } else {                                /* @0x800E4398 out-of-place: dst = src^T */
         d[0] = s[0]; d[1] = s[3]; d[2] = s[6];
         d[3] = s[1]; d[4] = s[4]; d[5] = s[7];

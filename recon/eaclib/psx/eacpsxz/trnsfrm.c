@@ -7,17 +7,16 @@
  *   fixedmult (16.16).  The asm computes the 3 components into stack temps and writes them to `out`
  *   only at the end, so `out` may safely alias `vec` or `mat`.
  */
-extern int fixedmult(int a, int b);                        /* eacpsxz @0x800E4328 (lbl_D4328) */
+extern "C" int fixedmult(int a, int b);                        /* eacpsxz @0x800E4328 (lbl_D4328) */
 
-typedef struct {
-    int x, y, z;
-} TransformResult;
-
-extern void transform(int *vec, int *mat, int *out)        /* @0x800EAED8 */
+extern "C" int *transform(int *vec, int *mat, int *out)        /* @0x800EAED8 */
 {
-    TransformResult result;
-    result.x = fixedmult(vec[0], mat[0]) + fixedmult(vec[1], mat[3]) + fixedmult(vec[2], mat[6]);
-    result.y = fixedmult(vec[0], mat[1]) + fixedmult(vec[1], mat[4]) + fixedmult(vec[2], mat[7]);
-    result.z = fixedmult(vec[0], mat[2]) + fixedmult(vec[1], mat[5]) + fixedmult(vec[2], mat[8]);
-    *(TransformResult *)out = result;
+    int o0, o1, o2;
+    o0 = fixedmult(vec[0], mat[0]) + fixedmult(vec[1], mat[3]) + fixedmult(vec[2], mat[6]);
+    o1 = fixedmult(vec[0], mat[1]) + fixedmult(vec[1], mat[4]) + fixedmult(vec[2], mat[7]);
+    o2 = fixedmult(vec[0], mat[2]) + fixedmult(vec[1], mat[5]) + fixedmult(vec[2], mat[8]);
+    out[0] = o0;
+    out[1] = o1;
+    out[2] = o2;
+    return out;
 }

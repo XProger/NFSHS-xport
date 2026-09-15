@@ -3,7 +3,7 @@
  *   (chunk visibility, build lists, spike belt, glare effects, render contexts). Self-contained.
  *   Verified vs disasm-v2.txt. NOT original source; SYM-faithful, recompilable C++.
  */
-#include "aiworld_types.h"
+#include "../../nfs4_types.h"
 #include "AIWORLD_externs.h"
 
 
@@ -35,40 +35,42 @@ void AIWorld_CalcSpeed(Car_tObj *carObj);
 int AIWorld_CalcLateralVelocity(Car_tObj *carObj);
 void AIWorld_FindBarrierLessLaneAndPosition(Car_tObj *carObj,int *goodLane,int *goodPosition);
 
-static inline int AIWorld_FIX8(int x)
-{
-  return x / 0x100;
-}
-
 
 /* ---- AIWorld_ZSplineDistance__FP8Car_tObjT0  [@0x80072f90] ---- */
 int AIWorld_ZSplineDistance(Car_tObj *carObj,Car_tObj *otherCarObj)
 {
-  coorddef relPos;    /* SYM AUTO struct @-0x28 -- H27 FIX: the oracle fully materializes ALL 3
-                          components of relPos/forward on the stack (incl. the UNUSED .y) before
-                          the two fixedmult calls; recon had inlined only the .x/.z terms actually
-                          consumed, dropping 2 subu+2 lw (11 insns short). */
-  coorddef forward;   /* SYM AUTO struct @-0x18; aggregate copy preserves retail's grouped loads */
-
-  relPos.x = (carObj->N).position.x - (otherCarObj->N).position.x;
-  relPos.y = (carObj->N).position.y - (otherCarObj->N).position.y;
-  relPos.z = (carObj->N).position.z - (otherCarObj->N).position.z;
-  forward = *(coorddef *)&(carObj->N).roadMatrix.m[6];
-  return fixedmult(relPos.x,forward.x) + fixedmult(relPos.z,forward.z);
+  coorddef relPos;
+  coorddef forward;
+  int iVar1;
+  int iVar2;
+  int iVar3;
+  int b;
+  
+  iVar1 = (carObj->N).position.z;
+  iVar3 = (otherCarObj->N).position.z;
+  b = (carObj->N).roadMatrix.m[8];
+  iVar2 = fixedmult((carObj->N).position.x - (otherCarObj->N).position.x,
+                     (carObj->N).roadMatrix.m[6]);
+  iVar1 = fixedmult(iVar1 - iVar3,b);
+  return iVar2 + iVar1;
 }
 
 /* ---- AIWorld_ZSplineDistance__FP8coorddefT0P10matrixtdef  [@0x80073024] ---- */
 int AIWorld_ZSplineDistance(coorddef *pos1,coorddef *pos2,matrixtdef *roadMatrix)
 {
-  coorddef relPos;    /* SYM AUTO struct @-0x28 -- H27 FIX (see the FP8Car_tObjT0 overload above):
-                          fully materialize relPos/forward incl. the unused .y component. */
-  coorddef forward;   /* SYM AUTO struct @-0x18; aggregate copy preserves retail's grouped loads */
-
-  relPos.x = pos1->x - pos2->x;
-  relPos.y = pos1->y - pos2->y;
-  relPos.z = pos1->z - pos2->z;
-  forward = *(coorddef *)&roadMatrix->m[6];
-  return fixedmult(relPos.x,forward.x) + fixedmult(relPos.z,forward.z);
+  coorddef relPos;
+  coorddef forward;
+  int iVar1;
+  int iVar2;
+  int iVar3;
+  int b;
+  
+  iVar1 = pos1->z;
+  iVar3 = pos2->z;
+  b = roadMatrix->m[8];
+  iVar2 = fixedmult(pos1->x - pos2->x,roadMatrix->m[6]);
+  iVar1 = fixedmult(iVar1 - iVar3,b);
+  return iVar2 + iVar1;
 }
 
 /* ---- AIWorld_ApxSplineDistance__FP8Car_tObjT0  [@0x800730b8] ---- */
@@ -81,22 +83,20 @@ int AIWorld_ApxSplineDistance(Car_tObj *carObj,Car_tObj *otherCarObj)
   int iVar1;
   int iVar2;
   
-  diff = (int)(carObj->N).simRoadInfo.slice - (int)(otherCarObj->N).simRoadInfo.slice;   /* SYM: diff REG $a0 */
-  halfTrack = gNumSlices / 2;   /* SYM: halfTrack REG $a1 -- computed ONCE, reused below
-                                    (recon had `gNumSlices/2` inlined twice, a double-roll bug) */
-  if (!(diff < 1) && !(diff <= halfTrack)) {
-    diff = diff - gNumSlices;
-  }
-  else {
-    iVar1 = diff * 2;
-    if (-1 < diff) goto LAB_8007311c;
-    if (diff < -halfTrack) {
-      diff = diff + gNumSlices;
+  iVar2 = (int)(carObj->N).simRoadInfo.slice - (int)(otherCarObj->N).simRoadInfo.slice;
+  if ((iVar2 < 1) || (iVar2 <= gNumSlices / 2)) {
+    iVar1 = iVar2 * 2;
+    if (-1 < iVar2) goto LAB_8007311c;
+    if (iVar2 < -(gNumSlices / 2)) {
+      iVar2 = iVar2 + gNumSlices;
     }
   }
-  iVar1 = diff << 1;
+  else {
+    iVar2 = iVar2 - gNumSlices;
+  }
+  iVar1 = iVar2 << 1;
 LAB_8007311c:
-  return (iVar1 + diff) * 0x20000;
+  return (iVar1 + iVar2) * 0x20000;
 }
 
 /* ---- AIWorld_ApxSplineDistance__FP8Car_tObji  [@0x80073128] ---- */
@@ -108,21 +108,20 @@ int AIWorld_ApxSplineDistance(Car_tObj *carObj,int location)
   int iVar1;
   int iVar2;
   
-  diff = (carObj->N).simRoadInfo.slice - location;   /* SYM: diff REG $a0 */
-  halfTrack = gNumSlices / 2;   /* SYM: halfTrack REG $a1 -- computed ONCE (double-roll bug) */
-  if (!(diff < 1) && !(diff <= halfTrack)) {
-    diff = diff - gNumSlices;
-  }
-  else {
-    iVar1 = diff * 2;
-    if (-1 < diff) goto LAB_80073188;
-    if (diff < -halfTrack) {
-      diff = diff + gNumSlices;
+  iVar2 = (carObj->N).simRoadInfo.slice - location;
+  if ((iVar2 < 1) || (iVar2 <= gNumSlices / 2)) {
+    iVar1 = iVar2 * 2;
+    if (-1 < iVar2) goto LAB_80073188;
+    if (iVar2 < -(gNumSlices / 2)) {
+      iVar2 = iVar2 + gNumSlices;
     }
   }
-  iVar1 = diff << 1;
+  else {
+    iVar2 = iVar2 - gNumSlices;
+  }
+  iVar1 = iVar2 << 1;
 LAB_80073188:
-  return (iVar1 + diff) * 0x20000;
+  return (iVar1 + iVar2) * 0x20000;
 }
 
 /* ---- AIWorld_ApxSplineDistance__FiP8Car_tObj  [@0x80073194] ---- */
@@ -142,33 +141,33 @@ int AIWorld_ApxSplineDistance(int locationA,int locationB)
   int iVar1;
   int iVar2;
   
-  diff = locationA - locationB;   /* SYM: diff REG $a0 */
-  halfTrack = gNumSlices / 2;   /* SYM: halfTrack REG $a1 -- computed ONCE (double-roll bug) */
-  if (!(diff < 1) && !(diff <= halfTrack)) {
-    diff = diff - gNumSlices;
-  }
-  else {
-    iVar1 = diff * 2;
-    if (-1 < diff) goto LAB_80073218;
-    if (diff < -halfTrack) {
-      diff = diff + gNumSlices;
+  iVar2 = locationA - locationB;
+  if ((iVar2 < 1) || (iVar2 <= gNumSlices / 2)) {
+    iVar1 = iVar2 * 2;
+    if (-1 < iVar2) goto LAB_80073218;
+    if (iVar2 < -(gNumSlices / 2)) {
+      iVar2 = iVar2 + gNumSlices;
     }
   }
-  iVar1 = diff << 1;
+  else {
+    iVar2 = iVar2 - gNumSlices;
+  }
+  iVar1 = iVar2 << 1;
 LAB_80073218:
-  return (iVar1 + diff) * 0x20000;
+  return (iVar1 + iVar2) * 0x20000;
 }
 
 /* ---- AIWorld_SplineDistance__FP8Car_tObjT0  [@0x80073224] ---- */
 int AIWorld_SplineDistance(Car_tObj *carObj,Car_tObj *otherCarObj)
 {
   int distance;
-
-  distance = AIWorld_ApxSplineDistance(carObj,otherCarObj);
-  if (distance + 0xc0000U < 0x180001) {
-    return AIWorld_ZSplineDistance(carObj,otherCarObj);
+  int iVar1;
+  
+  iVar1 = AIWorld_ApxSplineDistance(carObj,otherCarObj);
+  if (iVar1 + 0xc0000U < 0x180001) {
+    iVar1 = AIWorld_ZSplineDistance(carObj,otherCarObj);
   }
-  return distance;
+  return iVar1;
 }
 
 /* ---- AIWorld_SplineDistance__FP8Car_tObjiP8coorddef  [@0x8007327c] ---- */
@@ -176,10 +175,10 @@ int AIWorld_SplineDistance(Car_tObj *carObj,int location,coorddef *position)
 {
   int distance;
   int iVar1;
-
+  
   iVar1 = AIWorld_ApxSplineDistance(carObj,location);
   if (iVar1 + 0xc0000U < 0x180001) {
-    return AIWorld_ZSplineDistance(&(carObj->N).position,position,&(carObj->N).roadMatrix);
+    iVar1 = AIWorld_ZSplineDistance(&(carObj->N).position,position,&(carObj->N).roadMatrix);
   }
   return iVar1;
 }
@@ -193,87 +192,89 @@ int AIWorld_GameOdometer(Car_tObj *carObj)
 /* ---- AIWorld_IsDriveableLaneInSliceRange__Fiiii  [@0x800732f0] ---- */
 int AIWorld_IsDriveableLaneInSliceRange(int startSlice,int numSlicesToCheck,int direction,int laneIndex)
 {
-  int profileIndex;   /* SYM: REG -- clamp shape matches GetProfileMask/IsDriveableLane */
-  int laneOffset;      /* SYM: REG */
-  int mask;             /* SYM: REG -- computed ONCE before the loop */
-  int checkSliceOffset;  /* SYM: REG */
-  int checkSlice;         /* SYM: REG */
-  int sliceDelta;
-  int i;
-
-  laneOffset = 7 - laneIndex;
-  profileIndex = 8 - laneOffset;
-  if (profileIndex < 0) {
-    profileIndex = 0;
+  int profileIndex;
+  int laneOffset;
+  int mask;
+  int checkSliceOffset;
+  int checkSlice;
+  int iVar1;
+  int iVar2;
+  int iVar3;
+  int iVar4;
+  int iVar5;
+  int iVar6;
+  
+  iVar3 = 8 - (7 - laneIndex);
+  iVar4 = iVar3;
+  if (iVar3 < 0) {
+    iVar4 = 0;
   }
-  if (0xf < profileIndex) {
-    profileIndex = 0xf;
+  if (0xf < iVar3) {
+    iVar4 = 0xf;
   }
-  mask = 1 << (0xfU - profileIndex);
-  i = 0;
-  sliceDelta = 0;
-  while (true) {
-    if (numSlicesToCheck <= i) {
-      break;
+  iVar6 = 0;
+  iVar3 = 0;
+  do {
+    if (numSlicesToCheck <= iVar6) {
+      return 1;
     }
-    checkSlice = startSlice + sliceDelta;
-    if (sliceDelta >= 0) {    /* De Morgan complement -- oracle's sliceDelta<0 case is the
-                                  branch-TAKEN target, sliceDelta>=0 is the fall-through */
-      if (gNumSlices <= checkSlice) {
-        checkSlice = checkSlice - gNumSlices;
+    iVar5 = startSlice + iVar3;
+    if (iVar3 < 0) {
+      iVar2 = iVar5 * 0x20;
+      iVar1 = gNumSlices;
+      if (iVar5 < 0) goto LAB_80073374;
+    }
+    else {
+      iVar2 = iVar5 * 0x20;
+      if (gNumSlices <= iVar5) {
+        iVar1 = -gNumSlices;
+LAB_80073374:
+        iVar2 = (iVar5 + iVar1) * 0x20;
       }
     }
-    else if (checkSlice < 0) {
-      checkSlice = checkSlice + gNumSlices;
-    }
-    checkSliceOffset = checkSlice * 0x20;
-    sliceDelta = sliceDelta + direction;
-    if ((*(short *)(checkSliceOffset + (int)BWorldSm_slices + 0x16) & mask) == 0) {
+    iVar3 = iVar3 + direction;
+    if (((int)*(short *)(iVar2 + BWorldSm_slices + 0x16) & 1 << (0xfU - iVar4 & 0x1f)) == 0) {
       return 0;
     }
-    i = i + 1;
-  }
-  /* Exiting with `break` keeps the success value in the final return delay slot. */
-  return 1;
+    iVar6 = iVar6 + 1;
+  } while( true );
 }
 
 /* ---- AIWorld_IsDriveableLane__Fii  [@0x800733a8] ---- */
 int AIWorld_IsDriveableLane(int slice,int laneIndex)
 {
-  int profileIndex;   /* SYM: REG -- rewired from anonymous iVar1, matching the already-fixed
-                          AIWorld_GetProfileMask's split-statement clamp shape below */
-  int laneOffset;      /* SYM: REG */
-  int mask;             /* SYM: REG */
-
-  laneOffset = 7 - laneIndex;
-  profileIndex = 8 - laneOffset;
-  if (profileIndex < 0) {
-    profileIndex = 0;
+  int profileIndex;
+  int laneOffset;
+  int mask;
+  int iVar1;
+  
+  iVar1 = 8 - (7 - laneIndex);
+  if (iVar1 < 0) {
+    iVar1 = 0;
   }
-  if (0xf < profileIndex) {
-    profileIndex = 0xf;
+  if (0xf < iVar1) {
+    iVar1 = 0xf;
   }
-  mask = 1 << (0xfU - profileIndex);
-  return (int)*(short *)(slice * 0x20 + (int)BWorldSm_slices + 0x16) & mask;
+  return (int)*(short *)(slice * 0x20 + (int)BWorldSm_slices + 0x16) & 1 << (0xfU - iVar1 & 0x1f);
 }
 
 /* ---- AIWorld_GetProfileMask__Fi  [@0x800733fc] ---- */
 int AIWorld_GetProfileMask(int laneIndex)
 {
-  int profileIndex;   /* SYM: REG $v1 -- rewired from anonymous iVar1/iVar2 */
-  int laneOffset;      /* SYM: REG $v0 */
-
-  laneOffset = 7 - laneIndex;      /* split into 2 statements matching the oracle's literal
-                                       two subu ops -- a single `8 - (7 - laneIndex)` expression
-                                       gets constant-folded to laneIndex+1 by cc1plus, 3 insns short */
-  profileIndex = 8 - laneOffset;
-  if (profileIndex < 0) {
-    profileIndex = 0;
+  int profileIndex;
+  int laneOffset;
+  int iVar1;
+  int iVar2;
+  
+  iVar1 = 8 - (7 - laneIndex);
+  iVar2 = iVar1;
+  if (iVar1 < 0) {
+    iVar2 = 0;
   }
-  if (0xf < profileIndex) {
-    profileIndex = 0xf;
+  if (0xf < iVar1) {
+    iVar2 = 0xf;
   }
-  return 1 << (0xfU - profileIndex);
+  return 1 << (0xfU - iVar2 & 0x1f);
 }
 
 /* ---- AIWorld_IsDriveableLane_UsingMask__Fii  [@0x8007343c] ---- */
@@ -285,48 +286,50 @@ int AIWorld_IsDriveableLane_UsingMask(int slice,int mask)
 /* ---- AIWorld_CheckForBarrierBetweenLanes__Fiii  [@0x80073458] ---- */
 int AIWorld_CheckForBarrierBetweenLanes(int slice,int lane0,int lane1)
 {
-  int profileLane0;   /* SYM: REG $a1 -- rewired from anonymous uVar3 */
-  int profileLane1;   /* SYM: REG $v1 -- rewired from anonymous uVar1 */
-  int profile;        /* SYM: REG $a0 -- rewired from anonymous uVar2 */
-
-  profile = (int)*(short *)(slice * 0x20 + (int)BWorldSm_slices + 0x16);
-  profileLane0 = 0xe - lane0;
-  profileLane1 = 0xe - lane1;
-  if (profileLane1 < profileLane0) {   /* De Morgan complement of !(lane0<=lane1); the oracle's
-                                           ELSE-branch (lane0<=lane1 case) is the FALL-THROUGH,
-                                           this complement is the taken-branch target. */
-    return ~profile >> (profileLane1) & ~(-1 << ((profileLane0 - profileLane1) + 1));
+  int profileLane0;
+  int profileLane1;
+  int profile;
+  u_int uVar1;
+  u_int uVar2;
+  u_int uVar3;
+  
+  uVar3 = 0xe - lane0;
+  uVar1 = 0xe - lane1;
+  uVar2 = (u_int)*(short *)(slice * 0x20 + (int)BWorldSm_slices + 0x16);
+  if ((int)uVar3 <= (int)uVar1) {
+    return (int)~uVar2 >> (uVar3 & 0x1f) & ~(-1 << ((uVar1 - uVar3) + 1 & 0x1f));
   }
-  return ~profile >> (profileLane0) & ~(-1 << ((profileLane1 - profileLane0) + 1));
+  return (int)~uVar2 >> (uVar1 & 0x1f) & ~(-1 << ((uVar3 - uVar1) + 1 & 0x1f));
 }
 
 /* ---- AIWorld_LaneIndex__Fii  [@0x800734cc] ---- */
-/* SYM identifies only laneWidth ($v0) and li ($s0). Keeping the direct slice
- * indexing in both arms preserves retail's duplicated base loads and register
- * allocation; the signed divisions retain the bgez/addiu/sra sequences. */
 int AIWorld_LaneIndex(int slice,int position)
 {
   int laneWidth;
   int li;
+  u_char bVar1;
   int iVar2;
-
+  int iVar3;
+  
   if (position < 0) {
-    laneWidth = (int)*(u_char *)(BWorldSm_slices + slice * 32 + 30) * 0x8000;
-    li = 6;
+    bVar1 = *(u_char *)(slice * 0x20 + (int)BWorldSm_slices + 0x1e);
+    iVar3 = 6;
   }
   else {
-    laneWidth = (int)*(u_char *)(BWorldSm_slices + slice * 32 + 31) * 0x8000;
-    li = 7;
+    bVar1 = *(u_char *)(slice * 0x20 + (int)BWorldSm_slices + 0x1f);
+    iVar3 = 7;
   }
-  iVar2 = fixedmult(position,inverseLaneWidthTable[laneWidth / 0x4000]);
+  iVar2 = fixedmult(position,inverseLaneWidthTable[(int)((u_int)bVar1 * 0x8000) >> 0xe]);
   if (iVar2 < 0) {
     iVar2 = iVar2 + 0xffff;
   }
-  li = li + (iVar2 >> 0x10);
-  li = (li < 0) ? 0 : li;
+  iVar3 = iVar3 + (iVar2 >> 0x10);
+  if (iVar3 < 0) {
+    iVar3 = 0;
+  }
   iVar2 = 0xd;
-  if (li < 0xe) {
-    iVar2 = li;
+  if (iVar3 < 0xe) {
+    iVar2 = iVar3;
   }
   return iVar2;
 }
@@ -334,27 +337,25 @@ int AIWorld_LaneIndex(int slice,int position)
 /* ---- AIWorld_CalculateLaneInfo__FP8Car_tObj  [@0x80073594] ---- */
 void AIWorld_CalculateLaneInfo(Car_tObj *carObj)
 {
-  int rightEdgeIndex;   /* SYM: REG INT; clamp expression is explicitly unsigned (`sltiu`). */
-  int leftEdgeIndex;    /* SYM: REG INT */
-  int laneLoop;         /* SYM: REG INT; loop comparison remains signed (`slt`). */
+  int rightEdgeIndex;
+  int leftEdgeIndex;
+  int laneLoop;
+  short sVar1;
   int iVar2;
-
+  u_int uVar3;
+  u_int uVar4;
+  
   carObj->carInLane = 0;
   if ((carObj->AIFlags & 4U) == 0) {
-    /* the oracle RE-READS (carObj->N).simRoadInfo.slice fresh for EACH of the 3 calls (lh @+8,
-       three times) instead of caching it into a local -- caching it (as the old `sVar1` did)
-       forces an EXTRA value to survive across a call, needing a 3rd callee-saved reg (ours
-       saved s0/s1/s2, oracle only s0/s1). Eager-cache-drop, same class as the femenu
-       ptVar=FEApp finding in the catalog. */
     iVar2 = AIWorld_LaneIndex((int)(carObj->N).simRoadInfo.slice,carObj->roadPosition);
+    sVar1 = (carObj->N).simRoadInfo.slice;
     carObj->laneIndex = iVar2;
-    leftEdgeIndex = AIWorld_LaneIndex((int)(carObj->N).simRoadInfo.slice,
-                       (carObj->roadPosition - carObj->roadSpan) + 0x8000);
-    rightEdgeIndex = AIWorld_LaneIndex((int)(carObj->N).simRoadInfo.slice,
+    uVar3 = AIWorld_LaneIndex((int)sVar1,(carObj->roadPosition - carObj->roadSpan) + 0x8000);
+    uVar4 = AIWorld_LaneIndex((int)(carObj->N).simRoadInfo.slice,
                        carObj->roadPosition + carObj->roadSpan + -0x8000);
-    if (((u_int)rightEdgeIndex < 0xe) && ((u_int)leftEdgeIndex < 0xe)) {
-      for (laneLoop = leftEdgeIndex; (int)laneLoop <= (int)rightEdgeIndex; laneLoop = laneLoop + 1) {
-        carObj->carInLane = carObj->carInLane | 1 << laneLoop;
+    if ((uVar4 < 0xe) && (uVar3 < 0xe)) {
+      for (; (int)uVar3 <= (int)uVar4; uVar3 = uVar3 + 1) {
+        carObj->carInLane = carObj->carInLane | 1 << (uVar3 & 0x1f);
       }
     }
   }
@@ -364,101 +365,113 @@ void AIWorld_CalculateLaneInfo(Car_tObj *carObj)
 /* ---- AIWorld_CalculateDeltaRoadYaw__FP8Car_tObj  [@0x80073658] ---- */
 int AIWorld_CalculateDeltaRoadYaw(Car_tObj *carObj)
 {
-  int delta;     /* SYM: REG $a0, whole-function scope -- rewired from anonymous iVar1 */
-  int yaw0;      /* SYM: REG $s0, block-scoped inside the if -- rewired from anonymous iVar3 */
+  int delta;
+  int yaw0;
+  int iVar1;
   int iVar2;
-  int nextSlice;
-  int gnLess1;
-  int numSlices;
-
-  delta = 0;
+  int iVar3;
+  
+  iVar1 = 0;
   if ((carObj->carFlags & 8U) != 0) {
-    /* MATCH: the SLD puts the whole slice/gNumSlices/clamp chain on ONE retail line
-       (all of 8007367C..8007369C is SLD:492), and retail SINKS the gNumSlices read into
-       the taken arm right after the slice load -- that read order is what gives
-       slice=$a2 / numSlices=$a1.  The 0-insn void fence then stops sched from pulling
-       the `lw s0,0x178(v1)` roadYaw load past the +1 (oracle 80073688/8C order). */
     iVar2 = (int)(carObj->N).simRoadInfo.slice;
-    numSlices = gNumSlices;
-    yaw0 = (carObj->N).roadYaw;
-    nextSlice = iVar2 + 1;
-    __asm__("" : : "i"(0));
-    if (numSlices <= nextSlice) {
-      gnLess1 = numSlices - 1;
-      nextSlice = iVar2 - gnLess1;
+    iVar3 = (carObj->N).roadYaw;
+    iVar1 = iVar2 + 1;
+    if (gNumSlices <= iVar1) {
+      iVar1 = iVar2 - (gNumSlices + -1);
     }
-    delta = Newton_CalculateSliceYaw(nextSlice);
-    delta = delta - yaw0;
-    if (0x200 < delta) {
-      delta = delta + -0x400;
+    iVar1 = Newton_CalculateSliceYaw(iVar1);
+    iVar1 = iVar1 - iVar3;
+    if (0x200 < iVar1) {
+      iVar1 = iVar1 + -0x400;
     }
-    if (delta < -0x200) {
-      delta = delta + 0x400;
+    if (iVar1 < -0x200) {
+      iVar1 = iVar1 + 0x400;
     }
   }
-  return delta;
+  return iVar1;
 }
 
 /* ---- AIWorld_CalcRoadBend__FP8Car_tObji  [@0x800736e0] ---- */
-/* The SYM SLD maps the four fixed-point terms to one source statement.  Keeping each
- * signed /256 operation behind the inline helper prevents premature reassociation, while
- * the named first product preserves retail's evaluation order and register lifetimes. */
 int AIWorld_CalcRoadBend(Car_tObj *carObj,int lookAhead)
 {
   int thisSlice;
   int nextSlice;
-  int bend;
-
-  thisSlice = (int)(carObj->N).simRoadInfo.slice;
-  if (lookAhead >= 0) {
-    nextSlice = thisSlice + lookAhead;
-    if (gNumSlices <= nextSlice) {
-      nextSlice = nextSlice - gNumSlices;
+  int iVar1;
+  int iVar2;
+  int iVar3;
+  int iVar4;
+  
+  iVar2 = (int)(carObj->N).simRoadInfo.slice;
+  if (lookAhead < 0) {
+    iVar1 = iVar2 + lookAhead;
+    if (iVar1 < 0) {
+      iVar1 = iVar1 + gNumSlices;
     }
   }
   else {
-    nextSlice = thisSlice + lookAhead;
-    if (nextSlice < 0) {
-      nextSlice = nextSlice + gNumSlices;
+    iVar1 = iVar2 + lookAhead;
+    if (gNumSlices <= iVar1) {
+      iVar1 = iVar1 - gNumSlices;
     }
   }
-  bend = AIWorld_FIX8((int)*(signed char *)(BWorldSm_slices + nextSlice * 32 + 15) << 9) *
-         AIWorld_FIX8((int)*(signed char *)(BWorldSm_slices + thisSlice * 32 + 18) << 9);
-  return bend + AIWorld_FIX8((int)*(signed char *)(BWorldSm_slices + nextSlice * 32 + 17) << 9) *
-         AIWorld_FIX8((int)*(signed char *)(BWorldSm_slices + thisSlice * 32 + 20) << 9);
+  iVar4 = iVar1 * 0x20 + reinterpret_cast<int>(BWorldSm_slices);
+  iVar1 = *(char *)(iVar4 + 0xf) * 0x200;
+  if (iVar1 < 0) {
+    iVar1 = iVar1 + 0xff;
+  }
+  iVar3 = iVar2 * 0x20 + reinterpret_cast<int>(BWorldSm_slices);
+  iVar2 = *(char *)(iVar3 + 0x12) * 0x200;
+  if (iVar2 < 0) {
+    iVar2 = iVar2 + 0xff;
+  }
+  iVar4 = *(char *)(iVar4 + 0x11) * 0x200;
+  if (iVar4 < 0) {
+    iVar4 = iVar4 + 0xff;
+  }
+  iVar3 = *(char *)(iVar3 + 0x14) * 0x200;
+  if (iVar3 < 0) {
+    iVar3 = iVar3 + 0xff;
+  }
+  return (iVar1 >> 8) * (iVar2 >> 8) + (iVar4 >> 8) * (iVar3 >> 8);
 }
 
 /* ---- AIWorld_CalcFutureLateralVel__FP8Car_tObji  [@0x800737bc] ---- */
 int AIWorld_CalcFutureLateralVel(Car_tObj *carObj,int slicesAhead)
 {
-  coorddef right;   /* SYM AUTO struct -- the oracle fully MATERIALIZES right.x/y/z (shifted
-                        bytes) to the stack BEFORE any fixedmult call (sw 0x10/0x14/0x18(sp)),
-                        then reloads right.y/right.z per call -- matches a real named-struct
-                        write, not the old cVar1/cVar2 scalar-cache shortcut. */
-  int futureSlice;   /* SYM: REG -- rewired from anonymous iVar3's slice-wrap result */
-  int currentSlice;   /* SYM: REG -- (carObj->N).simRoadInfo.slice, cached once */
-
+  coorddef right;
+  int futureSlice;
+  int currentSlice;
+  char cVar1;
+  char cVar2;
+  int iVar3;
+  int iVar4;
+  int iVar5;
+  
   if ((carObj->carFlags & 0x10U) != 0) {
-    if (__builtin_abs(carObj->currentSpeed) < 0x140000) {
+    iVar3 = carObj->currentSpeed;
+    if (iVar3 < 0) {
+      iVar3 = -iVar3;
+    }
+    if (iVar3 < 0x140000) {
       slicesAhead = 0;
     }
   }
-  currentSlice = (carObj->N).simRoadInfo.slice;
-  futureSlice = currentSlice + slicesAhead;
-  if (slicesAhead >= 0) {
-    if (gNumSlices <= futureSlice) {
-      futureSlice = futureSlice - gNumSlices;
+  iVar3 = (carObj->N).simRoadInfo.slice + slicesAhead;
+  if (slicesAhead < 0) {
+    if (iVar3 < 0) {
+      iVar3 = iVar3 + gNumSlices;
     }
   }
-  else if (futureSlice < 0) {
-    futureSlice = futureSlice + gNumSlices;
+  else if (gNumSlices <= iVar3) {
+    iVar3 = iVar3 - gNumSlices;
   }
-  right.x = (int)*(signed char *)(BWorldSm_slices + futureSlice * 32 + 18) << 9;
-  right.y = (int)*(signed char *)(BWorldSm_slices + futureSlice * 32 + 19) << 9;
-  right.z = (int)*(signed char *)(BWorldSm_slices + futureSlice * 32 + 20) << 9;
-  return fixedmult((carObj->N).linearVel.x,right.x) +
-         fixedmult((carObj->N).linearVel.y,right.y) +
-         fixedmult((carObj->N).linearVel.z,right.z);
+  iVar3 = iVar3 * 0x20 + reinterpret_cast<int>(BWorldSm_slices);
+  cVar1 = *(char *)(iVar3 + 0x13);
+  cVar2 = *(char *)(iVar3 + 0x14);
+  iVar3 = fixedmult((carObj->N).linearVel.x,(int)*(char *)(iVar3 + 0x12) << 9);
+  iVar4 = fixedmult((carObj->N).linearVel.y,(int)cVar1 << 9);
+  iVar5 = fixedmult((carObj->N).linearVel.z,(int)cVar2 << 9);
+  return iVar3 + iVar4 + iVar5;
 }
 
 /* ---- AIWorld_CalcSpeed__FP8Car_tObj  [@0x800738d4] ---- */
@@ -471,8 +484,12 @@ void AIWorld_CalcSpeed(Car_tObj *carObj)
   
   iVar2 = (carObj->N).linearVel.x;
   iVar1 = (carObj->N).linearVel.z;
-  iVar2 = __builtin_abs(iVar2);
-  iVar1 = __builtin_abs(iVar1);
+  if (iVar2 < 0) {
+    iVar2 = -iVar2;
+  }
+  if (iVar1 < 0) {
+    iVar1 = -iVar1;
+  }
   if (iVar1 < iVar2) {
     carObj->speed = iVar2 + (iVar1 >> 2);
     return;
@@ -485,41 +502,52 @@ void AIWorld_CalcSpeed(Car_tObj *carObj)
 int AIWorld_CalcLateralVelocity(Car_tObj *carObj)
 {
   int temp;
-
-  temp = fixedmult((carObj->N).linearVel.x,(carObj->N).roadMatrix.m[0]);   /* running accumulator,
-                                    matches the oracle's immediate addu-after-each-call shape --
-                                    NOT 3 separate iVar1/2/3 results summed at the end */
-  temp = temp + fixedmult((carObj->N).linearVel.y,(carObj->N).roadMatrix.m[1]);
-  temp = temp + fixedmult((carObj->N).linearVel.z,(carObj->N).roadMatrix.m[2]);
-  return temp;
+  int iVar1;
+  int iVar2;
+  int iVar3;
+  
+  iVar1 = fixedmult((carObj->N).linearVel.x,(carObj->N).roadMatrix.m[0]);
+  iVar2 = fixedmult((carObj->N).linearVel.y,(carObj->N).roadMatrix.m[1]);
+  iVar3 = fixedmult((carObj->N).linearVel.z,(carObj->N).roadMatrix.m[2]);
+  return iVar1 + iVar2 + iVar3;
 }
 
 /* ---- AIWorld_FindBarrierLessLaneAndPosition__FP8Car_tObjPiT1  [@0x80073978] ---- */
 void AIWorld_FindBarrierLessLaneAndPosition(Car_tObj *carObj,int *goodLane,int *goodPosition)
 {
-  int roadSide;    /* SYM: REG -- direction*driveSide, rewired from anonymous iVar2 */
-  int laneWidth;   /* SYM: REG INT -- materialized PRE-SHIFTED (byte<<15) right where the byte is
-                         read (oracle: `sll s1,v0,15` right after each branch's `lbu`), not kept
-                         raw and multiplied later -- lets the shifted value be reused directly
-                         by the loop-trailing multiply/shift below without re-deriving it. */
-  int laneLoop;      /* SYM: REG -- rewired from anonymous iVar4 */
+  int laneWidth;
+  int laneLoop;
+  u_char bVar1;
+  int iVar2;
+  int currentSlice;
   int iVar3;
-
-  roadSide = carObj->direction * AITune_driveSide;
-  laneLoop = 0;
-  if (roadSide == 1) {
+  int optVar2;
+  int delta;
+  int optVar1;
+  int thisSlice;
+  int checkSlice;
+  int checkSliceOffset;
+  int temp;
+  int iVar4;
+  int roadSide;
+  coorddef right;
+  
+  iVar2 = carObj->direction * AITune_driveSide;
+  iVar4 = 0;
+  if (iVar2 == 1) {
     *goodLane = 7;
-    laneWidth = *(u_char *)((carObj->N).simRoadInfo.slice * 0x20 + (int)BWorldSm_slices + 0x1f) << 15;
+    bVar1 = *(u_char *)((carObj->N).simRoadInfo.slice * 0x20 + (int)BWorldSm_slices + 0x1f);
   }
   else {
     *goodLane = 6;
-    laneWidth = *(u_char *)((carObj->N).simRoadInfo.slice * 0x20 + (int)BWorldSm_slices + 0x1e) << 15;
+    bVar1 = *(u_char *)((carObj->N).simRoadInfo.slice * 0x20 + (int)BWorldSm_slices + 0x1e);
   }
-  for (; laneLoop < 3; laneLoop = laneLoop + 1) {
+  do {
     iVar3 = AIWorld_IsDriveableLane((int)(carObj->N).simRoadInfo.slice,*goodLane);
     if (iVar3 != 0) break;
-    *goodLane = *goodLane + roadSide;
-  }
-  *goodPosition = roadSide * (laneWidth * laneLoop + ((u_int)laneWidth >> 1));
+    iVar4 = iVar4 + 1;
+    *goodLane = *goodLane + iVar2;
+  } while (iVar4 < 3);
+  *goodPosition = iVar2 * ((u_int)bVar1 * 0x8000 * iVar4 + ((u_int)bVar1 * 0x8000 >> 1));
   return;
 }

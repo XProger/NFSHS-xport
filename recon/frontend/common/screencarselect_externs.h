@@ -1,38 +1,39 @@
 /* frontend/screens/screencarselect_externs.h - reconstructed externs. NOT original. */
 #ifndef _FE_SCREENS_SCREENCARSELECT_EXTERNS_H_
 #define _FE_SCREENS_SCREENCARSELECT_EXTERNS_H_
-#include "screencarselect_types.h"
-/* Source-only cast spelling; a typedef would invent a debug record absent
- * from ScreenCarSelect.obj. */
-#define code int
+#include "../../nfs4_types.h"
+#include "../../lib/libfns.h"
+typedef int code(...);   /* Ghidra fn-ptr type for vtable dispatch */
+extern int _i, _reflection;   /* DrawCar Ghidra phantom locals */
 
 /* ===== globals ===== */
-extern tfrontEnd          frontEnd;
+extern "C" extern tfrontEnd          frontEnd;
 extern tTournamentManager tournamentManager;
 extern tTrackManager      trackManager;
 extern tGlobalMenuDefs   *menuDefs;
 extern tFEApplication    *FEApp;
-extern int                ticks[];
-extern char              *Paths_Paths[];
+extern "C" int                ticks;
+extern "C" extern char              *Paths_Paths[];
 extern int                kRGBVals[28];
-extern char               textDefinitions[14][6];
-extern tPadModuleState    gPadinfo;
-extern int                screenheight, showRoomFlag, gFlip, gStopCommentaryNow;
-extern int                gShowroomLights[];   /* store-[] lever: cc1 materialises addr in a genreg (sw $0,%lo($v0)) not $at */
-extern int gMenuRotate[2];
+extern "C" char               textDefinitions[14][6];
+extern "C" u_char            *&Render_gPacketPtr, *&Render_gPalettePtr;
+extern "C" tPadModuleState    gPadinfo;
+extern "C" int                screenheight, showRoomFlag, gFlip, gShowroomLights, gStopCommentaryNow;
+extern "C" int gMenuRotate[2];
 extern u_long             gCameraRotation;
-extern DRender_tView gCView;   /* W58-A1: real type (render.cpp @0x80116F7C); was mistyped int* */
-extern Car_tObj *gCarObj[2];
-char *PlayerName(int);
-extern bool               CURRENTLYUSINGMEMCARD;
-extern GameSetup_tData GameSetup_gData;
+extern "C" extern DRender_tView gCView;
+extern "C" Car_tObj *gCarObj[2];
+extern "C" { char *PlayerName(...); }
+extern "C" char               CURRENTLYUSINGMEMCARD;
+extern "C" extern "C" GameSetup_tData GameSetup_gData;
 extern tCarManager carManager;
-void DrawC_MenuColorData(int, Car_tObj *, int);
-extern int DrawC_gMenuLights, DrawC_gMenuLightsDirection;
+extern "C" { void DrawC_MenuColorData(...); }
+extern "C" int DrawC_gMenuLights, DrawC_gMenuLightsDirection;
 
 /* ===== statics owned by ScreenCarSelect.obj ===== */
-extern PinkSlipsCarSelectState PinkSlipsScreenState[2];
-static int  gKnots[8][5] = {              /* STAT @0x80051e78 spline knots (byte-exact from image) */
+extern "C" PinkSlipsCarSelectState PinkSlipsScreenState[2];
+// Initial data from FRONT.BIN, not BSS. CalcSplinePosition indexes these.
+static int gKnots[8][5] = {              /* STAT @0x80051e78 */
     {491520, -524288, 17039360, 131072, 0},
     {491520, -524288, 17039360, 131072, 0},
     {196608, -524288, 17039360, 6684672, 11206656},
@@ -42,134 +43,89 @@ static int  gKnots[8][5] = {              /* STAT @0x80051e78 spline knots (byte
     {196608, -524288, 17039360, 6684672, 55902208},
     {196608, -524288, 17039360, 6684672, 55902208}
 };
-static int  gCatmullRom[4][4] = {         /* STAT @0x80051f18 Catmull-Rom basis (16.16) */
+static int gCatmullRom[4][4] = {         /* STAT @0x80051f18 */
     {-65536, 196608, -196608, 65536},
     {131072, -327680, 262144, -65536},
     {-65536, 0, 65536, 0},
     {0, 131072, 0, 0}
 };
-static tCarStatType remap[5] = { (tCarStatType)0, (tCarStatType)2, (tCarStatType)1, (tCarStatType)3, (tCarStatType)4 };  /* STAT @0x80051f58 */
-static short textVals[5] = {              /* STAT @0x80051f6c */
-    278, 279, 280, 281, 282
-};
-static short text2PVals[5] = {            /* STAT @0x80051f78 */
-    283, 284, 285, 286, 287
-};
-static short tvOrder[10] = {              /* STAT @0x80051f84 */
-    2, 7, 4, 8, 1, 6, 0, 9, 3, 5
-};
-static short tvSplitOrder[5] = {          /* STAT @0x80051f98 */
-    2, 1, 3, 0, 4
-};
-/* SYM-TYPE-OVERRIDE: gStateOverlays -- SYM reports CHAR, but retail uses signed
-   byte loads/tests and this build's plain char is unsigned. */
-static signed char gStateOverlays[8][4] = { /* STAT @0x80051fa4 (byte-exact) */
-    {-1, 6, 0, -1},
-    { 4, 6, 0, -1},
-    {-1, 6, 2, -1},
-    { 4, 6, 1, -1},
-    {-1, 6, 3,  5},
-    {-1,-1,-1, -1},
-    {-1,-1,-1, -1},
-    {-1,-1,-1, -1}
-};
-static RECT gOverlayPositions[7][2] = { /* STAT @0x80051fc4 */
-    {{ 290, 256, 200, 12}, {290, 200, 200, 12}},
-    {{ 213, 256, 288, 41}, {213, 185, 288, 41}},
-    {{ 213, 256, 288, 41}, {213, 185, 288, 41}},
-    {{ 213, 256, 288, 41}, {213, 185, 288, 41}},
-    {{ 325,   5, 162, 24}, {325,  29, 162, 24}},
-    {{ 495,  21,   3,  3}, {213,  21, 285,105}},
-    {{-120, 136, 130, 77}, {  0, 136, 130, 77}}
+static tCarStatType remap[5];                     /* STAT @0x80051f58 */
+static short textVals[5], text2PVals[5];  /* STAT @0x80051f6c/f78 */
+static short tvOrder[10], tvSplitOrder[5];/* STAT @0x80051f84/f98 */
+static char gStateOverlays[8][4];         /* STAT @0x80051fa4, 8 states x 4 slots */
+static const RECT gOverlayPositions[7][2] = { /* STAT @0x80051fc4 */
+    {{ 290, 256, 200, 12}, { 290, 200, 200, 12}},
+    {{ 213, 256, 288, 41}, { 213, 185, 288, 41}},
+    {{ 213, 256, 288, 41}, { 213, 185, 288, 41}},
+    {{ 213, 256, 288, 41}, { 213, 185, 288, 41}},
+    {{ 325,   5, 162, 24}, { 325,  29, 162, 24}},
+    {{ 495,  21,   3,  3}, { 213,  21, 285,105}},
+    {{-120, 136, 130, 77}, {   0, 136, 130, 77}},
 };
 static int  gRotateOffset[4];             /* STAT @0x80052c18 */
-static char gSwapFileName[2][20];         /* STAT @0x80052c28 */
+static char gSwapFileName[2][40];         /* STAT @0x80052c28 */
 static char WaitingString[50];            /* STAT @0x80052c58 */
 /* vtable data refs (Ghidra _DAT_) + per-class vtables */
-extern __vtbl_ptr_type tScreenCarSelect_vtable[], tScreenCarSelectDuel_vtable[], tScreenCarSelectTwoPlayer_vtable[], tScreenPinkSlipsCarSelect_vtable[];
+extern "C" __vtbl_ptr_type tScreenCarSelect_vtable[], tScreenCarSelectDuel_vtable[], tScreenCarSelectTwoPlayer_vtable[], tScreenPinkSlipsCarSelect_vtable[];
 /* singletons (EXT) */
-extern tScreenCarSelect *screenCarSelect;
+tScreenCarSelect *screenCarSelect;
 
 /* ===== base ctor/dtor helpers ===== */
-void tScreen_ctor(tScreen*); void tScreen_dtor(tScreen*, int __in_chrg);
-void tScreenCarSelect_ctor(tScreenCarSelect*); void tScreenCarSelect_dtor(tScreenCarSelect*);
+extern "C" { void tScreen_ctor(tScreen*); void tScreen_dtor(tScreen*); }
+extern "C" { void tScreenCarSelect_ctor(tScreenCarSelect*); void tScreenCarSelect_dtor(tScreenCarSelect*); }
 void tScreenCarSelectTwoPlayer_ctor(tScreenCarSelectTwoPlayer*); void tScreenCarSelectTwoPlayer_dtor(tScreenCarSelectTwoPlayer*);
 void tScreenCarSelectDuel_dtor(tScreenCarSelectDuel*); void tScreenPinkSlipsCarSelect_dtor(tScreenPinkSlipsCarSelect*);
 
 /* ===== tScreen helpers (free-fn form) ===== */
-void  DrawBackgroundImage(tScreen*, int, int, tTexture_ShapeInfo*, int) asm("DrawBackgroundImage__7tScreeniiP18tTexture_ShapeInfoi");
-bool IsShapeFileLoaded(tScreen*, tShapeInformation*) asm("IsShapeFileLoaded__7tScreenR17tShapeInformation");
-/* W58-A1 (08A phantom fix): the tScreen / tCarManager / tTrackManager / tVideoWall /
- * tDialogBase / tFEApplication entry points below were free `(...)`- or `(void*)`-typed
- * decls that mangled every call site to a symbol the link can never resolve
- * (`..__Fe` / `..__FPv`).  They are MEMBERS -- declarations live in the exact
- * owner type surface and call sites use obj->Method(...) / obj.Method(...).
- * Byte-neutral (`this` rides $a0).
- * Removed here: UploadShapes, UploadSwapShapes, TransitionOff, TransitionOn,
- * SetAvailableIcon, SetOffset, SetValid, GetStockCar, GetNumPinkSlipsCars,
- * CalcUsedPrice, CheapestCarStockPrice, GetTrack, Hide, Display, Redraw. */
-void  FreeShapes(tScreen*, tShapeInformation*) asm("FreeShapes__7tScreenR17tShapeInformation");
-void  InitializeShapes(tScreen*, tShapeInformation*, int) asm("InitializeShapes__7tScreenR17tShapeInformationUi");
-void  AsyncLoadSwapShapeFile(tScreen*, char*) asm("AsyncLoadSwapShapeFile__7tScreenPc");
-void  AsyncLoadShapeFile(tScreen*, char*, tShapeInformation*) asm("AsyncLoadShapeFile__7tScreenPcR17tShapeInformation");
+void  DrawBackgroundImage(tScreen*, int, int, tTexture_ShapeInfo*, int);
+extern "C" { void *IsShapeFileLoaded(tScreen*, tShapeInformation*); }
+extern "C" { void  UploadShapes(...); }
+void  FreeShapes(tScreen*, tShapeInformation*);
+void  InitializeShapes(tScreen*, tShapeInformation*, int);
+void  AsyncLoadSwapShapeFile(tScreen*, char*);
+void  AsyncLoadShapeFile(tScreen*, char*, tShapeInformation*);
+void TransitionOff(tScreen *, tScreen_TransitionType, tMenu *); void TransitionOn(tScreen *, tScreen_TransitionType, tMenu *);
 
 /* ===== tVideoWall methods (free-fn form) ===== */
-void TurnOn(tVideoWall*) asm("TurnOn__10tVideoWall"); void TurnOff(tVideoWall*) asm("TurnOff__10tVideoWall"); void TurnOffInstant(tVideoWall*) asm("TurnOffInstant__10tVideoWall");
-void UpdateImages(tVideoWall*) asm("UpdateImages__10tVideoWall"); void UpdateTransition(tVideoWall*) asm("UpdateTransition__10tVideoWall"); void Draw(tVideoWall*) asm("Draw__10tVideoWall");
-void SetAvailable(tVideoWall*, unsigned short) asm("SetAvailable__10tVideoWalls"); void SetAvailableText(tVideoWall*, short, short, short) asm("SetAvailableText__10tVideoWallsss");
-void Initialize(tVideoWall*, tTVConfig*, tTexture_ShapeInfo*, short, short, short*, short) asm("Initialize__10tVideoWallP9tTVConfigP18tTexture_ShapeInfossPss");
+void TurnOn(tVideoWall*); void TurnOff(tVideoWall*); void TurnOffInstant(tVideoWall*);
+void UpdateImages(tVideoWall*); void UpdateTransition(tVideoWall*); void Draw(tVideoWall*);
+void SetAvailable(tVideoWall*, unsigned short); void SetAvailableText(tVideoWall*, short, short, short);
+void SetAvailableIcon(tVideoWall *, short, short, short, short, tTexture_ShapeInfo *);
+void Initialize(tVideoWall*, tTVConfig*, tTexture_ShapeInfo*, short, short, short*, short);
 
 /* ===== FE / game / PsyQ helpers ===== */
 int   CalcFadeVal(int, int);
-char *TextSys_Word(int); int TextSys_WordX(int); int TextSys_WordY(int); int TextSys_WordFlags(int);
-/* W58-A1: TextValue/Decrement/Increment are tListIteratorCar members (the free
- * `(void*,tPlayer)` decls mangled to ..__FPv7tPlayer -- an unlinkable phantom). */
-void  DrawMoney(int, int, int, long, int, int);
-void  DrawShapeExtended(int, int, int, int, int, int, tDrawShapeExtended *);
-/* W58-A1 (08A phantom fix): true prototypes from configs/symbol_addrs.txt --
- * DrawShape_NFS4Rectangle__FR4RECT, DrawShape_NFS4RoundRectangle__FiR4RECTs. */
-void  DrawShape_NFS4Rectangle(RECT &); void DrawShape_NFS4RoundRectangle(int, RECT &, short);
-void  DrawSlider(short, short, short, short, short, short, short, short, short, bool, bool, short, short);
+extern "C" { char *TextSys_Word(int); int TextSys_WordX(int); int TextSys_WordY(int); int TextSys_WordFlags(int); }
+short TextValue(tListIteratorCar *, tPlayer); extern "C" { void Decrement(void*, tPlayer); void Increment(void*, tPlayer); }
+extern "C" { void  DrawMoney(...); }
+extern "C" { void  DrawShapeExtended(...); }
+extern "C" { void  DrawShape_NFS4Rectangle(...); void DrawShape_NFS4RoundRectangle(int, RECT*, short); }
+extern "C" { void  DrawSlider(...); }
 void  PSXDrawSquare(int,int,int,int,int);
-void  FETextRender_FullTextRGB(char *, short, short, int, char, short);
-void  FETextRender_MenuTextPositionedJustify(short, short, short, short,
-                                              tMenuTextState, tMenuTextType)
-  __asm__("FETextRender_MenuTextPositionedJustify__Fssss14tMenuTextState13tMenuTextType");
-void FETextRender_WordWrap(short index, RECT &r, tMenuTextState textState,
-                           tMenuTextType textType)
-  __asm__("FETextRender_WordWrap__FsR4RECT14tMenuTextState13tMenuTextType");
-void  FeAudio_AsyncPlaySpeech(int, int);
-bool FECheat_IsCheatEnabled(tCheatCode)
-  __asm__("FECheat_IsCheatEnabled__F10tCheatCode");
-/* W58-A1: GetTrackByID / GetTrackToRace are tTrackManager / tTournamentManager members. */
-short LoadGame(short, bool, bool);
-extern "C" int MCRD_handlecardevents(int);
-char *Platform_GetDCTBuffer(int, char *); void Platform_ResetDCTBuffer();
-/* W58-A1 (08A phantom fix): Draw_MenuRenderingView__FP8Car_tObjP13DRender_tViewiiiUliffii.
- * The old `(...)` decl also default-promoted the two float args to double at the call
- * site; the typed form keeps them float.  gCView is a real DRender_tView (render.cpp),
- * not an int* -- the W56-A1 "caller passes int**" note is fixed here at the decl. */
-void  Draw_MenuRenderingView(Car_tObj *, DRender_tView *, int, int, int, unsigned long, int, float, float, int, int);
-extern void *Draw_gPlayer1View;   /* int def in render.cpp */
+extern "C" { void  FETextRender_FullTextRGB(...); }
+void  FETextRender_MenuTextPositionedJustify(short, short, short, short, tMenuTextState, tMenuTextType);
+void FETextRender_WordWrap(short,RECT&,tMenuTextState,tMenuTextType);
+extern "C" { void  FeAudio_AsyncPlaySpeech(...); }
+extern "C" { void *FECheat_IsCheatEnabled(...); }
+short GetNumPinkSlipsCars(tCarManager *, short);
+void GetStockCar(tCarManager *, unsigned short, tCarInfo *); void GetTrack(tTrackManager *, unsigned short, tTrackInformation *);
+extern "C" { tTrackInformation *GetTrackByID(tTrackManager*, short); void GetTrackToRace(tTournamentManager*, void*); }
+short LoadGame(short player, bool PinkSlips, bool WithDialogs);
+extern "C" { void  MCRD_handlecardevents(...); }
+extern "C" { char *Platform_GetDCTBuffer(...); void Platform_ResetDCTBuffer(); }
+#include "../../game/psx/fe3dmenu.h"
+extern "C" int Draw_gPlayer1View;
+void SetOffset(tVideoWall *, short, short);
+void SetValid(tVideoWall *, short); extern "C" { void Hide(void*); void Display(void*); void Redraw(void*); }
 
 
 /* re-added (varargs; one per line to avoid shared-line breakage) */
-void  AudioMus_StopSong(int); void  CleanupSpinningCarsMenu(void); void  DeInit_Memcard(void);
-/* W58-A1 (08A phantom fix): DrawShape_NFS4TransRectangle__FR4RECTs,
- * FETextRender_MenuTextPositioned__Fsss14tMenuTextState13tMenuTextType. */
-void  DrawShape_NFS4TransRectangle(RECT &, short);
-void  FETextRender_MenuTextPositioned(short, short, short,
-                                      tMenuTextState, tMenuTextType)
- __asm__("FETextRender_MenuTextPositioned__Fsss14tMenuTextState13tMenuTextType");
-void  Init_Memcard(bool, bool);
- void  SetLicensePlate(void);
-extern "C" CARDINFO_def *MCRD_getcard(int);
-void *Draw_GetDRAWENV(int, int);
-extern "C" int fixedmult(int, int);
-extern "C" int fixeddiv(int, int);
-extern "C" int gettick(void);
-extern "C" int sprintf(char *, const char *, ...);
-extern "C" void SetDrawArea(DR_AREA *, RECT *);
+extern "C" { void  AudioMus_StopSong(...); void  CleanupSpinningCarsMenu(...); void  DeInit_Memcard(...); }
+extern "C" { void  DrawShape_NFS4TransRectangle(...); void  FETextRender_MenuTextPositioned(...); void  Init_Memcard(...); }
+ extern "C" void SetLicensePlate(void); void TransformVector(...); extern "C" void UploadSwapShapes(tScreen *, int);
+long CalcUsedPrice(tCarManager *, short); long CheapestCarStockPrice(tCarManager *); short GetNumOwnedCars(tCarManager *, short); short GetNumTourneyCars(tCarManager *, short);
+extern "C" { CARDINFO_def *MCRD_getcard(...); }
+extern "C" DRAWENV *Draw_GetDRAWENV(int, int); void GetGarageCar(tCarManager *, unsigned short, tCarInfo *, int); void *GetPinkSlipsCar(...);
 
-void PreLoad(tScreen*) asm("PreLoad__7tScreen");
+void PreLoad(tScreen*);
 #endif

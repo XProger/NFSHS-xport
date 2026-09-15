@@ -1,22 +1,23 @@
 /* frontend/screens/screendisplay_externs.h - reconstructed externs. NOT original. */
 #ifndef _FE_SCREENS_SCREENDISPLAY_EXTERNS_H_
 #define _FE_SCREENS_SCREENDISPLAY_EXTERNS_H_
-#include "screendisplay_types.h"
+#include "../../nfs4_types.h"
+#include "../../lib/libfns.h"
 
-extern tfrontEnd   frontEnd;
-extern int  ticks;
+extern "C" extern tfrontEnd   frontEnd;
+extern "C" int  ticks;
 extern tGlobalMenuDefs *menuDefs;
 /* (gFE_bgIndex/gFE_bgFadeVal are NOT globals: SYM STAT = DrawBackground-local statics
    lastpercentage/perfade @0x800528e0/e4 -- Ghidra mis-named them. Defined in the .cpp.) */
-extern int  gMasterSFXLevel, gMasterMusicLevel, gMasterEngineLevel, gMasterAmbientLevel;
-extern int  gMasterFENarrationLevel, gStereoMode, Audio_direct3davail;
+extern "C" extern int  gMasterSFXLevel, gMasterMusicLevel, gMasterEngineLevel, gMasterAmbientLevel;
+extern "C" int  gMasterFENarrationLevel, gStereoMode, Audio_direct3davail;
 extern SndBnk_t gSndBnk[7];
-extern SPEECHINFO ginfo;
+extern "C" extern SPEECHINFO ginfo;
 extern int  kRGBVals[28];
-extern char textDefinitions[14][6];
+extern "C" char textDefinitions[14][6];
 int  CalcFadeVal(int col1, int col2, int amount);   /* 3-arg overload */
-void DrawShapeExtended(int index, int flags, int x, int y, int fade, int abr, tDrawShapeExtended *extra);
-extern "C" int textpixels(char *str);
+extern "C" { void DrawShapeExtended(int index, int flags, int x, int y, int fade, int abr, tDrawShapeExtended *extra); }
+extern "C" { int  textpixels(char *str); }
 void SetMenu(tMenuItemSlidingMenu *thisobj, short i, void *menu);   /* sliding-menu method; menu is tMenu-derived */
 void *TransitionIsFinished(tOptionsMenu *thisobj);   /* method on the options menu */
 int CalcFadeVal(int col1, int amount);            /* 2-arg overload */

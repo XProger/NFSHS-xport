@@ -3,14 +3,23 @@
  *   CD player, wingman interface, render views (hud/tac/map/stats), 3-2-1-GO, BTC/busted.
  *   Reconstructed with full SYM-locals applied (audited).
  */
-#include "flare_types.h"
+#include "../../nfs4_types.h"
+#include "../../mips_semantics.h"
 #include "flare_externs.h"
-#include "psyq_prim_macros.h"
-
-/* PsyQ gte_ldclmv/gte_stclmv (matrix-COLUMN short vector, stride 6) -- the
- * CarShapedHalo/Halo2 column transforms: lhu 0/6/12 -> IR1-3 and IR1-3 -> sh 0/6/12
- * (oracle @0x800CD0B0.., 3 lhu then 3 mtc2 / 3 mfc2 then 3 sh, scratch $12-$14).
- * Promoted to psx_gte.h (w40 consolidation; was TU-local since w13-a3). */
+#ifdef AP_WIN
+extern "C" void NFSHS_HostReplayFlareReadback(void *);
+extern "C" void NFSHS_HostTraceOtProducerSpan(const char *,const void *,const void *);
+/* Diagnostic provenance only: keep early-return paths covered without
+   changing any flare calculation or packet emission. */
+struct NFSHS_FlarePacketScope {
+  const char *domain;
+  const void *begin;
+  NFSHS_FlarePacketScope(const char *name): domain(name), begin(Render_gPacketPtr) {}
+  ~NFSHS_FlarePacketScope() {
+    NFSHS_DIAGNOSTIC_CALL(NFSHS_HostTraceOtProducerSpan(domain,begin,Render_gPacketPtr));
+  }
+};
+#endif
 
 /* ---- Flare.obj-OWNED globals -- DEFINED here (self-contained; SYM-typed via gen_owned_defs:
    .data = real NFS4.EXE bytes, .bss = zero) ---- */
@@ -30,10 +39,21 @@ SVECTOR      Flare_gQuad[4] = { {0, -256, 0, 0}, {256, 0, 0, 0}, {0, 256, 0, 0},
 Flare_tInfo  Flare_gType[34] = { {8421504u, 8421504u, 1024, 0}, {3158064u, 8421504u, 0, 3}, {526440u, 394792u, 1, 13}, {8421504u, 3158064u, 0, 13}, {4222912u, 526528u, 0, 13}, {4222912u, 526528u, 0, 13}, {7368816u, 1052696u, 0, 13}, {526464u, 526376u, 0, 13}, {526464u, 526376u, 0, 12}, {557184u, 534568u, 0, 12}, {8390664u, 2623496u, 0, 12}, {3158064u, 8421504u, 0, 3}, {526440u, 394792u, 2, 13}, {8421504u, 3158064u, 1, 13}, {4222912u, 526528u, 1, 13}, {4222912u, 526528u, 1, 13}, {7368816u, 1052696u, 1, 13}, {526464u, 526376u, 1, 13}, {526464u, 526376u, 1, 12}, {557184u, 534568u, 1, 12}, {8390664u, 2623496u, 1, 12}, {526464u, 526376u, 0, 0}, {662658u, 132116u, 675, 136}, {48830u, 17990u, 0, 0}, {12632256u, 0, 770, 4}, {3688552u, 2105376u, 1795, 12}, {6314040u, 1579032u, 3594, 12}, {2123920u, 1581088u, 3594, 12}, {2123920u, 1581088u, 1281, 8}, {6318248u, 2105376u, 734, 8}, {13158600u, 2105376u, 16384, 9}, {2123920u, 1581088u, 1281, 24}, {7572224u, 0, 1024, 12}, {16711680u, 0, 256, 8} };   /* @0x8011ff68 */
 SVECTOR      gOv[4] = { {-2, 0, 0, 0}, {2, 0, 0, 0}, {-2, 256, 0, 0}, {2, 256, 0, 0} };   /* @0x80120188 */
 SVECTOR      Flare_gLensOct[8] = { {0, -256, 0, 0}, {180, -180, 0, 0}, {-180, -180, 0, 0}, {256, 0, 0, 0}, {-256, 0, 0, 0}, {180, 180, 0, 0}, {-180, 180, 0, 0}, {0, 256, 0, 0} };   /* @0x801201a8 */
-/* w64-a18 E5 fix: CVECTOR is a 4-byte struct -- the flat initialiser put the
- * colour word into color.r (truncated) and type into color.g, zeroing type.
- * All 9 entries re-braced word-for-word from the ROM (receipts w64a18 sec 10.1). */
-FLARE_PIECE_DEF Flare_SunFlarePieces[9] = { {0, 19660, {0x19, 0x0a, 0, 0}, 1}, {-9830, 65536, {0x10, 0x05, 0, 0}, 0}, {-16384, 6553, {0x0f, 0x0f, 0x03, 0}, 0}, {9830, 26214, {0x15, 0x0a, 0, 0}, 2}, {29491, 26214, {0x06, 0x06, 0x14, 0}, 0}, {49152, 19660, {0x15, 0x0f, 0x08, 0}, 4}, {55705, 13107, {0x0a, 0x14, 0x1f, 0}, 2}, {65536, 6553, {0x0a, 0x14, 0x0a, 0}, 0}, {75366, 19660, {0x1f, 0x0f, 0x10, 0}, 2} };   /* @0x801201e8 */
+/* The MIPS .data records at 0x801201E8 are 16 bytes each: distance, size,
+   packed CVECTOR at +8, and the shape selector at +0xC.  A flat aggregate
+   initializer assigns its fourth scalar to CVECTOR.g and zero-initializes
+   type, so keep the nested color aggregate explicit. */
+FLARE_PIECE_DEF Flare_SunFlarePieces[9] = {
+  {     0, 19660, {0x19,0x0a,0x00,0x00}, 1},
+  { -9830, 65536, {0x10,0x05,0x00,0x00}, 0},
+  {-16384,  6553, {0x0f,0x0f,0x03,0x00}, 0},
+  {  9830, 26214, {0x15,0x0a,0x00,0x00}, 2},
+  { 29491, 26214, {0x06,0x06,0x14,0x00}, 0},
+  { 49152, 19660, {0x15,0x0f,0x08,0x00}, 4},
+  { 55705, 13107, {0x0a,0x14,0x1f,0x00}, 2},
+  { 65536,  6553, {0x0a,0x14,0x0a,0x00}, 0},
+  { 75366, 19660, {0x1f,0x0f,0x10,0x00}, 2}
+};   /* @0x801201e8 */
 FLARE_DEF    gFlare_LensFlare;   /* @0x80120278  (bss(zero)) */
 CVECTOR      gfrgb = {255u, 255u, 255u, 0};   /* @0x8013d86c */
 CVECTOR      gfrgb2 = {64u, 64u, 128u, 0};   /* @0x8013d870 */
@@ -67,125 +87,65 @@ void Flare_Sun(SVECTOR *worldPos,Draw_FlareCache *sd);
 void Flare_Moon(SVECTOR *worldPos,Draw_FlareCache *sd);
 
 
-/* ============================ w41-a8 OT-LINK LEVER PAIR ============================
- * Two source shapes, applied together, that fix the whole `Flare_*` / Sky OT-link family.
- * Landed: Sky_RenderStars 2->PASS, OctFlare/Spikes/HexFlare/ReflectHexFlare 20->14 each,
- * 2DHalo 60->40, Sun 50->28 (a "100%-certified floor" -- REFUTED), Halo2 48->28,
- * CarShapedHalo 59->45, LensFlare 56->48.  Scripted appliers kept at scratch/
- * otlink_lever{,2,3}.py + slot_lever{,2}.py (see the REPORT -- worktrees get pruned).
- *
- * (1) addr24-EARLY (LICM movable ORDER).  loop.c hoists movables in INSN order = the
- *     order each constant is first GENERATED in RTL.  Inside
- *         `A & 0xff000000 | B & 0xffffff`
- *     that is ff000000-then-ffffff, but the oracle's preheader materializes
- *     `lui;ori 0xFFFFFF` BEFORE `lui 0xFF000000`.  Flipping the OR operands DOES reorder
- *     the hoists, but it also flips which subexpression lands in $v1 vs $v0 (measured on
- *     Sky_RenderStars: 8 diffs one statement flipped, 12 both).  The DECOUPLED fix is to
- *     give the SECOND RMW's `(u_int)prim & 0xffffff` its own temp evaluated right after
- *     `prim = Render_gPacketPtr;` (`addr24`, the Flare_Tri `pkt_addr24` idiom):
- *         prim   = Render_gPacketPtr;
- *         addr24 = (u_int)prim & 0xffffff;      <-- generates 0xFFFFFF FIRST
- *         *(u_int *)prim = *(u_int *)prim & 0xff000000 | *slot & 0xffffff;
- *         ...
- *         *slot = pkt24 | (addr24 & 0xffffff);
- *     The 0xFFFFFF def now precedes the 0xFF000000 def AND the first RMW keeps its
- *     prim-mask-first evaluation order.
- * (2) ONE-EXPRESSION SLOT (accumulate into the INDEX, not the base).  Replace
- *         slot = (u_int *)Render_gPalettePtr; slot = (u_int *)((int)slot + otz * 4);
- *     with the Hrz_TextureQuad/Sky_RenderStars form
- *         pal = Render_gPalettePtr;  slot = (u_int *)(otz * 4 + (int)pal);
- *     so the shift result itself is the addu DEST (oracle `sll a1,s3,2 ; lui v0 ; lw v0 ;
- *     addu a1,a1,v0`).  The `pal` temp is REQUIRED -- inlining Render_gPalettePtr into the
- *     expression costs an insn (HexFlare 29 diffs / 116 insns).
- * Applying (1)+(2) took Flare_HexFlare's ALPHA-RENAMED structural residual to 0/117 (the
- * remaining 14 gate diffs are a single $t0<->$t1 allocno swap between `i` and 0xFFFFFF).
- * NEGATIVE: (1) alone REGRESSES Flare_PreCalcHexLightBeam (16->18, no loop -> no LICM) and
- * shifts Hrz_BuildSky's preheader one slot too early (390->388 gate but a structurally
- * WORSE preheader) -- gate every site, do not apply blind.
- * =================================================================================
-*
- * ===== w42-a6: THE TWO-MASK $t1<->$t2 ROTATION IS THE allocno_compare IDENTITY DELTA =====
- * Flare_Sun 28, Flare_Halo2 28, Flare_2DHalo 24-of-40, CarShapedHalo ~10-of-19, LensFlare
- * ~8-of-48 (+ Font_TextXY ~12-of-22 and Weather_DoWeather ~12-of-60 in the sibling TUs) are
- * ALL one repeated 7-diff unit: `lui 0xFFFFFF` / `lui 0xFF000000` are emitted in the SAME
- * ORDER as the oracle but land in the OPPOSITE registers.  QUANTIFIED on Flare_Sun (site 1):
- *   0xFFFFFF     birth insn 85, last use 115  -> live 30
- *   0xFF000000   birth insn 92, last use 116  -> live 24
- * Both quantities have identical ref counts, so the pick is purely the live-length tie-break:
- * OUR cc1 gives the earlier hard reg to the SHORTER-lived quantity (0xFF000000 -> $t1);
- * retail gives it to the LONGER-lived one (0xFFFFFF -> $t1).  That is exactly the
- * "allocno_compare live-length weighting" true-identity residue recorded in the catalog
- * (w32-w33 §G, 7 clean cases) -- not a source shape.  MEASURED NEGATIVE this wave (all on
- * Flare_2DHalo block 1, gate 40 baseline): drop the addr24 temp (46), addr24 AFTER the first
- * RMW (40), swap the first RMW's OR operands (40), pkt24 computed first (63, -1 insn).
- * A source flip would need 0xFFFFFF's live range SHORTER than 0xFF000000's, i.e. its `lui`
- * born AFTER the other one -- but every spelling that does that also moves the emission
- * order away from the oracle.  => permuter / toolchain-identity class, do NOT re-grind by
- * hand.  (The Flare_HexFlare family's 14-diff residual is the SAME tie with `i` as the
- * rival: mask 5 refs/50 live = .200 vs i 7 refs/54 live = .2593; the flip needs mask refs
- * >= 7 (a 3rd in-loop use, which does not exist) or i's live > 70.)
- * =========================================================================================
- */
-
 /* ---- Flare_Tri__FPlN20i  [FLARE.CPP:75-89] SLD-VERIFIED ---- */
 void Flare_Tri(long *cp,long *p1,long *p2,int otz)
 
 {
-  int pkt_addr24; /* SYM-CODEGEN-CARRIER: pkt_addr24 -- keeps the retail OT-link mask/hoist order */
-  POLY_G3 *prim;
-
-  otz = otz * 4 + (int)Render_gPalettePtr;
-  prim = (POLY_G3 *)Render_gPacketPtr;
-  *(u_int *)prim = *(u_int *)prim & 0xff000000 | *(u_int *)otz & 0xffffff;
-  pkt_addr24 = *(u_int *)otz & 0xff000000;
-  Render_gPacketPtr = (u_char *)prim + 0x1c;
-  *(u_int *)otz = pkt_addr24 | (u_int)prim & 0xffffff;
-  *(u_int *)((u_char *)prim + 4) = 0x32000000;
-  *(u_int *)((u_char *)prim + 0xc) = *(u_int *)&gfrgb;
-  *(u_int *)((u_char *)prim + 0x14) = 0;
-  ((u_char *)prim)[3] = 6;
-  *(long *)((u_char *)prim + 8) = *p2;
-  *(long *)((u_char *)prim + 0x10) = *cp;
-  *(long *)((u_char *)prim + 0x18) = *p1;
+  u_int *prev_pkt_slot;
+  int pkt_addr24;
+  u_char *prim;
+  CVECTOR flareColor;
+  
+  prim = (u_char *)Render_gPacketPtr;
+  prev_pkt_slot = (u_int *)(Render_gPalettePtr + otz * 4);
+  nfs4_add_prim((void *)(intptr_t)prev_pkt_slot,Render_gPacketPtr);
+  pkt_addr24 = (u_int)Render_gPacketPtr & 0xffffff;
+  Render_gPacketPtr = Render_gPacketPtr + 0x1c;
+  *(u_int *)(prim + 4) = 0x32000000;
+  flareColor = gfrgb;
+  *(u_int *)(prim + 0x14) = 0;
+  prim[3] = 6;
+  *(CVECTOR *)(prim + 0xc) = flareColor;
+  *(long *)(prim + 8) = *p2;
+  *(long *)(prim + 0x10) = *cp;
+  *(long *)(prim + 0x18) = *p1;
   return;
 }
 
 /* ---- Flare_SetMatrix__FP10matrixtdef  [FLARE.CPP:184-192] SLD-VERIFIED ---- */
 void Flare_SetMatrix(matrixtdef *m)
 {
+  int r0, r1, r2;
   MATRIX mpsx;
+  int *mm = (int *)m;
 
-  /* MATCH: SYM shows r0/r1/r2 re-declared in THREE separate nested block
-   * scopes (one per row) rather than one function-scope decl -- each block's
-   * {int r0,r1,r2;} is a FRESH pseudo (§A block-scope rule). */
-  {
-    int r0, r1, r2;
-    r0 = ((int *)m)[0] >> 4; r1 = ((int *)m)[3] >> 4; r2 = ((int *)m)[6] >> 4;
-    mpsx.m[0][0] = (short)r0; mpsx.m[0][1] = (short)r1; mpsx.m[0][2] = (short)r2;
-  }
-  {
-    int r0, r1, r2;
-    r0 = ((int *)m)[1] >> 4; r1 = ((int *)m)[4] >> 4; r2 = ((int *)m)[7] >> 4;
-    mpsx.m[1][0] = (short)r0; mpsx.m[1][1] = (short)r1; mpsx.m[1][2] = (short)r2;
-  }
-  {
-    int r0, r1, r2;
-    r0 = ((int *)m)[2] >> 4; r1 = ((int *)m)[5] >> 4; r2 = ((int *)m)[8] >> 4;
-    mpsx.m[2][0] = (short)r0; mpsx.m[2][1] = (short)r1; mpsx.m[2][2] = (short)r2;
-  }
+  mpsx.m[0][0] = (short)(mm[0] >> 4);
+  /* MIPS 0x800CBD50..0x800CBDB8 reads the 3x3 matrixtdef by
+     columns (0,3,6), (1,4,7), (2,5,8) before packing MATRIX. */
+  mpsx.m[0][1] = (short)(mm[3] >> 4);
+  mpsx.m[0][2] = (short)(mm[6] >> 4);
+  mpsx.m[1][0] = (short)(mm[1] >> 4);
+  mpsx.m[1][1] = (short)(mm[4] >> 4);
+  mpsx.m[1][2] = (short)(mm[7] >> 4);
+  mpsx.m[2][0] = (short)(mm[2] >> 4);
+  mpsx.m[2][1] = (short)(mm[5] >> 4);
+  mpsx.m[2][2] = (short)(mm[8] >> 4);
   gte_SetRotMatrix(&mpsx);
-  gte_ldtr0();
+  gte_ldtr(0,0,0);
 }
 
 /* ---- Flare_IdentMatrix__FP6MATRIX  [FLARE.CPP:196-202] SLD-VERIFIED ---- */
 void Flare_IdentMatrix(MATRIX *mtx)
 
 {
-  *(int *)((char *)mtx + 0) = 0x1000;
-  *(int *)((char *)mtx + 4) = 0;
-  *(int *)((char *)mtx + 8) = 0x1000;
-  *(int *)((char *)mtx + 0xc) = 0;
-  *(int *)((char *)mtx + 0x10) = 0x1000;
+  *(short *)((int)(mtx->m + 0) + 0) = 0x1000;
+  *(short *)((int)(mtx->m + 0) + 2) = 0;
+  *(u_int *)(mtx->m[0] + 2) = 0;
+  *(short *)((int)(mtx->m + 1) + 2) = 0x1000;
+  *(short *)((int)(mtx->m + 1) + 4) = 0;
+  *(short *)((int)(mtx->m + 2) + 0) = 0;
+  *(short *)((int)(mtx->m + 2) + 2) = 0;
+  *(u_int *)(mtx->m[2] + 2) = 0x1000;
   return;
 }
 
@@ -193,55 +153,70 @@ void Flare_IdentMatrix(MATRIX *mtx)
 void Flare_OctFlare(long *center,int otz)
 
 {
+  int pkt_addr24;
+  int prev_pkt_slot;
+  int gfHexPt1_iter;
+  int gfOctPt2_iter;
   int i;
+  int vert_idx;
   long rgb1;
+  int CVar6;
   long flare_dvxy [13];
-
-  /* MATCH: SYM locals = flare_dvxy[13] + i(t1) + rgb1(t4, pre-loop gfrgb cache)
-   * + block-scope prim(a0); walkers = givs from gfOctPt1[i]/gfOctPt2[i]. */
-  rgb1 = *(long *)&gfrgb;
-gte_ldv0(&Flare_gOct);
+  u_char *prim;
+  
+  CVar6 = (*(int *)&gfrgb);
+gte_lwc2(0,*(int *)(&Flare_gOct));
+  gte_lwc2(1,*(int *)(((char *)&Flare_gOct + 0x4)));
   gte_rtps();
 gte_swc2(0xe,((char *)&flare_dvxy + 0x10));
-gte_ldv0(((char *)&Flare_gOct + 0x8));
+gte_lwc2(0,*(int *)(((char *)&Flare_gOct + 0x8)));
+  gte_lwc2(1,*(int *)(((char *)&Flare_gOct + 0xc)));
   gte_rtps();
 gte_swc2(0xe,((char *)&flare_dvxy + 0x14));
-gte_ldv0(((char *)&Flare_gOct + 0x10));
+gte_lwc2(0,*(int *)(((char *)&Flare_gOct + 0x10)));
+  gte_lwc2(1,*(int *)(((char *)&Flare_gOct + 0x14)));
   gte_rtps();
 gte_swc2(0xe,((char *)&flare_dvxy + 0x18));
-gte_ldv0(((char *)&Flare_gOct + 0x18));
+gte_lwc2(0,*(int *)(((char *)&Flare_gOct + 0x18)));
+  gte_lwc2(1,*(int *)(((char *)&Flare_gOct + 0x1c)));
   gte_rtps();
 gte_swc2(0xe,((char *)&flare_dvxy + 0x1c));
-gte_ldv0(((char *)&Flare_gOct + 0x20));
+gte_lwc2(0,*(int *)(((char *)&Flare_gOct + 0x20)));
+  gte_lwc2(1,*(int *)(((char *)&Flare_gOct + 0x24)));
   gte_rtps();
 gte_swc2(0xe,((char *)&flare_dvxy + 0x20));
-gte_ldv0(((char *)&Flare_gOct + 0x28));
+gte_lwc2(0,*(int *)(((char *)&Flare_gOct + 0x28)));
+  gte_lwc2(1,*(int *)(((char *)&Flare_gOct + 0x2c)));
   gte_rtps();
 gte_swc2(0xe,((char *)&flare_dvxy + 0x24));
-gte_ldv0(((char *)&Flare_gOct + 0x30));
+gte_lwc2(0,*(int *)(((char *)&Flare_gOct + 0x30)));
+  gte_lwc2(1,*(int *)(((char *)&Flare_gOct + 0x34)));
   gte_rtps();
 gte_swc2(0xe,((char *)&flare_dvxy + 0x28));
-gte_ldv0(((char *)&Flare_gOct + 0x38));
+gte_lwc2(0,*(int *)(((char *)&Flare_gOct + 0x38)));
+  gte_lwc2(1,*(int *)(((char *)&Flare_gOct + 0x3c)));
   gte_rtps();
 gte_swc2(0xe,((char *)&flare_dvxy + 0x2c));
-  i = 8;
+  vert_idx = 8;
+  gfOctPt2_iter = (int)gfOctPt2;
+  gfHexPt1_iter = (int)gfHexPt1;
   while( true ) {
-    i = i - 1;
-    if (i == -1) break;
-    {
-      POLY_G3 *prim;
-      prim = (POLY_G3 *)Render_gPacketPtr;
-      setaddr(prim,getaddr(otz * 4 + (int)Render_gPalettePtr));
-      Render_gPacketPtr = (u_char *)prim + 0x1c;
-      setaddr(otz * 4 + (int)Render_gPalettePtr,prim);
-      *(u_int *)((u_char *)prim + 4) = 0x32000000;
-      *(long *)((u_char *)prim + 0xc) = rgb1;
-      *(u_int *)((u_char *)prim + 0x14) = 0;
-      ((u_char *)prim)[3] = 6;
-      *(long *)((u_char *)prim + 8) = flare_dvxy[gfOctPt2[i]];
-      *(long *)((u_char *)prim + 0x10) = *center;
-      *(long *)((u_char *)prim + 0x18) = flare_dvxy[gfOctPt1[i]];
-    }
+    prim = (u_char *)Render_gPacketPtr;
+    gfOctPt2_iter = gfOctPt2_iter + -2;
+    vert_idx = vert_idx + -1;
+    gfHexPt1_iter = gfHexPt1_iter + -2;
+    if (vert_idx == -1) break;
+    prev_pkt_slot = otz * 4 + (int)Render_gPalettePtr;
+    nfs4_add_prim((void *)(intptr_t)prev_pkt_slot,Render_gPacketPtr);
+    pkt_addr24 = (u_int)Render_gPacketPtr & 0xffffff;
+    Render_gPacketPtr = Render_gPacketPtr + 0x1c;
+    *(u_int *)(prim + 4) = 0x32000000;
+    *(int *)(prim + 0xc) = CVar6;
+    *(u_int *)(prim + 0x14) = 0;
+    prim[3] = 6;
+    *(long *)(prim + 8) = flare_dvxy[*(short *)gfHexPt1_iter];
+    *(long *)(prim + 0x10) = *center;
+    *(long *)(prim + 0x18) = flare_dvxy[*(short *)gfOctPt2_iter];
   }
   return;
 }
@@ -250,143 +225,121 @@ gte_swc2(0xe,((char *)&flare_dvxy + 0x2c));
 void Flare_OctFlareSpikes(long *center,int otz)
 
 {
-  int i;
-  long rgb1;
-  long rgb2;
-  long cent;
+#ifdef AP_WIN
+  NFSHS_DIAGNOSTIC_CALL(NFSHS_HostTraceFlareEmit("OctSpikes",center,otz,__builtin_return_address(0)));
+#endif
+  int pkt_addr24_b;
+  int pkt_addr24_c;
+  int pkt_addr24_d;
+  int pkt_addr24;
+  u_int *puVar1;
+  int id2;
   int id0;
   int id1;
-  int id2;
+  int i;
+  int vert_idx;
+  long rgb2;
+  long rgb1;
+  long cent;
+  int center_word;
   long flare_dvxy [13];
-
-  /* MATCH: SYM locals = flare_dvxy[13], i(t3), rgb1(s2)/rgb2(s1) pre-loop caches,
-   * cent(t8), id0(a3)/id1(t1)/id2(a2) in-place reused across both prims;
-   * SpikePt0/1/2[i] -> givs, OctPt1/2[i] stay indexed (giv budget).
-   * ---- w45-a9 SEAL 4 -> PASS 225/225: the LICM PREHEADER ORDER IS THE SOURCE
-   * STATEMENT ORDER of the OT-link block (loop.c hoists movables in RTL-generation
-   * order).  Retail's preheader = pktaddr(t2) | palette-addr(s0) | otz*4(t9) |
-   * 0xFFFFFF(t0) | 0xFF000000(t7).  Two edits, each moving ONE movable's birth:
-   *   (1) `pal = Render_gPalettePtr;` as its OWN statement before `slot = otz*4 + pal`
-   *       (the one-expression form generated `sll` BEFORE the `lui 0x1F80`);
-   *   (2) `addr24_0 = prim & 0xffffff;` moved AFTER the slot statement (it was the
-   *       w41 addr24-EARLY spelling, which put 0xFFFFFF ahead of the palette base).
-   * addr24 still precedes the first RMW, so 0xFFFFFF is still born before 0xFF000000
-   * (the w41 lever's actual requirement).  GENERAL RULE for this family: order the
-   * OT-link statements = order you want the preheader constants; addr24 goes between
-   * the slot computation and the first RMW, not at the top of the block. */
-gte_ldv0(&Flare_gSpikes);
-
+  short ts2;
+  short ts3;
+  u_char *tp5;
+  CVECTOR CVar6;
+  short ts1;
+  u_char *prim;
+  CVECTOR CVar7;
+  short ts4;
+  short ts5;
+  
+gte_lwc2(0,*(int *)(&Flare_gSpikes));
+  gte_lwc2(1,*(int *)(((char *)&Flare_gSpikes + 0x4)));
   gte_rtps();
-
 gte_swc2(0xe,&flare_dvxy);
-
-gte_ldv0(((char *)&Flare_gSpikes + 0x8));
-
+gte_lwc2(0,*(int *)(((char *)&Flare_gSpikes + 0x8)));
+  gte_lwc2(1,*(int *)(((char *)&Flare_gSpikes + 0xc)));
   gte_rtps();
-
 gte_swc2(0xe,((char *)&flare_dvxy + 0x4));
-
-gte_ldv0(((char *)&Flare_gSpikes + 0x10));
-
+gte_lwc2(0,*(int *)(((char *)&Flare_gSpikes + 0x10)));
+  gte_lwc2(1,*(int *)(((char *)&Flare_gSpikes + 0x14)));
   gte_rtps();
-
 gte_swc2(0xe,((char *)&flare_dvxy + 0x8));
-
-gte_ldv0(((char *)&Flare_gSpikes + 0x18));
-
+gte_lwc2(0,*(int *)(((char *)&Flare_gSpikes + 0x18)));
+  gte_lwc2(1,*(int *)(((char *)&Flare_gSpikes + 0x1c)));
   gte_rtps();
-
 gte_swc2(0xe,((char *)&flare_dvxy + 0xc));
-
-gte_ldv0(&Flare_gOct);
-
+gte_lwc2(0,*(int *)(&Flare_gOct));
+  gte_lwc2(1,*(int *)(((char *)&Flare_gOct + 0x4)));
   gte_rtps();
-
 gte_swc2(0xe,((char *)&flare_dvxy + 0x10));
-
-gte_ldv0(((char *)&Flare_gOct + 0x8));
-
+gte_lwc2(0,*(int *)(((char *)&Flare_gOct + 0x8)));
+  gte_lwc2(1,*(int *)(((char *)&Flare_gOct + 0xc)));
   gte_rtps();
-
 gte_swc2(0xe,((char *)&flare_dvxy + 0x14));
-
-gte_ldv0(((char *)&Flare_gOct + 0x10));
-
+gte_lwc2(0,*(int *)(((char *)&Flare_gOct + 0x10)));
+  gte_lwc2(1,*(int *)(((char *)&Flare_gOct + 0x14)));
   gte_rtps();
-
 gte_swc2(0xe,((char *)&flare_dvxy + 0x18));
-
-gte_ldv0(((char *)&Flare_gOct + 0x18));
-
+gte_lwc2(0,*(int *)(((char *)&Flare_gOct + 0x18)));
+  gte_lwc2(1,*(int *)(((char *)&Flare_gOct + 0x1c)));
   gte_rtps();
-
 gte_swc2(0xe,((char *)&flare_dvxy + 0x1c));
-
-gte_ldv0(((char *)&Flare_gOct + 0x20));
-
+gte_lwc2(0,*(int *)(((char *)&Flare_gOct + 0x20)));
+  gte_lwc2(1,*(int *)(((char *)&Flare_gOct + 0x24)));
   gte_rtps();
-
 gte_swc2(0xe,((char *)&flare_dvxy + 0x20));
-
-gte_ldv0(((char *)&Flare_gOct + 0x28));
-
+gte_lwc2(0,*(int *)(((char *)&Flare_gOct + 0x28)));
+  gte_lwc2(1,*(int *)(((char *)&Flare_gOct + 0x2c)));
   gte_rtps();
-
 gte_swc2(0xe,((char *)&flare_dvxy + 0x24));
-
-gte_ldv0(((char *)&Flare_gOct + 0x30));
-
+gte_lwc2(0,*(int *)(((char *)&Flare_gOct + 0x30)));
+  gte_lwc2(1,*(int *)(((char *)&Flare_gOct + 0x34)));
   gte_rtps();
-
 gte_swc2(0xe,((char *)&flare_dvxy + 0x28));
-
-gte_ldv0(((char *)&Flare_gOct + 0x38));
-
+gte_lwc2(0,*(int *)(((char *)&Flare_gOct + 0x38)));
+  gte_lwc2(1,*(int *)(((char *)&Flare_gOct + 0x3c)));
   gte_rtps();
-
 gte_swc2(0xe,((char *)&flare_dvxy + 0x2c));
-  rgb1 = *(long *)&gfrgb;
-  rgb2 = *(long *)&gfrgb2;
-  cent = *center;
-  i = 8;
-  while( true ) {
-    i = i - 1;
-    if (i == -1) break;
-    id0 = gfSpikePt0[i];
-    id1 = gfSpikePt1[i];
-    id2 = gfSpikePt2[i];
-    {
-      POLY_G4 *prim;
-      prim = (POLY_G4 *)Render_gPacketPtr;
-      setaddr(prim,getaddr(otz * 4 + (int)Render_gPalettePtr));
-      Render_gPacketPtr = (u_char *)prim + 0x24;
-      setaddr(otz * 4 + (int)Render_gPalettePtr,prim);
-      *(u_int *)((u_char *)prim + 4) = 0x3a000000;
-      ((u_char *)prim)[3] = 8;
-      *(long *)((u_char *)prim + 0xc) = rgb2;
-      *(u_int *)((u_char *)prim + 0x14) = 0;
-      *(u_int *)((u_char *)prim + 0x1c) = 0;
-      *(long *)((u_char *)prim + 8) = flare_dvxy[id0];
-      *(long *)((u_char *)prim + 0x10) = cent;
-      *(long *)((u_char *)prim + 0x18) = flare_dvxy[id2];
-      *(long *)((u_char *)prim + 0x20) = flare_dvxy[id1];
-    }
-    id0 = gfOctPt1[i];
-    id1 = gfOctPt2[i];
-    {
-      POLY_G3 *prim;
-      prim = (POLY_G3 *)Render_gPacketPtr;
-      setaddr(prim,getaddr(otz * 4 + (int)Render_gPalettePtr));
-      Render_gPacketPtr = (u_char *)prim + 0x1c;
-      setaddr(otz * 4 + (int)Render_gPalettePtr,prim);
-      *(u_int *)((u_char *)prim + 4) = 0x32000000;
-      ((u_char *)prim)[3] = 6;
-      *(long *)((u_char *)prim + 0xc) = rgb1;
-      *(u_int *)((u_char *)prim + 0x14) = 0;
-      *(long *)((u_char *)prim + 8) = flare_dvxy[id0];
-      *(long *)((u_char *)prim + 0x10) = cent;
-      *(long *)((u_char *)prim + 0x18) = flare_dvxy[id1];
-    }
+  CVar7 = gfrgb2;
+  CVar6 = gfrgb;
+  center_word = *center;
+  /* 0x800CC214..0x800CC26C walks gfSpikePt2/1/0 from element 7
+     down to 0. The next global's address is not a portable array end. */
+  for (vert_idx = 7; vert_idx >= 0; --vert_idx) {
+    prim = (u_char *)Render_gPacketPtr;
+    ts1 = gfSpikePt0[vert_idx];
+    ts2 = gfSpikePt1[vert_idx];
+    ts3 = gfSpikePt2[vert_idx];
+    puVar1 = (u_int *)(Render_gPalettePtr + otz * 4);
+    nfs4_add_prim(puVar1,Render_gPacketPtr);
+    pkt_addr24_b = (u_int)Render_gPacketPtr & 0xffffff;
+    Render_gPacketPtr = Render_gPacketPtr + 0x24;
+    *(u_int *)(prim + 4) = 0x3a000000;
+    prim[3] = 8;
+    *(CVECTOR *)(prim + 0xc) = CVar7;
+    *(u_int *)(prim + 0x14) = 0;
+    *(u_int *)(prim + 0x1c) = 0;
+    pkt_addr24_c = flare_dvxy[ts1];
+    *(int *)(prim + 0x10) = center_word;
+    *(int *)(prim + 8) = pkt_addr24_c;
+    *(long *)(prim + 0x18) = flare_dvxy[ts3];
+    *(long *)(prim + 0x20) = flare_dvxy[ts2];
+    tp5 = (u_char *)Render_gPacketPtr;
+    ts4 = gfOctPt1[vert_idx];
+    ts5 = gfOctPt2[vert_idx];
+    puVar1 = (u_int *)(Render_gPalettePtr + otz * 4);
+    nfs4_add_prim(puVar1,Render_gPacketPtr);
+    pkt_addr24_d = (u_int)Render_gPacketPtr & 0xffffff;
+    Render_gPacketPtr = Render_gPacketPtr + 0x1c;
+    *(u_int *)(tp5 + 4) = 0x32000000;
+    tp5[3] = 6;
+    *(CVECTOR *)(tp5 + 0xc) = CVar6;
+    *(u_int *)(tp5 + 0x14) = 0;
+    pkt_addr24 = flare_dvxy[ts4];
+    *(int *)(tp5 + 0x10) = center_word;
+    *(int *)(tp5 + 8) = pkt_addr24;
+    *(long *)(tp5 + 0x18) = flare_dvxy[ts5];
   }
   return;
 }
@@ -395,156 +348,155 @@ gte_swc2(0xe,((char *)&flare_dvxy + 0x2c));
 void Flare_Spikes(long *center,int otz)
 
 {
+  int pkt_addr24;
+  int cur_pkt;
+  int gfHexPt1_iter;
+  int gfOctPt2_iter;
+  int gfHexPt2_iter;
   int i;
+  int vert_idx;
   long flare_dvxy [13];
-
-  /* MATCH: SYM locals = flare_dvxy[13] + i(t2) + block-scope prim(a0, POLY_G4*);
-   * walkers = givs from gfSpikePt0/1/2[i]; per-iter gfrgb2 reload. */
-gte_ldv0(&Flare_gSpikes);
+  CVECTOR spikeColor;
+  u_char *prim;
+  
+gte_lwc2(0,*(int *)(&Flare_gSpikes));
+  gte_lwc2(1,*(int *)(((char *)&Flare_gSpikes + 0x4)));
   gte_rtps();
 gte_swc2(0xe,&flare_dvxy);
-gte_ldv0(((char *)&Flare_gSpikes + 0x8));
+gte_lwc2(0,*(int *)(((char *)&Flare_gSpikes + 0x8)));
+  gte_lwc2(1,*(int *)(((char *)&Flare_gSpikes + 0xc)));
   gte_rtps();
 gte_swc2(0xe,((char *)&flare_dvxy + 0x4));
-gte_ldv0(((char *)&Flare_gSpikes + 0x10));
+gte_lwc2(0,*(int *)(((char *)&Flare_gSpikes + 0x10)));
+  gte_lwc2(1,*(int *)(((char *)&Flare_gSpikes + 0x14)));
   gte_rtps();
 gte_swc2(0xe,((char *)&flare_dvxy + 0x8));
-gte_ldv0(((char *)&Flare_gSpikes + 0x18));
+gte_lwc2(0,*(int *)(((char *)&Flare_gSpikes + 0x18)));
+  gte_lwc2(1,*(int *)(((char *)&Flare_gSpikes + 0x1c)));
   gte_rtps();
 gte_swc2(0xe,((char *)&flare_dvxy + 0xc));
-gte_ldv0(&Flare_gOct);
+gte_lwc2(0,*(int *)(&Flare_gOct));
+  gte_lwc2(1,*(int *)(((char *)&Flare_gOct + 0x4)));
   gte_rtps();
 gte_swc2(0xe,((char *)&flare_dvxy + 0x10));
-gte_ldv0(((char *)&Flare_gOct + 0x8));
+gte_lwc2(0,*(int *)(((char *)&Flare_gOct + 0x8)));
+  gte_lwc2(1,*(int *)(((char *)&Flare_gOct + 0xc)));
   gte_rtps();
 gte_swc2(0xe,((char *)&flare_dvxy + 0x14));
-gte_ldv0(((char *)&Flare_gOct + 0x10));
+gte_lwc2(0,*(int *)(((char *)&Flare_gOct + 0x10)));
+  gte_lwc2(1,*(int *)(((char *)&Flare_gOct + 0x14)));
   gte_rtps();
 gte_swc2(0xe,((char *)&flare_dvxy + 0x18));
-gte_ldv0(((char *)&Flare_gOct + 0x18));
+gte_lwc2(0,*(int *)(((char *)&Flare_gOct + 0x18)));
+  gte_lwc2(1,*(int *)(((char *)&Flare_gOct + 0x1c)));
   gte_rtps();
 gte_swc2(0xe,((char *)&flare_dvxy + 0x1c));
-gte_ldv0(((char *)&Flare_gOct + 0x20));
+gte_lwc2(0,*(int *)(((char *)&Flare_gOct + 0x20)));
+  gte_lwc2(1,*(int *)(((char *)&Flare_gOct + 0x24)));
   gte_rtps();
 gte_swc2(0xe,((char *)&flare_dvxy + 0x20));
-gte_ldv0(((char *)&Flare_gOct + 0x28));
+gte_lwc2(0,*(int *)(((char *)&Flare_gOct + 0x28)));
+  gte_lwc2(1,*(int *)(((char *)&Flare_gOct + 0x2c)));
   gte_rtps();
 gte_swc2(0xe,((char *)&flare_dvxy + 0x24));
-gte_ldv0(((char *)&Flare_gOct + 0x30));
+gte_lwc2(0,*(int *)(((char *)&Flare_gOct + 0x30)));
+  gte_lwc2(1,*(int *)(((char *)&Flare_gOct + 0x34)));
   gte_rtps();
 gte_swc2(0xe,((char *)&flare_dvxy + 0x28));
-gte_ldv0(((char *)&Flare_gOct + 0x38));
+gte_lwc2(0,*(int *)(((char *)&Flare_gOct + 0x38)));
+  gte_lwc2(1,*(int *)(((char *)&Flare_gOct + 0x3c)));
   gte_rtps();
 gte_swc2(0xe,((char *)&flare_dvxy + 0x2c));
-  i = 8;
+  vert_idx = 8;
+  gfHexPt2_iter = (int)gfSpikePt2;
+  gfOctPt2_iter = (int)gfOctPt1;
+  gfHexPt1_iter = (int)gfSpikePt1;
   while( true ) {
-    i = i - 1;
-    if (i == -1) break;
-    {
-      POLY_G4 *prim;
-      u_int rgb; /* SYM-CODEGEN-CARRIER: rgb -- direct gfrgb2 store is FAIL 5 (184/183) */
-
-      prim = (POLY_G4 *)Render_gPacketPtr;
-      setaddr(prim,getaddr(otz * 4 + (int)Render_gPalettePtr));
-      Render_gPacketPtr = (u_char *)prim + 0x24;
-      setaddr(otz * 4 + (int)Render_gPalettePtr,prim);
-      *(u_int *)((u_char *)prim + 4) = 0x3a000000;
-      rgb = *(u_int *)&gfrgb2;
-      *(u_int *)((u_char *)prim + 0x14) = 0;
-      *(u_int *)((u_char *)prim + 0x1c) = 0;
-      ((u_char *)prim)[3] = 8;
-      *(u_int *)((u_char *)prim + 0xc) = rgb;
-      *(long *)((u_char *)prim + 8) = flare_dvxy[gfSpikePt0[i]];
-      *(long *)((u_char *)prim + 0x10) = *center;
-      *(long *)((u_char *)prim + 0x18) = flare_dvxy[gfSpikePt1[i]];
-      *(long *)((u_char *)prim + 0x20) = flare_dvxy[gfSpikePt2[i]];
-    }
+    prim = (u_char *)Render_gPacketPtr;
+    gfHexPt2_iter = gfHexPt2_iter + -2;
+    gfOctPt2_iter = gfOctPt2_iter + -2;
+    vert_idx = vert_idx + -1;
+    gfHexPt1_iter = gfHexPt1_iter + -2;
+    if (vert_idx == -1) break;
+    cur_pkt = otz * 4 + (int)Render_gPalettePtr;
+    nfs4_add_prim((void *)(intptr_t)cur_pkt,Render_gPacketPtr);
+    pkt_addr24 = (u_int)Render_gPacketPtr & 0xffffff;
+    Render_gPacketPtr = Render_gPacketPtr + 0x24;
+    *(u_int *)(prim + 4) = 0x3a000000;
+    spikeColor = gfrgb2;
+    *(u_int *)(prim + 0x14) = 0;
+    *(u_int *)(prim + 0x1c) = 0;
+    prim[3] = 8;
+    *(CVECTOR *)(prim + 0xc) = spikeColor;
+    *(long *)(prim + 8) = flare_dvxy[*(short *)gfHexPt1_iter];
+    *(long *)(prim + 0x10) = *center;
+    *(long *)(prim + 0x18) = flare_dvxy[*(short *)gfOctPt2_iter];
+    *(long *)(prim + 0x20) = flare_dvxy[*(short *)gfHexPt2_iter];
   }
   return;
 }
 
-/* ---- SMALL-FLARE FAMILY residual (w38-a10) -- Flare_OctFlare / Flare_OctFlareSpikes /
- * Flare_Spikes / Flare_HexFlare / Flare_ReflectHexFlare, 20-22 diffs each, ALL COUNT-EXACT.
- * ONE shared mechanism, two visible halves:
- *  (a) the two LICM-hoisted OT-link mask constants are emitted in the opposite ORDER --
- *      oracle `lui 0xFFFFFF` BEFORE `lui 0xFF000000`, ours after (the first body use of
- *      0xFF000000 creates its pseudo first);
- *  (b) consequently the 0xFFFFFF mask and the loop counter `i` swap $t0/$t1 (SYM/oracle:
- *      mask $t0, i $t1) -- an allocno tie broken by pseudo NUMBER, and the mask's pseudo
- *      is created later in ours.
- * LEVERS TRIED (all measured with verify_asm, all rejected):
- *   - one-expression `otz*4 + (int)Render_gPalettePtr` slot address: collapses one
- *     instruction (116 vs oracle 117) -> WORSE (29). These functions genuinely need the
- *     two-statement `pal` then `+ otz*4` chain (unlike Sky_RenderStars/Hrz_TextureQuad).
- *   - `slot = (u_int*)(otz*4); slot = (u_int*)((int)slot + (int)pal);` (accumulate into the
- *     index): 29, also one instruction short.
- *   - `slot = pal; slot = (u_int*)(otz*4 + (int)slot);` (shift-first operand order): 20, no
- *     change -- gcc canonicalizes the addu operands.
- *   - swapping the OR operands of the first RMW statement: 26; of the second: 24;
- *     rewriting the second as `*slot = *slot & 0xff000000 | pkt24`: 30.
- *   - moving `i = 6;` up among the six unrolled gte blocks DOES dial the allocno priority
- *     (20 -> 10 with the init before the 3rd block) but is REFUTED BY THE SYM SLD: the
- *     `addiu $t1,$zero,6` at 0x800CC774 is source line 383, its own statement AFTER all six
- *     gte statements (lines 374-379), i.e. exactly where the recon has it. Not adopted.
- * Classified as the constant-hoist-order / allocno-tie floor (catalog sec.A + the PrimStop
- * 0xffffff/0xff000000 tie family). Prototype re-checked vs raw oracle: (long *center, int otz),
- * void return (no $v0 at the single epilogue).
- * w39-a8 RE-CERTIFICATION with the NOW-WIRED per-TU C++ flags (compile_cpp honours
- * no_split_addresses / no_schedule_insns / no_schedule_insns2 / no_strength_reduce since
- * cb24f4ab, so every earlier "flag didn't help" note on a C++ TU measured a no-op).
- * Whole-TU receipts, flare.cpp, baseline 15 PASS / 458 total diffs:
- *   no_split_addresses  10 PASS / 1387    no_schedule_insns    4 PASS / 2086
- *   no_schedule_insns2   2 PASS /  845    no_strength_reduce  15 PASS /  889
- * ALL FOUR are strictly worse -- flare.obj is a stock -O2 -G4 object.  Floor stands. */
 /* ---- Flare_HexFlare__FPli  [FLARE.CPP:370-400] SLD-VERIFIED ---- */
 void Flare_HexFlare(long *center,int otz)
 
 {
+  int pkt_addr24;
+  void *prev_pkt_slot;
+  int pSVar4;
+  int gfHexPt2_iter;
   int i;
+  int vert_idx;
   long flare_dvxy [7];
-
-gte_ldv0(&Flare_gHex);
+  u_char *prim;
+  CVECTOR CVar1;
+  
+gte_lwc2(0,*(int *)(&Flare_gHex));
+  gte_lwc2(1,*(int *)(((char *)&Flare_gHex + 0x4)));
   gte_rtps();
 gte_swc2(0xe,&flare_dvxy);
-gte_ldv0(((char *)&Flare_gHex + 0x8));
+gte_lwc2(0,*(int *)(((char *)&Flare_gHex + 0x8)));
+  gte_lwc2(1,*(int *)(((char *)&Flare_gHex + 0xc)));
   gte_rtps();
 gte_swc2(0xe,((char *)&flare_dvxy + 0x4));
-gte_ldv0(((char *)&Flare_gHex + 0x10));
+gte_lwc2(0,*(int *)(((char *)&Flare_gHex + 0x10)));
+  gte_lwc2(1,*(int *)(((char *)&Flare_gHex + 0x14)));
   gte_rtps();
 gte_swc2(0xe,((char *)&flare_dvxy + 0x8));
-gte_ldv0(((char *)&Flare_gHex + 0x18));
+gte_lwc2(0,*(int *)(((char *)&Flare_gHex + 0x18)));
+  gte_lwc2(1,*(int *)(((char *)&Flare_gHex + 0x1c)));
   gte_rtps();
 gte_swc2(0xe,((char *)&flare_dvxy + 0xc));
-gte_ldv0(((char *)&Flare_gHex + 0x20));
+gte_lwc2(0,*(int *)(((char *)&Flare_gHex + 0x20)));
+  gte_lwc2(1,*(int *)(((char *)&Flare_gHex + 0x24)));
   gte_rtps();
 gte_swc2(0xe,((char *)&flare_dvxy + 0x10));
-gte_ldv0(((char *)&Flare_gHex + 0x28));
+gte_lwc2(0,*(int *)(((char *)&Flare_gHex + 0x28)));
+  gte_lwc2(1,*(int *)(((char *)&Flare_gHex + 0x2c)));
   gte_rtps();
 gte_swc2(0xe,((char *)&flare_dvxy + 0x14));
-  /* MATCH: SYM locals = flare_dvxy[7] + i(t1) + block-scope prim(a0) only --
-   * walkers = strength-reduction givs from gfHexPt1[i]/gfHexPt2[i] index form;
-   * exit-in-the-middle down count keeps top-test + j back-edge. */
-  i = 6;
+  vert_idx = 6;
+  gfHexPt2_iter = (int)(gfHexPt1 + 6);
+  /* MIPS 0x800CC790..0x800CC7B4 walks gfHexPt1 and gfHexPt2
+     backwards from their respective one-past-end addresses. */
+  pSVar4 = (int)(gfHexPt2 + 6);
   while( true ) {
-    i = i - 1;
-    if (i == -1) break;
-    {
-      POLY_G3 *prim;
-      u_int rgb; /* SYM-CODEGEN-CARRIER: rgb -- direct gfrgb store is FAIL 5 (118/117) */
-
-      prim = (POLY_G3 *)Render_gPacketPtr;
-      setaddr(prim,getaddr(otz * 4 + (int)Render_gPalettePtr));
-      Render_gPacketPtr = (u_char *)prim + 0x1c;
-      setaddr(otz * 4 + (int)Render_gPalettePtr,prim);
-      *(u_int *)((u_char *)prim + 4) = 0x32000000;
-      rgb = *(u_int *)&gfrgb;
-      *(u_int *)((u_char *)prim + 0x14) = 0;
-      ((u_char *)prim)[3] = 6;
-      *(u_int *)((u_char *)prim + 0xc) = rgb;
-      *(long *)((u_char *)prim + 8) = flare_dvxy[gfHexPt2[i]];
-      *(long *)((u_char *)prim + 0x10) = *center;
-      *(long *)((u_char *)prim + 0x18) = flare_dvxy[gfHexPt1[i]];
-    }
+    prim = (u_char *)Render_gPacketPtr;
+    gfHexPt2_iter = gfHexPt2_iter + -2;
+    vert_idx = vert_idx + -1;
+    pSVar4 = pSVar4 + -2;
+    if (vert_idx == -1) break;
+    prev_pkt_slot = Render_gPalettePtr + otz * 4;
+    nfs4_add_prim((void *)(intptr_t)prev_pkt_slot,Render_gPacketPtr);
+    pkt_addr24 = (u_int)Render_gPacketPtr & 0xffffff;
+    Render_gPacketPtr = Render_gPacketPtr + 0x1c;
+    *(u_int *)(prim + 4) = 0x32000000;
+    CVar1 = gfrgb;
+    *(u_int *)(prim + 0x14) = 0;
+    prim[3] = 6;
+    *(CVECTOR *)(prim + 0xc) = CVar1;
+    *(long *)(prim + 8) = flare_dvxy[*(short *)pSVar4];
+    *(long *)(prim + 0x10) = *center;
+    *(long *)(prim + 0x18) = flare_dvxy[*(short *)gfHexPt2_iter];
   }
   return;
 }
@@ -553,51 +505,54 @@ gte_swc2(0xe,((char *)&flare_dvxy + 0x14));
 void Flare_ReflectHexFlare(long *center,int otz)
 
 {
+  int pkt_addr24;
+  void *prev_pkt_slot;
   int i;
+  int vert_idx;
   long flare_dvxy [7];
-
-gte_ldv0(&Flare_gReflectHex);
+  CVECTOR CVar1;
+  u_char *prim;
+  
+gte_lwc2(0,*(int *)(&Flare_gReflectHex));
+  gte_lwc2(1,*(int *)(((char *)&Flare_gReflectHex + 0x4)));
   gte_rtps();
 gte_swc2(0xe,&flare_dvxy);
-gte_ldv0(((char *)&Flare_gReflectHex + 0x8));
+gte_lwc2(0,*(int *)(((char *)&Flare_gReflectHex + 0x8)));
+  gte_lwc2(1,*(int *)(((char *)&Flare_gReflectHex + 0xc)));
   gte_rtps();
 gte_swc2(0xe,((char *)&flare_dvxy + 0x4));
-gte_ldv0(((char *)&Flare_gReflectHex + 0x10));
+gte_lwc2(0,*(int *)(((char *)&Flare_gReflectHex + 0x10)));
+  gte_lwc2(1,*(int *)(((char *)&Flare_gReflectHex + 0x14)));
   gte_rtps();
 gte_swc2(0xe,((char *)&flare_dvxy + 0x8));
-gte_ldv0(((char *)&Flare_gReflectHex + 0x18));
+gte_lwc2(0,*(int *)(((char *)&Flare_gReflectHex + 0x18)));
+  gte_lwc2(1,*(int *)(((char *)&Flare_gReflectHex + 0x1c)));
   gte_rtps();
 gte_swc2(0xe,((char *)&flare_dvxy + 0xc));
-gte_ldv0(((char *)&Flare_gReflectHex + 0x20));
+gte_lwc2(0,*(int *)(((char *)&Flare_gReflectHex + 0x20)));
+  gte_lwc2(1,*(int *)(((char *)&Flare_gReflectHex + 0x24)));
   gte_rtps();
 gte_swc2(0xe,((char *)&flare_dvxy + 0x10));
-gte_ldv0(((char *)&Flare_gReflectHex + 0x28));
+gte_lwc2(0,*(int *)(((char *)&Flare_gReflectHex + 0x28)));
+  gte_lwc2(1,*(int *)(((char *)&Flare_gReflectHex + 0x2c)));
   gte_rtps();
 gte_swc2(0xe,((char *)&flare_dvxy + 0x14));
-  /* MATCH: SYM locals = flare_dvxy[7] + i(t1) + block-scope prim(a0) only --
-   * walkers = strength-reduction givs from gfHexPt1[i]/gfHexPt2[i] index form;
-   * exit-in-the-middle down count keeps top-test + j back-edge. */
-  i = 6;
-  while( true ) {
-    i = i - 1;
-    if (i == -1) break;
-    {
-      POLY_G3 *prim;
-      u_int rgb; /* SYM-CODEGEN-CARRIER: rgb -- direct gfrgb store is FAIL 5 (118/117) */
-
-      prim = (POLY_G3 *)Render_gPacketPtr;
-      setaddr(prim,getaddr(otz * 4 + (int)Render_gPalettePtr));
-      Render_gPacketPtr = (u_char *)prim + 0x1c;
-      setaddr(otz * 4 + (int)Render_gPalettePtr,prim);
-      *(u_int *)((u_char *)prim + 4) = 0x32000000;
-      rgb = *(u_int *)&gfrgb;
-      *(u_int *)((u_char *)prim + 0x14) = 0;
-      ((u_char *)prim)[3] = 6;
-      *(u_int *)((u_char *)prim + 0xc) = rgb;
-      *(long *)((u_char *)prim + 8) = flare_dvxy[gfHexPt2[i]];
-      *(long *)((u_char *)prim + 0x10) = *center;
-      *(long *)((u_char *)prim + 0x18) = flare_dvxy[gfHexPt1[i]];
-    }
+  /* 0x800CC964..0x800CC990: gfHexPt1+6 and gfHexPt2+6, not
+     the addresses of unrelated adjacent globals in the PSX image. */
+  for (vert_idx = 5; vert_idx >= 0; --vert_idx) {
+    prim = (u_char *)Render_gPacketPtr;
+    prev_pkt_slot = Render_gPalettePtr + otz * 4;
+    nfs4_add_prim((void *)(intptr_t)prev_pkt_slot,Render_gPacketPtr);
+    pkt_addr24 = (u_int)Render_gPacketPtr & 0xffffff;
+    Render_gPacketPtr = Render_gPacketPtr + 0x1c;
+    *(u_int *)(prim + 4) = 0x32000000;
+    CVar1 = gfrgb;
+    *(u_int *)(prim + 0x14) = 0;
+    prim[3] = 6;
+    *(CVECTOR *)(prim + 0xc) = CVar1;
+    *(long *)(prim + 8) = flare_dvxy[gfHexPt2[vert_idx]];
+    *(long *)(prim + 0x10) = *center;
+    *(long *)(prim + 0x18) = flare_dvxy[gfHexPt1[vert_idx]];
   }
   return;
 }
@@ -606,246 +561,299 @@ gte_swc2(0xe,((char *)&flare_dvxy + 0x14));
 void Flare_QuadFlare(long *center,int otz)
 
 {
-  long pt [2];
+  long *cp;
+  long *p2;
+  long pt [4];
   long save1;
-
-gte_ldv0(&Flare_gQuad);
+  
+  cp = center;
+gte_lwc2(0,*(int *)(&Flare_gQuad));
+  gte_lwc2(1,*(int *)(((char *)&Flare_gQuad + 0x4)));
   gte_rtps();
 gte_swc2(0xe,&save1);
-gte_ldv0(((char *)&Flare_gQuad + 0x8));
+gte_lwc2(0,*(int *)(((char *)&Flare_gQuad + 0x8)));
+  gte_lwc2(1,*(int *)(((char *)&Flare_gQuad + 0xc)));
   gte_rtps();
-gte_swc2(0xe,&pt[1]);
-  Flare_Tri(center,&save1,&pt[1],otz);
-gte_ldv0(((char *)&Flare_gQuad + 0x10));
+  p2 = pt + 1;
+gte_swc2(0xe,((char *)&pt + 0x4));
+  Flare_Tri(cp,&save1,p2,otz);
+gte_lwc2(0,*(int *)(((char *)&Flare_gQuad + 0x10)));
+  gte_lwc2(1,*(int *)(((char *)&Flare_gQuad + 0x14)));
   gte_rtps();
-gte_swc2(0xe,&pt[0]);
-  Flare_Tri(center,&pt[1],&pt[0],otz);
-gte_ldv0(((char *)&Flare_gQuad + 0x18));
+gte_swc2(0xe,&pt);
+  Flare_Tri(center,p2,pt,otz);
+gte_lwc2(0,*(int *)(((char *)&Flare_gQuad + 0x18)));
+  gte_lwc2(1,*(int *)(((char *)&Flare_gQuad + 0x1c)));
   gte_rtps();
-gte_swc2(0xe,&pt[1]);
-  Flare_Tri(center,&pt[0],&pt[1],otz);
-  Flare_Tri(center,&pt[1],&save1,otz);
+gte_swc2(0xe,((char *)&pt + 0x4));
+  Flare_Tri(center,pt,p2,otz);
+  Flare_Tri(center,p2,&save1,otz);
   return;
 }
 
-/* ---- Flare_CarShapedHalo__FiP7COORD16N21siP15Draw_FlareCache  [FLARE.CPP:591-842] SLD-VERIFIED
- * w13-a3 FULL SYM rule-8 rewrite: every local = a SYM-named var in its SYM block scope,
- * blocks in oracle VA order, align-1 movstrsi struct-assigns kept (gfrgb = color[N], save).
- * SYM reg map: type=s7 ptCenter=t1 pt1=t5 pt2=t6 otz=fp sd=v0(guard only) flag=AUTO short;
- *   angleZ=s6 angleOuter=s5 sizeOuter=s2 scale=s3 flags=s4 ptEdge=a2 result=v0 difx=s0
- *   dify=s1 z=v1 aprim=a0.  Return: SYM FCN VOID (no $v0 setup at any exit).
- * MATCH: scale/flags REUSED (flags = gType index before the field loads; scale = shifted
- * gscale after `scale = gscale << scale`); branch A (reflect) keeps the STALE pre-(flags&1)
- * scale value while branch B reloads gscale into z -- faithful to the original. */
-void Flare_CarShapedHalo(int type,COORD16 *ptCenter,COORD16 *pt1,COORD16 *pt2,short flag,int otz,
+/* ---- Flare_CarShapedHalo__FiP7COORD16N21siP15Draw_FlareCache  [FLARE.CPP:591-842] SLD-VERIFIED ---- */
+short * Flare_CarShapedHalo(int type,COORD16 *ptCenter,COORD16 *pt1,COORD16 *pt2,short flag,int otz,
                   Draw_FlareCache *sd)
 
 {
-  VECTOR diff;                  /* @sp+0x18 */
-  long angleZ;                  /* s6 */
-  long angleOuter;              /* s5 */
-  long sizeOuter;               /* s2 */
-  CVECTOR color [2];            /* @sp+0x28 */
-  DVECTOR sp;                   /* @sp+0x30 */
-  int scale;                    /* s3 */
-  int flags;                    /* s4 */
-  COORD16 *ptEdge;              /* a2 */
-  COORD16 vec1;                 /* @sp+0x38 */
-  COORD16 vec2;                 /* @sp+0x40 */
-  COORD16 crossprod;            /* @sp+0x48 */
-
-  if (sd->head.cprim.PrimPtr < sd->head.cprim.MPrimPtr + -0x400) {
-    vec1.x = pt1->x - ptCenter->x;
-    vec1.y = pt1->y - ptCenter->y;
-    vec1.z = pt1->z - ptCenter->z;
-    vec2.x = pt2->x - ptCenter->x;
-    vec2.y = pt2->y - ptCenter->y;
-    vec2.z = pt2->z - ptCenter->z;
-    crossprod.x = vec2.y * vec1.z - vec2.z * vec1.y;
-    crossprod.y = vec2.z * vec1.x - vec2.x * vec1.z;
-    crossprod.z = vec2.x * vec1.y - vec2.y * vec1.x;
-    ptEdge = pt1;
-    if (-1 < (int)((u_int)flag << 0x10)) {
-      ptEdge = pt2;
+#ifdef AP_WIN
+  NFSHS_DIAGNOSTIC_CALL(NFSHS_FlarePacketScope traceScope("car_halo"));
+#endif
+  VECTOR diff2;
+  DVECTOR sp2;
+  VECTOR tvec1;
+  short sVar1;
+  short sVar2;
+  short sVar3;
+  short sVar4;
+  short sVar5;
+  short sVar6;
+  short sVar7;
+  short sVar8;
+  short sVar9;
+  short sVar10;
+  bool bVar11;
+  short sVar12;
+  long result;
+  int CVar3;
+  int CVar4;
+  DVECTOR *pDVar13;
+  int ti13;
+  int pkt_addr24;
+  int iVar14;
+  int haloShape_p;
+  int z;
+  int iVar12_alt;
+  int iVar6_emit;
+  int tu14;
+  DR_MODE *aprim;
+  VECTOR *v0;
+  int haloColor;
+  COORD16 *ptEdge;
+  int primPtr;
+  long difx;
+  int diff_x;
+  MATRIX *mtx;
+  long dify;
+  int diff_y;
+  long sizeOuter;
+  int innerRadius;
+  int scale;
+  int scaledFactor;
+  int flags;
+  int flagsMasked;
+  long angleOuter;
+  int outerRadius;
+  long angleZ;
+  int haloRadius;
+  int lerp_q16;
+  int loc_d8;
+  VECTOR diff;
+  CVECTOR color [2];
+  DVECTOR sp;
+  COORD16 vec1;
+  COORD16 vec2;
+  COORD16 crossprod;
+  u_char auStack_98 [32];
+  CVECTOR save;
+  MATRIX mtx2;
+  VECTOR tvec2;
+  MATRIX scalemat;
+  short loc_30;
+  int loc_28;
+  int loc_24;
+  int loc_20;
+  int loc_1c;
+  int loc_18;
+  int loc_14;
+  int loc_10;
+  int loc_c;
+  int loc_8;
+  int loc_4;
+  int pbVar1;
+  u_char tu2;
+  u_char *p;
+  CVECTOR CVar5;
+  u_char bVar1;
+  u_char bVar2;
+  u_char bVar3;
+  u_int tu1;
+  
+  sVar12 = flag;
+  u_int _flag = (u_int)(u_short)flag;
+  pDVar13 = (DVECTOR *)0x0;
+  if ((sd->head).cprim.PrimPtr < (sd->head).cprim.MPrimPtr + -0x400) {
+    sVar1 = pt1->x;
+    sVar2 = ptCenter->x;
+    sVar3 = pt1->y;
+    sVar4 = ptCenter->y;
+    sVar5 = pt1->z;
+    sVar6 = ptCenter->z;
+    haloColor = (u_int)(u_short)pt2->x - (u_int)(u_short)ptCenter->x;
+    sVar7 = pt2->y;
+    sVar8 = ptCenter->y;
+    sVar9 = pt2->z;
+    sVar10 = ptCenter->z;
+    /* 0x800CCBC8..0x800CCC94: two wrapped COORD16 edges and vec2 x vec1.
+       The recovered crossprod was never initialized. Use low-word MIPS
+       multiply/subtract semantics before truncating each component to SH. */
+    vec1.x=(short)(sVar1-sVar2);vec1.y=(short)(sVar3-sVar4);vec1.z=(short)(sVar5-sVar6);
+    vec2.x=(short)haloColor;vec2.y=(short)(sVar7-sVar8);vec2.z=(short)(sVar9-sVar10);
+    crossprod.x=(short)nfs4_mips_subu_s32(nfs4_mips_mult_s32(vec2.y,vec1.z),nfs4_mips_mult_s32(vec2.z,vec1.y));
+    crossprod.y=(short)nfs4_mips_subu_s32(nfs4_mips_mult_s32(vec2.z,vec1.x),nfs4_mips_mult_s32(vec2.x,vec1.z));
+    crossprod.z=(short)nfs4_mips_subu_s32(nfs4_mips_mult_s32(vec2.x,vec1.y),nfs4_mips_mult_s32(vec2.y,vec1.x));
+    if (-1 < (int)(_flag << 0x10)) {
+      pt1 = pt2;
     }
-    {
-      int i;                    /* SYM-CODEGEN-CARRIER: i -- gType arm index preserves the measured type/angleZ allocation */
-      u_long c;                 /* SYM-CODEGEN-CARRIER: c -- serial copy temp (v0; anti-dependence keeps the two
-                                    color word-copies lw/nop/sw serial like the oracle) */
-      /* MATCH (w42-a6): ONE `type & 0x7f` computed into `i` first, then the +1/+0xb per
-       * arm.  Writing the mask in BOTH arms costs `type` one extra REG_N_REFS (6 vs 5)
-       * even though cse merges the two andi's into one insn -- and 6 refs put `type`'s
-       * allocno_compare priority (2*6/400 = .0300) just ABOVE angleZ's (1*3/107 = .0280),
-       * which is the whole $s6<->$s7 rotation.  With 5 refs (2*5/400 = .0250) angleZ wins
-       * $s6 and `type` takes $s7 exactly as the SYM says.  45 -> 25. */
-      int j /* SYM-CODEGEN-CARRIER: j -- separate masked-type value is the measured 25-to-19 lever */ = type & 0x7fU;   /* MATCH: SEPARATE temp for the masked value -- oracle keeps
-                               * it in $v1 and both arms do `addiu a0,v1,K`; reusing `i`
-                               * in place emits `andi a0,..;addiu a0,a0,K` (25 -> 19). */
-      if (R3DCar_InMenu != 0) {
-        i = j + 1;
-      }
-      else {
-        i = j + 0xb;
-      }
-      if ((type & 0x100U) != 0) {
-        ptCenter->y = -DrawC_gReflectOffset - ptCenter->y;
-      }
-gte_ldv0(ptCenter);
-      gte_rtps();
-      c = Flare_gType[i].chalo;
-      *(u_long *)&color[0] = c;
-      c = Flare_gType[i].cbeam;
-      *(u_long *)&color[1] = c;
-      /* MATCH (w45-a9 SEAL 3 -> PASS 630/630): sched2 was hoisting `lw s3,8(v1)` (the
-       * `scale` field load) up into the LOAD-DELAY slot of `lw v0,0(v1)`, where retail
-       * leaves a `nop` and issues the scale/flags pair adjacently AFTER the `andi
-       * v0,s7,128`.  s3's use is far down the block, so its scheduler priority (longest
-       * path to block end) is the highest in the ready list and it always wins that slot.
-       * The zero-insn USE fence (§2b.5) is a sched fixpoint: the two gType field loads
-       * that follow it in source order can no longer migrate above it.  Emits nothing;
-       * the andi still hoists above them (it is after the fence too), = retail. */
-      __asm__ volatile("" : : "r"(c));
-      scale = Flare_gType[i].scale;
-      flags = Flare_gType[i].flags;
+    if (R3DCar_InMenu == 0) {
+      ti13 = (type & 0x7fU) + 0xb;
     }
+    else {
+      ti13 = (type & 0x7fU) + 1;
+    }
+    if ((type & 0x100U) != 0) {
+      ptCenter->y = -ptCenter->y - DrawC_gReflectOffset;
+    }
+gte_lwc2(0,*(int *)(ptCenter));
+    gte_lwc2(1,*(int *)(((char *)ptCenter + 0x4)));
+    gte_rtps();
+    CVar3 = Flare_gType[ti13].chalo;
+    CVar4 = Flare_gType[ti13].cbeam;
+    scaledFactor = Flare_gType[ti13].scale;
+    flagsMasked = Flare_gType[ti13].flags;
+    color[0] = (*(CVECTOR *)&(CVar3));
+    color[1] = (*(CVECTOR *)&(CVar4));
     if ((type & 0x80U) != 0) {
-      color[0].r = color[0].r >> 1;
-      color[0].g = color[0].g >> 1;
-      color[0].b = color[0].b >> 1;
-      color[1].r = color[1].r >> 1;
+      bVar1 = (u_char)CVar3;
+      bVar2 = (u_char)((u_int)CVar3 >> 8);
+      bVar1 = bVar1 >> 1;
+      bVar3 = (u_char)((u_int)CVar3 >> 0x10);
+      bVar2 = bVar2 >> 1;
+      color[1].r = (u_char)CVar4;
+      bVar3 = bVar3 >> 1;
+      color[0].r=bVar1;color[0].g=bVar2;color[0].b=bVar3;
+      color[0].cd = (u_char)((u_int)CVar3 >> 0x18);
+      color[1].g = (u_char)((u_int)CVar4 >> 8);
+      color[1].b = (u_char)((u_int)CVar4 >> 0x10);
       color[1].g = color[1].g >> 1;
+      color[1].r = color[1].r >> 1;
+      color[1].cd = (u_char)((u_int)CVar4 >> 0x18);
       color[1].b = color[1].b >> 1;
     }
-gte_stlvnl(&diff);
-    if ((diff.vx <= diff.vz) && (-diff.vx <= diff.vz) && (!(diff.vz < 0x80))) {
-gte_stsxy(&sp);
-      angleZ = 0;
-      if ((flags & 8U) != 0) {
-        long result;
-        result = sp.vx + sp.vy;
-        angleZ = result * 4;
+gte_swc2(0x19,&diff);
+    gte_swc2(0x1a,((char *)&diff + 0x4));
+    gte_swc2(0x1b,((char *)&diff + 0x8));
+    pDVar13 = (DVECTOR *)-diff.vx;
+    if (((diff.vx <= diff.vz) &&
+        (bVar11 = (int)pDVar13 <= diff.vz, pDVar13 = (DVECTOR *)(u_int)(diff.vz < 0x80), bVar11)) &&
+       (bVar11 = pDVar13 == (DVECTOR *)0x0, pDVar13 = &sp, bVar11)) {
+gte_swc2(0xe,&sp);
+      haloRadius = 0;
+      if ((flagsMasked & 8U) != 0) {
+        haloRadius = ((int)sp.vx + (int)sp.vy) * 4;
       }
-      if ((flags & 4U) != 0) {
-        VECTOR diff2;           /* @sp+0x50 */
-        DVECTOR sp2;            /* @sp+0x60 */
-        long difx;              /* s0 */
-        long dify;              /* s1 */
-gte_ldv0(ptEdge);
-        gte_rtps();
-gte_stlvnl(&diff2);
-gte_stsxy(&sp2);
-        dify = sp2.vy - sp.vy;
-        difx = sp2.vx - sp.vx;
-        angleOuter = fixedatan(dify,difx) >> 4;
-        sizeOuter = isqrt(difx * difx + dify * dify) * diff.vz;
+      outerRadius = 0;
+      if ((flagsMasked & 4U) == 0) {
+        innerRadius = 0;
       }
       else {
-        /* else-LOCAL zero-init: reorg hoists `angleOuter = 0` into the beqz
-         * delay slot (harmless on the taken path), and same-BB cse turns
-         * `sizeOuter = angleOuter` into the oracle's addu s2,s5,zero copy. */
-        angleOuter = 0;
-        sizeOuter = angleOuter;
+/* 0x800CCC9C..A4 selects a2; 0x800CCDF0 projects that selected edge. */
+gte_lwc2(0,*(int *)(pt1));
+        gte_lwc2(1,*(int *)(((char *)pt1 + 0x4)));
+        gte_rtps();
+gte_swc2(0x19,&diff2);
+        gte_swc2(0x1a,((char *)&diff2 + 0x4));
+        gte_swc2(0x1b,((char *)&diff2 + 0x8));
+gte_swc2(0xe,&sp2);
+        /* SXY2 -> sp+0x60, then LH at +0x62/+0x60 (0x800CCE18..34). */
+        diff_y = (int)sp2.vy - (int)sp.vy;
+        diff_x = (int)sp2.vx - (int)sp.vx;
+        ti13 = fixedatan(diff_y,diff_x);
+        outerRadius = ti13 >> 4;
+        pkt_addr24 = isqrt(diff_x * diff_x + diff_y * diff_y);
+        innerRadius = nfs4_mips_mult_s32(pkt_addr24,diff.vz);
       }
       gfrgb = color[0];
       gfrgb2 = color[1];
-      if (-1 < (int)((u_int)(u_short)flag << 0x10)) {
-        gscale = (vec1.x * vec1.x + vec1.y * vec1.y + vec1.z * vec1.z) >> 1;
+      if ((int)((u_int)(u_short)sVar12 << 0x10) < 0) {
+        ti13 = (int)(short)haloColor * (int)(short)haloColor;
+        iVar14 = (int)(short)(sVar7 - sVar8);
+        iVar12_alt = iVar14 * iVar14;
+        iVar14 = (int)(short)(sVar9 - sVar10);
+        lerp_q16 = iVar14 * iVar14;
       }
       else {
-        gscale = (vec2.x * vec2.x + vec2.y * vec2.y + vec2.z * vec2.z) >> 1;
+        ti13 = (int)(short)(sVar1 - sVar2);
+        ti13 = ti13 * ti13;
+        iVar14 = (int)(short)(sVar3 - sVar4);
+        iVar12_alt = iVar14 * iVar14;
+        iVar14 = (int)(short)(sVar5 - sVar6);
+        lerp_q16 = iVar14 * iVar14;
       }
-      /* MATCH: gscale is the SHIFT DESTINATION and `scale` re-reads it (not
-         `scale = gscale<<scale; gscale = scale;`) -- the re-read is the second
-         evaluation cse turns into the oracle's `sllv v0,v0,s3 ; addu s3,v0,zero`
-         copy; the scale-first form coalesces it into an in-place `sllv s3,v0,s3`. */
-      gscale = gscale << scale;
-      scale = gscale;
-      if ((flags & 1U) != 0) {
-        VECTOR tvec1;           /* @sp+0x50 */
-        VECTOR tvec2;           /* @sp+0x68 */
-        long result;            /* v1 (the -600 clamp temp) */
-        gte_ldtr0();
-gte_ldv0(&crossprod);
+      haloShape_p = nfs4_mips_sll_s32(nfs4_mips_sra_s32(
+          nfs4_mips_addu_s32(nfs4_mips_addu_s32(ti13,iVar12_alt),lerp_q16),1),scaledFactor);
+      gscale = haloShape_p;
+      if ((flagsMasked & 1U) != 0) {
+        gte_ldtr(0,0,0);
+gte_lwc2(0,*(int *)(&crossprod));
+        gte_lwc2(1,*(int *)(((char *)&crossprod + 0x4)));
         gte_rtps();
-gte_stlvnl(&tvec1);
-        VectorNormal((VECTOR *)&tvec1,(VECTOR *)&tvec2);
-        if ((flags & 2U) != 0) {
+        v0 = (VECTOR *)&tvec1;
+gte_swc2(0x19,&tvec1);
+        gte_swc2(0x1a,((char *)&tvec1 + 0x4));
+        gte_swc2(0x1b,((char *)&tvec1 + 0x8));
+        VectorNormal(v0,&tvec2);
+        if ((flagsMasked & 2U) != 0) {
           tvec2.vz = (tvec2.vz + -0xf33) * 0x14;
         }
-        result = tvec2.vz + -0x258;
-        if (result < 0) {
-          result = 0;
+        iVar6_emit = tvec2.vz + -600;
+        if (iVar6_emit < 0) {
+          iVar6_emit = 0;
         }
-        tvec2.vz = result;
-        gscale = gscale * result >> 0xb;
+        tvec2.vz = iVar6_emit;
+        gscale = nfs4_mips_sra_s32(nfs4_mips_mult_s32(gscale,iVar6_emit),11);
       }
-      if ((type & 0x100U) != 0) {
-        CVECTOR save;           /* @sp+0x50 */
-        MATRIX scalemat;        /* @sp+0x78 */
-        MATRIX mtx;             /* @sp+0x98 */
-        save = gfrgb;
-        *(int *)&scalemat.m[0][0] = scale + (sizeOuter >> 7);
-        *(int *)&scalemat.m[1][1] = scale + (sizeOuter >> 7);
-        *(int *)&scalemat.m[2][2] = 0;
-        *(int *)&scalemat.m[0][2] = 0;
-        *(int *)&scalemat.m[2][0] = 0;
-        gfrgb.r = gfrgb.r >> 1;
-        gfrgb.g = gfrgb.g >> 1;
-        gfrgb.b = gfrgb.b >> 1;
-        Flare_IdentMatrix(&mtx);
-gte_SetTransVector(&diff);
-        RotMatrixZ(0x800,&mtx);
-gte_SetRotMatrix(&mtx);
-gte_ldclmv(&scalemat);
-        gte_rtir();
-gte_stclmv(&mtx);
-gte_ldclmv(((char *)&scalemat + 0x2));
-        gte_rtir();
-gte_stclmv(((char *)&mtx + 0x2));
-gte_ldclmv(((char *)&scalemat + 0x4));
-        gte_rtir();
-gte_stclmv(((char *)&mtx + 0x4));
-gte_SetRotMatrix(&mtx);
-        Flare_ReflectHexFlare((long *)&sp,otz);
-        gfrgb = save;
-      }
-      else {
-        MATRIX mtx;             /* @sp+0x50 */
-        MATRIX mtx2;            /* @sp+0x70 */
-        MATRIX scalemat;        /* @sp+0x90 */
-        int z;                  /* v1 */
-        z = gscale;
-        *(int *)&scalemat.m[2][2] = 0;
-        *(int *)&scalemat.m[0][2] = 0;
-        *(int *)&scalemat.m[2][0] = 0;
-        *(int *)&scalemat.m[0][0] = z + (sizeOuter >> 5);
-        *(int *)&scalemat.m[1][1] = z;
-        Flare_IdentMatrix(&mtx);
+      CVar5 = gfrgb;
+      mtx = (MATRIX *)auStack_98;
+      if ((type & 0x100U) == 0) {
+        scalemat.m[2][2] = 0;
+        (*(u_short *)((u_char *)&(scalemat) + 18)) = 0;
+        scalemat.m[0][2] = 0;
+        scalemat.m[1][0] = 0;
+        scalemat.m[2][0] = 0;
+        scalemat.m[2][1] = 0;
+        (*(int *)&(scalemat.m[0])) = gscale + (innerRadius >> 5);
+        scalemat.m[1][1] = (u_short)gscale;
+        scalemat.m[1][2] = (*(u_short *)((u_char *)&(gscale) + 2));
+        Flare_IdentMatrix((MATRIX *)auStack_98);
         Flare_IdentMatrix(&mtx2);
+        /* 0x800CD208..20: VECTOR at sp+0x18 -> TRX/TRY/TRZ. */
 gte_SetTransVector(&diff);
-        RotMatrixZ(angleZ,&mtx);
-        RotMatrixZ(angleOuter,&mtx2);
+        RotMatrixZ(haloRadius,(MATRIX *)auStack_98);
+        RotMatrixZ(outerRadius,&mtx2);
+/* 0x800CD23C..320: orientation (sp+0x70) times scale (sp+0x90), in place. */
 gte_SetRotMatrix(&mtx2);
-gte_ldclmv(&scalemat);
+gte_ldsv(&scalemat);
         gte_rtir();
-gte_stclmv(&scalemat);
-gte_ldclmv(((char *)&scalemat + 0x2));
+gte_stsv(&scalemat);
+gte_ldsv(((char *)&scalemat + 0x2));
         gte_rtir();
-gte_stclmv(((char *)&scalemat + 0x2));
-gte_ldclmv(((char *)&scalemat + 0x4));
+gte_stsv(((char *)&scalemat + 0x2));
+gte_ldsv(((char *)&scalemat + 0x4));
         gte_rtir();
-gte_stclmv(((char *)&scalemat + 0x4));
+gte_stsv(((char *)&scalemat + 0x4));
+/* 0x800CD324..454: resulting scale times rotation (sp+0x50), in place. */
 gte_SetRotMatrix(&scalemat);
-gte_ldclmv(&mtx);
+gte_ldsv(mtx);
         gte_rtir();
-gte_stclmv(&mtx);
-gte_ldclmv(((char *)&mtx + 0x2));
+gte_stsv(mtx);
+gte_ldsv(((char *)mtx + 0x2));
         gte_rtir();
-gte_stclmv(((char *)&mtx + 0x2));
-gte_ldclmv(((char *)&mtx + 0x4));
+gte_stsv(((char *)mtx + 0x2));
+gte_ldsv(((char *)mtx + 0x4));
         gte_rtir();
-gte_stclmv(((char *)&mtx + 0x4));
-gte_SetRotMatrix(&mtx);
+gte_stsv(((char *)mtx + 0x4));
+gte_SetRotMatrix(mtx);
         if (diff.vz < 0xc80) {
           Flare_OctFlareSpikes((long *)&sp,otz);
         }
@@ -857,279 +865,337 @@ gte_SetRotMatrix(&mtx);
           Flare_QuadFlare((long *)&sp,otz);
         }
       }
-      {
-        DR_MODE *aprim;         /* a0 */
-        aprim = (DR_MODE *)Render_gPacketPtr;
-        setaddr(aprim,getaddr(otz * 4 + (int)Render_gPalettePtr));
-        Render_gPacketPtr = (u_char *)aprim + 0xc;
-        setaddr(otz * 4 + (int)Render_gPalettePtr,aprim);
-        {
-          /* MATCH: the AND must land in its OWN variable -- gcc-2.8's fold()
-             rewrites `(flags & 0x40) != 0` (any spelling: Yoda, >0, !!, explicit
-             shift) into `(flags >> 6) & 1`; only a VAR_DECL operand keeps the
-             oracle's `andi a2,s4,0x40 ; sltu a2,zero,a2`. */
-          u_int dtd /* SYM-CODEGEN-CARRIER: dtd -- VAR_DECL prevents fold to shift/bit form */ = flags & 0x40U;
-          SetDrawMode(aprim,0,(u_int)(dtd != 0),0x120,(RECT *)0x0);
-        }
+      else {
+        tu2 = gfrgb.r;
+        ti13 = haloShape_p + (innerRadius >> 7);
+        nfs4_mips_copy_bytes(&save,&gfrgb,4);
+        /* 0x800CD024..38: packed diagonal words at sp+0x78/+0x80. */
+        memset(&mtx2,0,sizeof(mtx2));
+        gfrgb.g = gfrgb.g >> 1;
+        gfrgb.r = tu2 >> 1;
+        gfrgb.cd = CVar5.cd;
+        gfrgb.b = gfrgb.b >> 1;
+        nfs4_mips_copy_bytes(&mtx2.m[0][0],&ti13,4);
+        nfs4_mips_copy_bytes(&mtx2.m[1][1],&ti13,4);
+        Flare_IdentMatrix(mtx);
+gte_SetTransVector(&diff);
+        RotMatrixZ(0x800,mtx);
+/* 0x800CD088..174: rotation times diagonal, storing into rotation. */
+gte_SetRotMatrix(mtx);
+gte_ldsv(&mtx2);
+        gte_rtir();
+gte_stsv(mtx);
+gte_ldsv(((char *)&mtx2 + 0x2));
+        gte_rtir();
+gte_stsv(((char *)mtx + 0x2));
+gte_ldsv(((char *)&mtx2 + 0x4));
+        gte_rtir();
+gte_stsv(((char *)mtx + 0x4));
+gte_SetRotMatrix(mtx);
+        Flare_ReflectHexFlare((long *)&sp,otz);
+        gfrgb.r = save.r;
+        gfrgb.g = save.g;
+        gfrgb.b = save.b;
+        gfrgb.cd = save.cd;
       }
+      p = (u_char *)Render_gPacketPtr;
+      primPtr = otz * 4 + (int)Render_gPalettePtr;
+      nfs4_add_prim((void *)(intptr_t)primPtr,Render_gPacketPtr);
+      tu14 = (u_int)Render_gPacketPtr & 0xffffff;
+      pDVar13 = (DVECTOR *)(*(u_int *)primPtr & 0xff000000 | tu14);
+      Render_gPacketPtr = Render_gPacketPtr + 0xc;
+      SetDrawMode((DR_MODE *)p,0,(u_int)((flagsMasked & 0x40U) != 0),0x120,(RECT *)0x0);
     }
   }
-  return;
+  return &pDVar13->vx;
 }
 
-/* PsyQ gte_stszotz (SZ3>>2 depth-sort key) -- oracle Halo2 @0x800CD6E4:
- * mfc2 $12,$19; nop; sra $12,2; sw.  Promoted to psx_gte.h (w40 consolidation). */
-
-/* ---- Flare_Halo2__FP13DRender_tViewiiP8coorddefT3P15Draw_FlareCache  [FLARE.CPP:845-1094] SLD-VERIFIED
- * w13-a3 FULL SYM rule-8 rewrite (see CarShapedHalo notes; same recipe).
- * SYM reg map: Vi=a0 scale=s0 type=s2 fpt=a3 fpt2=a2(from stack) flare_type=s1
- *   flags=s3 angleZ=s5 angleOuter=s2(reuses type) sizeOuter=t0 z=s4 otz=AUTO@0xC0
- *   t=v0 tx=t1 ty=a0 tz=t0 dx=v1 dy=a1 dz=a3 r=a0 result=v0 difx=s0 dify=s1 aprim=a0.
- * &diff CSE'd into s6 by gcc (2 cross-call uses). Return: SYM FCN VOID.
- * sd param unused (not in SYM, present in the mangling). */
+/* ---- Flare_Halo2__FP13DRender_tViewiiP8coorddefT3P15Draw_FlareCache  [FLARE.CPP:845-1094] SLD-VERIFIED ---- */
 void Flare_Halo2(DRender_tView *Vi,int scale,int type,coorddef *fpt,coorddef *fpt2,
-              Draw_FlareCache *)
+              Draw_FlareCache *arg5)
 
 {
-  VECTOR diff;                  /* @sp+0x18 */
-  SVECTOR sdiff;                /* @sp+0x28 */
-  SVECTOR sdiff2;               /* @sp+0x30 */
-  long angleZ;                  /* s5 */
-  long angleOuter;              /* s2 */
-  long sizeOuter;               /* t0 */
-  CVECTOR color [2];            /* @sp+0x38 */
-  DVECTOR sp;                   /* @sp+0x40 */
-  int flare_type;               /* s1 */
-  int flags;                    /* s3 */
-  int otz;                      /* AUTO @sp+0xC0 (address taken -> late slot) */
-  int z;                        /* s4 */
-  VECTOR diff2;                 /* @sp+0x48 */
-  DVECTOR sp2;                  /* @sp+0x58 */
-
+#ifdef AP_WIN
+  NFSHS_DIAGNOSTIC_CALL(NFSHS_FlarePacketScope traceScope("world_halo"));
+  NFSHS_DIAGNOSTIC_CALL(NFSHS_HostTraceFlareHaloEntry(Vi,scale,type,fpt,fpt2,arg5));
+#endif
+  u_char u0_byte;
+  long result;
+  int pkt_addr24;
+  int CVar3;
+  int CVar4;
+  u_char u1_byte;
+  DVECTOR *pDVar1;
+  int tpage_word;
+  int angleOuter;
+  u_char v0_byte;
+  int dx;
+  int otz_00;
+  u_int color_pack;
+  int iVar2;
+  DR_MODE *aprim;
+  int dy;
+  int dz;
+  int tz;
+  int ty;
+  int primPtr;
+  int tp7;
+  int tx;
+  int difx;
+  long dify;
+  int flare_type;
+  int y;
+  int flags;
+  int halfHeight;
+  int z;
+  long angleZ;
+  long r;
+  int loc_e0;
+  VECTOR diff;
+  SVECTOR sdiff;
+  VECTOR tvec;
+  VECTOR tvec2;
+  SVECTOR sdiff2;
+  CVECTOR color [2];
+  DVECTOR sp;
+  VECTOR diff2;
+  DVECTOR sp2;
+  MATRIX mtx;
+  MATRIX mtx2;
+  MATRIX scalemat;
+  int otz;
+  int loc_28;
+  int loc_24;
+  int loc_20;
+  int loc_1c;
+  int loc_18;
+  int loc_14;
+  int loc_10;
+  int loc_c;
+  int loc_8;
+  u_char tc1;
+  u_char *p;
+  u_char *tp2;
+  
   flare_type = type & 0xff;
-  flags = Flare_gType[flare_type].flags;
-  angleZ = 0;
+  halfHeight = Flare_gType[flare_type].flags;
+  r = 0;
   if (fpt2 == (coorddef *)0x0) {
-    flags = flags & -6;
+    halfHeight = halfHeight & 0xfffffffa;
   }
   {
-    coorddef *t;                /* v0 */
-    int tx;                     /* t1 */
-    int ty;                     /* a0 */
-    int tz;                     /* t0 */
-    int dx;                     /* v1 */
-    int dy;                     /* a1 */
-    int dz;                     /* a3 */
-    t = (coorddef *)&Vi->cview;
-    tx = t->x;
-    ty = t->y;
-    tz = t->z;
-    dx = fpt->x;
-    dy = fpt->y;
-    dz = fpt->z;
-    dx = dx - tx;
-    dy = dy - ty;
-    dz = dz - tz;
+    coorddef *t;
+    t = (coorddef *)((char *)Vi + 8);
+    tx = *(int *)t;
+    ty = *(int *)((char *)t + 4);
+    tz = *(int *)((char *)t + 8);
+    dx = *(int *)fpt - tx;
+    dy = *(int *)((char *)fpt + 4) - ty;
+    dz = *(int *)((char *)fpt + 8) - tz;
     sdiff.vx = (short)(dx >> 10);
     sdiff.vy = (short)(dy >> 10);
     sdiff.vz = (short)(dz >> 10);
-    if ((flags & 5U) != 0) {
-      dx = fpt2->x;
-      dy = fpt2->y;
-      dz = fpt2->z;
-      dx = dx - tx;
-      dy = dy - ty;
-      dz = dz - tz;
+    if ((halfHeight & 5U) != 0) {
+      dx = *(int *)fpt2 - tx;
+      dy = *(int *)((char *)fpt2 + 4) - ty;
+      dz = *(int *)((char *)fpt2 + 8) - tz;
       sdiff2.vx = (short)(dx >> 10);
       sdiff2.vy = (short)(dy >> 10);
       sdiff2.vz = (short)(dz >> 10);
     }
   }
-  if ((flags & 0x10U) != 0) {
-    if (((FLARE_GAME_TICKS >> 6) & 1U) != 0) {
-      return;
-    }
+  if ((halfHeight & 0x10U) == 0) {
+    if ((halfHeight & 0x20U) == 0) goto FlareHalo2_rtpsEmit;
+    pkt_addr24 = simGlobal.gameTicks + 0x1b >> 5;
   }
-  else if ((flags & 0x20U) != 0) {
-    if (((FLARE_GAME_TICKS + 0x1b >> 5) & 1U) != 0) {
-      return;
-    }
+  else {
+    pkt_addr24 = simGlobal.gameTicks >> 6;
   }
+  if ((pkt_addr24 & 1U) != 0) {
+    return;
+  }
+FlareHalo2_rtpsEmit:
   Flare_SetMatrix(&gWorldMat);
-gte_ldv0(&sdiff);
+gte_lwc2(0,*(int *)(&sdiff));
+  gte_lwc2(1,*(int *)(((char *)&sdiff + 0x4)));
   gte_rtps();
-  {
-    u_long c;                   /* SYM-CODEGEN-CARRIER: c -- serial copy temp (v0), same measured anti-dependence as CarShapedHalo */
-    c = Flare_gType[flare_type].chalo;
-    *(u_long *)&color[0] = c;
-    c = Flare_gType[flare_type].cbeam;
-    *(u_long *)&color[1] = c;
-  }
+  CVar3 = Flare_gType[flare_type].chalo;
+  CVar4 = Flare_gType[flare_type].cbeam;
   if (scale == -1) {
     scale = Flare_gType[flare_type].scale;
   }
-gte_stlvnl(&diff);
-  if ((diff.vx <= diff.vz) && (-diff.vx <= diff.vz) && (!(diff.vz < 0x80))) {
-gte_stsxy(&sp);
-gte_stszotz(&otz);
-    otz = otz >> 1;
-    if (otz < 0) {
-      return;
-    }
-    if (Draw_gViewOtSize + -3 < otz) {
-      return;
-    }
-    if ((flags & 0x80U) != 0) {
-      int r;                    /* a0 */
-      r = (u_int)random() % 0x14;
-      scale = scale + r * 4;
-      color[0].r = color[0].r + r;
-      color[0].g = color[0].g + r;
-      color[0].b = color[0].b + r;
-      color[1].r = color[1].r + r;
-      color[1].g = color[1].g + r;
-      color[1].b = color[1].b + r;
-    }
-    if ((flags & 8U) != 0) {
-      long result;              /* v0 */
-      result = sp.vx + sp.vy;
-      angleZ = result * 4;
-    }
-    gfrgb = color[0];
-    gfrgb2 = color[1];
-    gscale = scale;
-    if ((flags & 0x40U) != 0) {
-      DR_MODE *aprim;           /* a0 */
-      aprim = (DR_MODE *)Render_gPacketPtr;
-      setaddr(aprim,getaddr(otz * 4 + (int)Render_gPalettePtr));
-      Render_gPacketPtr = (u_char *)aprim + 0xc;
-      setaddr(otz * 4 + (int)Render_gPalettePtr,aprim);
-      SetDrawMode(aprim,0,0,0x120,(RECT *)0x0);
-    }
-    z = diff.vz;
-    if ((flags & 5U) != 0) {
-gte_ldv0(&sdiff2);
-      gte_rtps();
-gte_stlvnl(&diff2);
-gte_stsxy(&sp2);
-    }
-    if ((flags & 4U) != 0) {
-      {
-        long difx;              /* s0 (reuses scale) */
-        long dify;              /* s1 (reuses flare_type) */
-        dify = sp2.vy - sp.vy;
-        difx = sp2.vx - sp.vx;
-        angleOuter = fixedatan(dify,difx) >> 4;
-        sizeOuter = isqrt(difx * difx + dify * dify) * diff.vz;
+gte_swc2(0x19,&diff);
+  gte_swc2(0x1a,((char *)&diff + 0x4));
+  gte_swc2(0x1b,((char *)&diff + 0x8));
+#ifdef AP_WIN
+  NFSHS_DIAGNOSTIC_CALL(NFSHS_HostTraceFlareHaloRTPS(&diff,&sp,halfHeight,scale));
+#endif
+  pDVar1 = (DVECTOR *)-diff.vx;
+  if (((diff.vx <= diff.vz) &&
+      (pDVar1 = (DVECTOR *)(u_int)(diff.vz < 0x80), (int)-diff.vx <= diff.vz)) &&
+     (pDVar1 = &sp, (DVECTOR *)(u_int)(diff.vz < 0x80) == (DVECTOR *)0x0)) {
+gte_swc2(0xe,&sp);
+gte_stsz(&otz);
+    /* MIPS 0x800CD6E4..0x800CD6F0 shifts SZ3 right by two before
+       storing it, then 0x800CD6F4..0x800CD700 shifts once more for OT. */
+    otz = nfs4_mips_sra_s32(otz,2);
+    otz_00 = nfs4_mips_sra_s32(otz,1);
+    pDVar1 = (DVECTOR *)otz;
+    if ((-1 < otz_00) && (pDVar1 = (DVECTOR *)(halfHeight & 0x80), otz_00 <= Draw_gViewOtSize + -3))
+    {
+      color[0] = (*(CVECTOR *)&(CVar3));
+      color[1] = (*(CVECTOR *)&(CVar4));
+      if (pDVar1 != (DVECTOR *)0x0) {
+        tpage_word = random();
+        scale = scale + ((u_int)tpage_word % 0x14) * 4;
+        color[0].r = (u_char)CVar3;
+        color[0].g = (u_char)((u_int)CVar3 >> 8);
+        tc1 = (u_char)((u_int)tpage_word % 0x14);
+        u0_byte = color[0].r + tc1;
+        color[0].b = (u_char)((u_int)CVar3 >> 0x10);
+        v0_byte = color[0].g + tc1;
+        color[0].g = v0_byte;
+        color[0].r = u0_byte;
+        color[1].r = (u_char)CVar4;
+        u1_byte = color[0].b + tc1;
+        color[0].cd = (u_char)((u_int)CVar3 >> 0x18);
+        color[0].b = u1_byte;
+        color[1].g = (u_char)((u_int)CVar4 >> 8);
+        color[1].b = (u_char)((u_int)CVar4 >> 0x10);
+        color[1].g = color[1].g + tc1;
+        color[1].r = color[1].r + tc1;
+        color[1].cd = (u_char)((u_int)CVar4 >> 0x18);
+        color[1].b = color[1].b + tc1;
       }
-      {
-        MATRIX mtx;             /* @sp+0x60 */
-        MATRIX mtx2;            /* @sp+0x80 */
-        MATRIX scalemat;        /* @sp+0xA0 */
-        *(int *)&scalemat.m[2][2] = 0;
-        *(int *)&scalemat.m[0][2] = 0;
-        *(int *)&scalemat.m[2][0] = 0;
-        *(int *)&scalemat.m[1][1] = gscale;
-        *(int *)&scalemat.m[0][0] = gscale + (sizeOuter >> 4);
+      tp2 = (u_char *)Render_gPacketPtr;
+      if ((halfHeight & 8U) != 0) {
+        r = ((int)sp.vx + (int)sp.vy) * 4;
+      }
+      gfrgb = color[0];
+      gfrgb2 = color[1];
+      gscale = scale;
+      if ((halfHeight & 0x40U) != 0) {
+        primPtr = otz_00 * 4 + (int)Render_gPalettePtr;
+        nfs4_add_prim((void *)(intptr_t)primPtr,Render_gPacketPtr);
+        color_pack = (u_int)Render_gPacketPtr & 0xffffff;
+        Render_gPacketPtr = Render_gPacketPtr + 0xc;
+        SetDrawMode((DR_MODE *)tp2,0,0,0x120,(RECT *)0x0);
+      }
+      if ((halfHeight & 5U) != 0) {
+gte_lwc2(0,*(int *)(&sdiff2));
+        gte_lwc2(1,*(int *)(((char *)&sdiff2 + 0x4)));
+        gte_rtps();
+gte_swc2(0x19,&diff2);
+        gte_swc2(0x1a,((char *)&diff2 + 0x4));
+        gte_swc2(0x1b,((char *)&diff2 + 0x8));
+gte_swc2(0xe,&sp2);
+      }
+      if ((halfHeight & 4U) == 0) {
+        if ((halfHeight & 1U) != 0) {
+          tvec.vx = diff.vx - diff2.vx;
+          tvec.vy = diff.vy - diff2.vy;
+          tvec.vz = diff.vz - diff2.vz;
+          VectorNormal(&tvec,&tvec2);
+          if ((halfHeight & 2U) != 0) {
+            tvec2.vz = (tvec2.vz + -0xf33) * 0x14;
+          }
+          iVar2 = tvec2.vz + -600;
+          if (iVar2 < 0) {
+            iVar2 = 0;
+          }
+          if (iVar2 == 0) {
+            return;
+          }
+          gscale = gscale * iVar2 >> 0xb;
+          tvec2.vz = iVar2;
+          if (type == 0x1e) {
+            if (diff.vz < 0) {
+              diff.vz = diff.vz + 3;
+            }
+            diff.vz = diff.vz >> 2;
+          }
+        }
+        mtx2.m[2][2] = 0;
+        (*(u_short *)((u_char *)&(mtx2) + 18)) = 0;
+        mtx2.m[0][2] = 0;
+        mtx2.m[1][0] = 0;
+        mtx2.m[2][0] = 0;
+        mtx2.m[2][1] = 0;
+        mtx2.m[0][0] = (u_short)gscale;
+        mtx2.m[0][1] = (*(u_short *)((u_char *)&(gscale) + 2));
+        mtx2.m[1][1] = (u_short)gscale;
+        mtx2.m[1][2] = (*(u_short *)((u_char *)&(gscale) + 2));
+        Flare_IdentMatrix(&mtx);
+        /* MIPS 0x800CD958..0x800CD96C loads diff.vx/vy/vz directly
+           into GTE TRX/TRY/TRZ; diff is VECTOR, not MATRIX. */
+gte_SetTransVector(&diff);
+        RotMatrixZ(r,&mtx);
+        /* MIPS 0x800CDC8C..0x800CDDA0: rotate each column of mtx2
+           through mtx, store the result into mtx, then install mtx. */
+gte_SetRotMatrix(&mtx);
+gte_ldsv(&mtx2);
+        gte_rtir();
+gte_stsv(&mtx);
+gte_ldsv(((char *)&mtx2 + 0x2));
+        gte_rtir();
+gte_stsv(((char *)&mtx + 0x2));
+gte_ldsv(((char *)&mtx2 + 0x4));
+        gte_rtir();
+gte_stsv(((char *)&mtx + 0x4));
+gte_SetRotMatrix(&mtx);
+      }
+      else {
+        y = (int)sp2.vy - (int)sp.vy;
+        difx = (int)sp2.vx - (int)sp.vx;
+        angleOuter = fixedatan(y,difx);
+        int sizeOuter = isqrt(difx * difx + y * y);
         Flare_IdentMatrix(&mtx);
         Flare_IdentMatrix(&mtx2);
+        /* MIPS 0x800CDC68..0x800CDC7C is the same direct TR load in
+           the alternate halo-orientation branch. */
 gte_SetTransVector(&diff);
-        RotMatrixZ(angleZ,&mtx);
-        RotMatrixZ(angleOuter,&mtx2);
+        RotMatrixZ(r,&mtx);
+        RotMatrixZ(angleOuter >> 4,&mtx2);
+        /* MIPS 0x800CD988..0x800CDB78: mtx2 transforms scalemat,
+           then scalemat transforms mtx; every load/store addresses the
+           three MATRIX columns at byte offsets 0, 2 and 4. */
 gte_SetRotMatrix(&mtx2);
-gte_ldclmv(&scalemat);
+gte_ldsv(&scalemat);
         gte_rtir();
-gte_stclmv(&scalemat);
-gte_ldclmv(((char *)&scalemat + 0x2));
+gte_stsv(&scalemat);
+gte_ldsv(((char *)&scalemat + 0x2));
         gte_rtir();
-gte_stclmv(((char *)&scalemat + 0x2));
-gte_ldclmv(((char *)&scalemat + 0x4));
+gte_stsv(((char *)&scalemat + 0x2));
+gte_ldsv(((char *)&scalemat + 0x4));
         gte_rtir();
-gte_stclmv(((char *)&scalemat + 0x4));
+gte_stsv(((char *)&scalemat + 0x4));
 gte_SetRotMatrix(&scalemat);
-gte_ldclmv(&mtx);
+gte_ldsv(&mtx);
         gte_rtir();
-gte_stclmv(&mtx);
-gte_ldclmv(((char *)&mtx + 0x2));
+gte_stsv(&mtx);
+gte_ldsv(((char *)&mtx + 0x2));
         gte_rtir();
-gte_stclmv(((char *)&mtx + 0x2));
-gte_ldclmv(((char *)&mtx + 0x4));
+gte_stsv(((char *)&mtx + 0x2));
+gte_ldsv(((char *)&mtx + 0x4));
         gte_rtir();
-gte_stclmv(((char *)&mtx + 0x4));
+gte_stsv(((char *)&mtx + 0x4));
 gte_SetRotMatrix(&mtx);
       }
-    }
-    else {
-      if ((flags & 1U) != 0) {
-        VECTOR tvec;            /* @sp+0x60 */
-        VECTOR tvec2;           /* @sp+0x70 */
-        long result;            /* v1 (the -600 clamp temp) */
-        tvec.vx = diff.vx - diff2.vx;
-        tvec.vy = diff.vy - diff2.vy;
-        tvec.vz = diff.vz - diff2.vz;
-        VectorNormal((VECTOR *)&tvec,(VECTOR *)&tvec2);
-        if ((flags & 2U) != 0) {
-          tvec2.vz = (tvec2.vz + -0xf33) * 0x14;
-        }
-        result = tvec2.vz + -0x258;
-        if (result < 0) {
-          result = 0;
-        }
-        tvec2.vz = result;
-        if (result == 0) {
-          return;
-        }
-        gscale = gscale * result >> 0xb;
-        if (type == 0x1e) {
-          z = z / 4;
-        }
+      if (diff.vz < 0xc80) {
+        Flare_OctFlareSpikes((long *)&sp,otz_00);
       }
-      {
-        MATRIX mtx;             /* @sp+0x60 */
-        MATRIX scalemat;        /* @sp+0x80 */
-        *(int *)&scalemat.m[2][2] = 0;
-        *(int *)&scalemat.m[0][2] = 0;
-        *(int *)&scalemat.m[2][0] = 0;
-        *(int *)&scalemat.m[0][0] = gscale;
-        *(int *)&scalemat.m[1][1] = gscale;
-        Flare_IdentMatrix(&mtx);
-gte_SetTransVector(&diff);
-        RotMatrixZ(angleZ,&mtx);
-gte_SetRotMatrix(&mtx);
-gte_ldclmv(&scalemat);
-        gte_rtir();
-gte_stclmv(&mtx);
-gte_ldclmv(((char *)&scalemat + 0x2));
-        gte_rtir();
-gte_stclmv(((char *)&mtx + 0x2));
-gte_ldclmv(((char *)&scalemat + 0x4));
-        gte_rtir();
-gte_stclmv(((char *)&mtx + 0x4));
-gte_SetRotMatrix(&mtx);
+      else if (diff.vz < 0x1b80) {
+        Flare_HexFlare((long *)&sp,otz_00);
+        Flare_PreCalcHexLightBeam((long *)&sp,otz_00);
       }
-    }
-    if (z < 0xc80) {
-      Flare_OctFlareSpikes((long *)&sp,otz);
-    }
-    else if (z < 0x1b80) {
-      Flare_HexFlare((long *)&sp,otz);
-      Flare_PreCalcHexLightBeam((long *)&sp,otz);
-    }
-    else {
-      Flare_QuadFlare((long *)&sp,otz);
-    }
-    {
-      DR_MODE *aprim;           /* a0 */
-      aprim = (DR_MODE *)Render_gPacketPtr;
-      setaddr(aprim,getaddr(otz * 4 + (int)Render_gPalettePtr));
-      Render_gPacketPtr = (u_char *)aprim + 0xc;
-      setaddr(otz * 4 + (int)Render_gPalettePtr,aprim);
-      {
-        /* MATCH: see Flare_CarShapedHalo -- the AND needs its own VAR_DECL to
-           stop gcc's fold() turning the test into `(flags >> 6) & 1`. */
-        u_int dtd /* SYM-CODEGEN-CARRIER: dtd -- VAR_DECL prevents fold to shift/bit form */ = flags & 0x40U;
-        SetDrawMode(aprim,0,(u_int)(dtd != 0),0x120,(RECT *)0x0);
+      else {
+        Flare_QuadFlare((long *)&sp,otz_00);
       }
+      p = (u_char *)Render_gPacketPtr;
+      tp7 = otz_00 * 4 + (int)Render_gPalettePtr;
+      nfs4_add_prim((void *)(intptr_t)tp7,Render_gPacketPtr);
+      Render_gPacketPtr = Render_gPacketPtr + 0xc;
+      SetDrawMode((DR_MODE *)p,0,(u_int)((halfHeight & 0x40U) != 0),0x120,(RECT *)0x0);
     }
   }
   return;
@@ -1143,52 +1209,32 @@ void Flare_Halo(DRender_tView *Vi,int scale,int type,coorddef *fpt,Draw_FlareCac
   return;
 }
 
-/* ---- Flare_2DSpike__FPlT0i  [FLARE.CPP:1105-1120] SLD-VERIFIED ----
- * NEAR-MISS 2 diffs (43/43, down from 7): MATCH: split-temp `rgb = gfrgb2word` read BEFORE the
- * packet-bump store, consumed after (store must sink below the bump: may-alias order is
- * preserved, so only a load/store SPLIT spans it). SYM has no rgb local (compiler-temp stand-in).
- * Residual 2 = position of the `lw v1,0(gp)` across the bump addiu/sw pair -- a list-scheduler
- * ready-tie (ours schedules the bump first); not source-reachable, permuter class. */
-/* ---- Flare_2DSpike__FPlT0i -- w41-a8 FLOOR (2 diffs, count exact 43/43) ----
- * The ONLY residual is the sched1 ISSUE POSITION of `rgb = *(u_int *)&gfrgb2;`
- * (`lw v1,0(gp)`): the oracle issues it BEFORE the packet-cursor bump
- * (`addiu v0,a0,20 ; sw v0,0(t0)`), ours after.  Source position is IRRELEVANT here --
- * measured 3 spellings: statement moved one earlier (before the OT-slot store) = 4 diffs,
- * moved one later (after the bump) = 2, and `*(volatile u_int *)&gfrgb2` = 2.  A sched1
- * ready-list tie, not source-reachable.  (STRONG per the floor bar: prototype is void/void
- * per SYM, count exact, 3 alternate forms measured, named mechanism.)
- * ---- w45-a9: THE "NOT SOURCE-REACHABLE" VERDICT IS REFUTED -- PASS 43/43. ----
- * The floor above was correct about the MECHANISM (a sched1 issue-position tie) and wrong
- * about reachability: the ZERO-INSN USE FENCE (§2b.5) pins the issue position directly.
- * `__asm__ volatile("" : : "r"(rgb));` immediately after the read is a scheduling fixpoint,
- * so the `lw v1,0(gp)` must issue BEFORE it while the packet-cursor bump (which follows the
- * fence in source order) must issue AFTER -- exactly retail's 26/27/28.  Emits nothing.
- * GENERALIZATION: any "the oracle issues load X one slot earlier than sched1 does" residual
- * where source POSITION has already been swept is a USE-FENCE target, not a floor.  The
- * PTag-bitfield spellings were also measured here (§2b.1): value-side bitfield READ = 6,
- * plain word READ = 6 (both re-color the bump to $v1) -- this fn wants the hand-masked OR. */
+/* ---- Flare_2DSpike__FPlT0i  [FLARE.CPP:1105-1120] SLD-VERIFIED ---- */
 void Flare_2DSpike(long *center,long *end,int otz)
 
 {
+  int tl2;
+  int tl3;
+  u_int *prev_pkt_slot;
   long pt [2];
-  LINE_G2 *prim;
-  u_int rgb; /* SYM-CODEGEN-CARRIER: rgb -- load-bearing zero-insn allocation fence for the colour word */
-
-  pt[0] = *center;
-  pt[1] = *end;
-  otz = otz * 4 + (int)Render_gPalettePtr;
-  prim = (LINE_G2 *)Render_gPacketPtr;
-  *(u_int *)prim = *(u_int *)prim & 0xff000000 | *(u_int *)otz & 0xffffff;
-  *(u_int *)otz = *(u_int *)otz & 0xff000000 | (u_int)prim & 0xffffff;
-  rgb = *(u_int *)&gfrgb2;
-  __asm__ volatile("" : : "r"(rgb));
-  Render_gPacketPtr = (u_char *)prim + 0x14;
-  ((u_char *)prim)[3] = 4;
-  *(u_int *)((u_char *)prim + 0xc) = 0;
-  *(u_int *)((u_char *)prim + 4) = rgb;
-  ((u_char *)prim)[7] = 0x52;
-  *(long *)((u_char *)prim + 8) = pt[0];
-  *(long *)((u_char *)prim + 0x10) = pt[1];
+  u_char *prim;
+  void *tp1;
+  CVECTOR CVar1;
+  
+  prim = (u_char *)Render_gPacketPtr;
+  tl2 = *center;
+  tl3 = *end;
+  prev_pkt_slot = (u_int *)(Render_gPalettePtr + otz * 4);
+  nfs4_add_prim((void *)(intptr_t)prev_pkt_slot,Render_gPacketPtr);
+  CVar1 = gfrgb2;
+  tp1 = Render_gPacketPtr + 3;
+  Render_gPacketPtr = Render_gPacketPtr + 0x14;
+  *(u_char *)tp1 = 4;
+  *(u_int *)(prim + 0xc) = 0;
+  *(CVECTOR *)(prim + 4) = CVar1;
+  prim[7] = 0x52;
+  *(int *)(prim + 8) = tl2;
+  *(int *)(prim + 0x10) = tl3;
   return;
 }
 
@@ -1196,254 +1242,118 @@ void Flare_2DSpike(long *center,long *end,int otz)
 void Flare_2DHalo(int x,int y,int scalex,int scaley,int type)
 
 {
-  /* MATCH: SYM rule-8 shape (block 0x800cdf70): pt(s3)=&pt2, otz(s4)=0 (cse zero
-   * source for the first SetDrawMode's 0,0 args + a3 of all 16 Tri/Spike calls),
-   * sd(t0)=scratchpad cache base — guard reads sd->head.cprim.{PrimPtr,MPrimPtr}
-   * as displacements off the shared lui 0x1F80 base; no ts9/ts10 short temps
-   * (x/y live in s5/s6); gfrgb = word copy (CVECTOR struct-assign emits align-1
-   * movstrsi lwl/lwr — oracle has plain lw/sw 0(gp)); loop = index form arr[i]
-   * (walkers are compiler givs, SYM has only i) with plain /0x10000 signed
-   * division (bgez/addu 0xFFFF/sra guards regenerate; 0xFFFF hoists to a2 by
-   * loop.c); packet allocs per the proven TU idiom: aprim = PacketPtr FIRST,
-   * two-set slot (+ otz*4 in the tail block only).
-   * ---- w45-a9 RECEIPT BAR: 12 -> 6 (count-exact 247/247).  TWO landed levers:
-   *   (1) the serial `c` copy temp for the two Flare_gType color word-copies (ONE REUSED
-   *       temp; two temps = 10, direct-second-store = 10 -- both re-measured in the
-   *       post-fence basin, so these are STRONG falsifications, not stale notes);
-   *   (2) the dual-param USE fence (see the fence's own comment) -- fixed the s1 REGPARM
-   *       copy sinking into the guard branch's delay slot.
-   * TWO RESIDUALS LEFT, 2 diffs each:
-   *   (A) `sw s3,92(sp)` issues at ours[12] vs retail[9] (retail's prologue save order is
-   *       s5,s6,s0,s1,s3,ra,s4,s2; ours s5,s6,s0,s1,ra,s4,s3,s2 around the `lui t0`).
-   *       MEASURED NEGATIVE at THIS baseline: moving the `sd =` assignment below the pt2
-   *       stores (6, no move); swapping the `pt`/`pt2` declaration order (6, no move).
-   *       NEW NAMED ANGLE: s3 is `pt`, defined ONLY in the fall-through block (`addiu
-   *       s3,sp,24` -- the very insn retail puts in the delay slot).  Its save placement
-   *       is the same reorg/thread interaction the fence just fixed for s1, so give `pt`
-   *       an ENTRY-BLOCK birth (`pt = &pt2;` hoisted above the guard) and name `pt` as a
-   *       third fence operand.  Exact analogue of the s1 fix; untried.
-   *   (B) the SECOND color copy lands in $v1 (ours) where retail reuses the now-dead
-   *       gType base register $v0 (`lw v0,4(v0)`).  ONE `c` pseudo spans the base's death
-   *       so $v0 is unavailable to it; two pseudos would allow it but cost the serial
-   *       schedule (10).  NEW NAMED ANGLE: keep ONE `c` but kill the BASE instead -- take
-   *       the element address into a pointer local and re-assign it for the second read
-   *       (`p = &Flare_gType[flare_type]; c = p->chalo; ...; p = p; c = p->cbeam;` /
-   *       `*(u_long *)((char *)p + 4)`), so the base pseudo dies at the second load and
-   *       local-alloc can hand $v0 to the reborn range (dead-base-reuse, catalog §F row
-   *       115).  Or re-run the two-temp spelling AFTER (A) lands (lever-order
-   *       dependence, §2b.4 -- (1) and (2) already proved order-dependence here).
-   * ---- w46-a8: BOTH w45 ANGLES EXECUTED AND FALSIFIED (6 stays, count-exact 247/247).
-   *   (A) `pt` ENTRY-BLOCK BIRTH: hoisting `pt = &pt2;` above the guard measures 8 with the
-   *       fence unchanged AND 8 with `pt` added as a third fence operand -- the hoist itself
-   *       costs 2 diffs, so the s1-fix analogue does NOT transfer to s3.  The `sw s3,92(sp)`
-   *       save position is unmoved in both.
-   *   (B) KILL-THE-BASE: all three pointer-local spellings for the second gType colour read
-   *       are much worse -- `p = &Flare_gType[ft]; c = p->chalo; p = p; c = *(u_long*)((char*)p+4);`
-   *       20, `p = (Flare_tInfo*)((char*)p+4); c = *(u_long*)p;` 22, plain `c = p->cbeam;` 20.
-   *       Combining (A)+(B) is worse still (22/24).  The single-`c`-pseudo-spans-the-base
-   *       diagnosis stands; the cure does not.
-   *   Also measured NEUTRAL here (the w46 Font_SwitchFont seal lever): a MEM_IN_STRUCT_P
-   *   struct view on the gfrgb / gfrgb2 word stores -- 6 in all three combinations.
-   *   NEW NAMED ANGLE: residual (A) is a sched2 STORE-PLACEMENT drain (a prologue `sw` that
-   *   retail issues 3 slots earlier), i.e. exactly the class the trackspec.cpp SetDefault
-   *   seal cracked with a fence WALK.  The existing dual-param fence is a fixpoint AFTER the
-   *   pt2 stores; walk a SECOND zero-insn fence through the entry block one statement at a
-   *   time (before `sd =`, between the two pt2 stores, after the guard) -- position is the
-   *   dial and this fn has never had more than one fence position tested.
-   *   ---- w49-a4: THE SECOND-FENCE WALK IS NOW RUN (three positions, all count-exact
-   *   247/247): before `sd =` 8 (worse) . between the two pt2 stores 6 (no move) .
-   *   after `sd =` / before the pt2 stores 6 (no move).  So a second zero-insn fence does
-   *   NOT move the `sw s3,92(sp)` prologue save -- residual (A) survives the w46 note's
-   *   own recommendation.  Both residuals unchanged; the untried instrument is still the
-   *   -dl/-dg qty table for this entry block.
-   *   ---- w50-A3: FOUR MORE FALSIFICATIONS, all count-exact 247/247 unless noted.
-   *   Residual (B), the colour-copy register: two temps 10 . two temps + a USE fence
-   *   between them 20 . one temp + a USE fence between the two copies 20.  (The w45
-   *   "two temps = 10" receipt therefore REPRODUCES in this basin -- it is not stale --
-   *   and adding a fence makes it strictly worse, so the serial-schedule/register trade
-   *   is real and the ONE-temp form stays.)
-   *   Residual (A), the `sw s3,92(sp)` save: naming x and y as extra operands of the
-   *   existing dual-param fence 6 (no move) . a USE fence on `sd` right after its
-   *   assignment 6 (no move) . a USE fence on `sd` as the FIRST statement inside the
-   *   guard 7 @248 (costs an insn) . hoisting `pt = &pt2;` above the guard AND naming
-   *   `pt` in the entry fence 8.  ⇒ every entry-block fence position and operand set has
-   *   now been swept; the save's position is not fence-reachable.  The -dl/-dg qty table
-   *   remains the only untried instrument, exactly as the w49 note says.
- *   ---- w51-a10 (2026-08-09): 6 STAYS, count-exact 247/247; 10 MORE falsifications.
- *   Residual (B), the second colour copy's register: reusing the DEAD `flare_type`
- *   pseudo as the second carrier (the catalog variable-identity/two-roles lever) 20 .
- *   a do{}while(0) depth wrapper on the second copy 25 @248 . a w47 OPACITY fence
- *   between the two copies 20 . swapping the READ ORDER (cbeam first) 8 . and the
- *   TWO-TEMP family re-measured in this basin with four serialization devices, all
- *   10: plain two temps . volatile on the SECOND read 30 @249 . volatile on the
- *   FIRST store 10 . a read-back data dependence through gfrgb 10 . c2 block-scoped
- *   10.  => retail genuinely holds the two colours in TWO pseudos ($v1 then $v0) AND
- *   keeps them serial; no C device reaches both at once.  Residual (A) untouched:
- *   the `sw s3,92(sp)` prologue save is now a named PER_FN prologue-save-order
- *   SPLICE candidate (same family as PER_FN_EPILOGUE_UNFILL / PER_FN_RA_SINK in
- *   build.py) -- the flag axis and every fence position/operand set are receipted
- *   dead across w45/w46/w49/w50 and now w51.
- *   ---- w60-a7 (2026-08-14): 6 STAYS.  THE NAMED UNTRIED INSTRUMENT WAS RUN.
- *   Lab fidelity first: this fn compiles BYTE-IDENTICAL (247/247) under the
- *   instrumented cc1plus-ecoff (`-O2 -G4 -mgas -msplit-addresses -funsigned-char
- *   -fno-exceptions -fno-rtti`), so its GCC_TRACE_ALLOC trace is a receipt.
- *   [allocno_compare] + [find_reg] for the GLOBAL allocnos:
- *       p85  17 refs / 179 live / 16 calls = 3798 -> reg 19 = $s3   (pt)
- *       p86  18 / 384 / 17               = 1875 -> reg 20 = $s4   (otz)
- *       p80  10 / 350 / 13               =  857 -> reg 21 = $s5   (x)
- *       p81  10 / 354 / 13               =  847 -> reg 22 = $s6   (y)
- *       p82   4 / 138 / 1                =  579 -> reg 16 = $s0   (scalex)
- *       p83   4 / 138 / 1                =  579 -> reg 17 = $s1   (scaley)
- *       p87   4 /  58 / 0                = 1379 -> reg  8 = $t0   (sd)
- *   EVERY ONE OF THESE MATCHES RETAIL.  ⇒ residual (A) is NOT an allocation
- *   question at any layer -- the save-order divergence is sched2 placing an
- *   already-correct `sw $s3` three slots later, so the PER_FN prologue-save-order
- *   SPLICE named above is the right and only route, and no further source dial
- *   should be spent on it.  Residual (B) likewise sits below the global layer (both
- *   colour carriers are block-local qtys), where w51's 10-device sweep already
- *   closed the source axis.
- *   ---- w61-a15 (2026-08-15): 6 -> 4 IS AVAILABLE NOW; the last 2 need a mechanism
- *   that does not exist yet.  RESIDUAL (A) IS A ONE-LINE PER_FN_TEXT_MOVES (the
- *   "prologue-save-order splice" this receipt has been asking for since w51 -- it
- *   needs NO new build.py mechanism, the generic text-move table expresses it):
- *       "Flare_2DHalo__Fiiiii": [
- *           {"take": r"\tsw\t\$19,92\(\$sp\)\n", "after": r"\tmove\t\$17,\$7\n"},
- *       ],
- *   Probe-verified: 6 -> 4, count-exact 247/247, TU 26/27 with the LensFlare rows,
- *   zero regressions.  (Wire it only together with a fix for (B), or as a receipted
- *   partial -- on its own it does not change the PASS count.)
- *   RESIDUAL (B) RE-SWEPT FROM THE NEW 4-DIFF BASIN (lever-order law: every earlier
- *   (B) falsification was measured in the 6 basin): control 4 . two temps 8 . direct
- *   second store 8 . byte-base second read `*(u_long*)((char*)&Flare_gType[ft]+4)`
- *   45 @248 . index-term-first on BOTH reads 45 @250.  The source axis is closed in
- *   the new basin too.
- *   ⇒ (B) IS A PURE REGISTER SUBSTITUTION -- ours `lw $v1,4($v0); sw $v1,0($gp)`,
- *   retail `lw $v0,4($v0); sw $v0,0($gp)`, same two slots, same operands, the dead
- *   base reused as the destination.  PER_FN_TEXT_MOVES can relocate a line but not
- *   rename a register, so this function is the first concrete adopter for a
- *   `{"sub": <regex>, "with": <repl>}` key on the same table (a bounded, per-fn,
- *   dependence-checked substitution).  That key would also be the first handle on
- *   the much larger reload-scratch class this belt carries -- e.g.
- *   cario.cpp CarIO_ReadInCarTextureData, where 164 of 184 diffs collapse under a
- *   {$t0,$t1} rename (its own w41/w42 receipts measured exactly that).  Recommend
- *   the orchestrator decide the policy before it is wired; it is a bigger step than
- *   a relocation and every adopter must be dependence-checked by hand.
- *   Probe harnesses: scratchpad/w61a15/{p4.py,tugate_probe.py,row_flare2.txt}.
- *   CORPUS CHECK (user directive, read-only): silent-hill's src/maps/unk_draw_m1s05.c
- *   writes packet colour/UV words exactly the way this fn does
- *   (`*(u32*)&(*poly)->u0 = <packed literal>`), i.e. one word store per pair --
- *   it confirms the word-copy SHAPE we already use and offers no two-carrier
- *   device; rage-racer has no matched C for this class (its prim submission is
- *   INCLUDE_ASM). */
-  DVECTOR pt2;
-  DVECTOR *pt = &pt2;
-  int otz;
+  int flare_type;
+  int drawResult;
+  int haloShape_p;
+  int pkt_addr24;
+  short ts9;
+  int pkt_addr24_b;
+  DR_MODE *aprim;
+  DVECTOR *pDVar1;
+  int i;
+  int iVar2;
   Draw_FlareCache *sd;
-
-  sd = (Draw_FlareCache *)&Render_gPalettePtr;
-  pt2.vx = (short)x;
-  pt2.vy = (short)y;
-  /* Initializing pt at declaration keeps the scale-parameter copies in the entry
-   * block and naturally reproduces retail's prologue/save schedule. */
-  if (sd->head.cprim.PrimPtr < sd->head.cprim.MPrimPtr + -0x1000) {
-    int flare_type;
-
-    otz = 0;
-    flare_type = type & 0xffU;
-    /* MATCH (w62-a13, 4 -> PASS 247/247): residual (B) was an ALIAS-DEPENDENCE
-       question, not an allocation one -- and the SYM proves the shape.  @404394
-       lists NO colour local at all (only flare_type/aprim/i), so retail wrote the
-       two copies with no temp; `gfrgb`@0x8013d86c and `gfrgb2`@0x8013d870 are the
-       ADJACENT chalo/cbeam word pair, i.e. the destination is the same
-       Flare_tInfo layout as the source.  Spelling the stores as STRUCT MEMBER
-       stores does two things at once:
-         (1) MEM_IN_STRUCT_P is set on the destination, so gcc-2.8 alias.c's
-             `fixed_scalar_and_varying_struct_p` no longer disambiguates the store
-             (fixed-address SCALAR) from the next `Flare_gType[..].cbeam` load
-             (varying-address STRUCT).  With the dependence restored, sched1 keeps
-             the pairs SERIAL -- load, `li a3,288`, store, `lw a0,0(t3)`, load,
-             `lui t2`, store -- exactly retail.  The old `*(u_long *)&gfrgb = c;`
-             cast made the store a fixed scalar, gcc proved independence and
-             bunched both loads (the 4 misplaced-filler diffs).
-         (2) dropping the shared `c` temp gives the second colour its OWN pseudo,
-             born where the gType base dies, so local-alloc hands it $v0 (retail's
-             dead-base reuse `lw $v0,4($v0)`) instead of $v1.
-       BOTH halves are required: two pseudos alone = 8 (registers right, schedule
-       wrong); the struct view with ONE shared `c` = 4 (schedule right, registers
-       wrong).  That is catalog 12E's "a dial buys the REGISTER or the COUNT, never
-       both" -- here the two dials are independent and compose.
-       FALSIFIED at this site (all count-exact 247/247 unless noted): two temps 8 .
-       direct second store 8 . block-local c2 8 . identity launder on c / c2 / both
-       18-20 . USE fence between the copies, before either store, at the top, at the
-       end 18-28 . `volatile` on either or both stores 8 (volatile does NOT create
-       the alias dependence -- it only blocks slot-filling).
-       EQUIVALENT PASSING FORMS (kept as receipts, not taken): a local
-       `typedef struct { u_long w; } Flare_Word;` view on both stores with two temps,
-       with one temp, or with none; and a `Flare_tInfo *dst = (Flare_tInfo *)&gfrgb;`
-       pointer local.  The in-place member view below is the SYM-faithful one (no
-       invented type, no local). */
-    ((Flare_tInfo *)&gfrgb)->chalo = Flare_gType[flare_type].chalo;
-    ((Flare_tInfo *)&gfrgb)->cbeam = Flare_gType[flare_type].cbeam;
-    {
-      DR_MODE *aprim;
-      aprim = (DR_MODE *)Render_gPacketPtr;
-      setaddr(aprim,getaddr(Render_gPalettePtr));
-      Render_gPacketPtr = (u_char *)aprim + 0xc;
-      setaddr(Render_gPalettePtr,aprim);
-      SetDrawMode(aprim,0,0,0x120,(RECT *)0x0);
-    }
-    {
-      DVECTOR npt [2];
-      DVECTOR save1;
-      DVECTOR octring [8];
-      int i;
-
-      for (i = 0; i < 8; i++) {
-        octring[i].vx = (short)(Flare_gOct[i].vx * scalex / 0x10000);
-        octring[i].vy = (short)(Flare_gOct[i].vy * scaley / 0x10000);
+  DVECTOR *pt;
+  int otz;
+  short ts10;
+  int loc_60;
+  DVECTOR pt2;
+  DVECTOR npt [2];
+  DVECTOR save1;
+  DVECTOR octring [8];
+  u_char *p;
+  u_char *tp3;
+  u_char *tp2;
+  u_char *tp1;
+  
+  tp2 = (u_char *)Render_gPacketPtr;
+  tp1 = (u_char *)Render_gPalettePtr;
+  ts9 = (short)nfs4_mips_sign_extend((unsigned int)x,16);
+  ts10 = (short)nfs4_mips_sign_extend((unsigned int)y,16);
+  if (Render_gPacketPtr < Render_gPacketEnd + -0x1000) {
+    gfrgb = (*(CVECTOR *)&(Flare_gType[type & 0xffU].chalo));
+    gfrgb2 = (*(CVECTOR *)&(Flare_gType[type & 0xffU].cbeam));
+    nfs4_add_prim(Render_gPalettePtr,Render_gPacketPtr);
+    pkt_addr24 = (u_int)Render_gPacketPtr & 0xffffff;
+    Render_gPacketPtr = Render_gPacketPtr + 0xc;
+    pt2.vx = ts9;
+    pt2.vy = ts10;
+    SetDrawMode((DR_MODE *)tp2,0,0,0x120,(RECT *)0x0);
+    iVar2 = 0;
+    pDVar1 = octring;
+    SVECTOR *haloShape = Flare_gOct;
+    do {
+      drawResult = nfs4_mips_mult_s32(haloShape->vx,scalex);
+      if (drawResult < 0) {
+        drawResult = nfs4_mips_addu_s32(drawResult,0xffff);
       }
-      save1.vx = octring[0].vx + x;
-      save1.vy = octring[0].vy + y;
-      npt[1].vx = octring[1].vx + x;
-      npt[1].vy = octring[1].vy + y;
-      Flare_Tri((long *)pt,(long *)&save1,(long *)&npt[1],otz);
-      Flare_2DSpike((long *)pt,(long *)&npt[1],otz);
-      npt[0].vx = octring[2].vx + x;
-      npt[0].vy = octring[2].vy + y;
-      Flare_Tri((long *)pt,(long *)&npt[1],(long *)npt,otz);
-      Flare_2DSpike((long *)pt,(long *)npt,otz);
-      npt[1].vx = octring[3].vx + x;
-      npt[1].vy = octring[3].vy + y;
-      Flare_Tri((long *)pt,(long *)npt,(long *)&npt[1],otz);
-      Flare_2DSpike((long *)pt,(long *)&npt[1],otz);
-      npt[0].vx = octring[4].vx + x;
-      npt[0].vy = octring[4].vy + y;
-      Flare_Tri((long *)pt,(long *)&npt[1],(long *)npt,otz);
-      Flare_2DSpike((long *)pt,(long *)npt,otz);
-      npt[1].vx = octring[5].vx + x;
-      npt[1].vy = octring[5].vy + y;
-      Flare_Tri((long *)pt,(long *)npt,(long *)&npt[1],otz);
-      Flare_2DSpike((long *)pt,(long *)&npt[1],otz);
-      npt[0].vx = octring[6].vx + x;
-      npt[0].vy = octring[6].vy + y;
-      Flare_Tri((long *)pt,(long *)&npt[1],(long *)npt,otz);
-      Flare_2DSpike((long *)pt,(long *)npt,otz);
-      npt[1].vx = octring[7].vx + x;
-      npt[1].vy = octring[7].vy + y;
-      Flare_Tri((long *)pt,(long *)npt,(long *)&npt[1],otz);
-      Flare_2DSpike((long *)pt,(long *)&npt[1],otz);
-      Flare_Tri((long *)pt,(long *)&npt[1],(long *)&save1,otz);
-      Flare_2DSpike((long *)pt,(long *)&save1,otz);
-    }
-    {
-      DR_MODE *aprim;
-
-      aprim = (DR_MODE *)Render_gPacketPtr;
-      setaddr(aprim,getaddr(otz * 4 + (int)Render_gPalettePtr));
-      Render_gPacketPtr = (u_char *)aprim + 0xc;
-      setaddr(otz * 4 + (int)Render_gPalettePtr,aprim);
-      SetDrawMode(aprim,0,1,0x120,(RECT *)0x0);
-    }
+      pDVar1->vx = (short)nfs4_mips_sign_extend(
+          (unsigned int)nfs4_mips_sra_s32(drawResult,16),16);
+      haloShape_p = nfs4_mips_mult_s32(haloShape->vy,scaley);
+      if (haloShape_p < 0) {
+        haloShape_p = nfs4_mips_addu_s32(haloShape_p,0xffff);
+      }
+      pDVar1->vy = (short)nfs4_mips_sign_extend(
+          (unsigned int)nfs4_mips_sra_s32(haloShape_p,16),16);
+      pDVar1 = pDVar1 + 1;
+      iVar2 = iVar2 + 1;
+      haloShape = haloShape + 1;
+    } while (iVar2 < 8);
+    pDVar1 = npt + 1;
+    save1.vx = (short)nfs4_mips_sign_extend(
+        (unsigned int)nfs4_mips_addu_s32(octring[0].vx,x),16);
+    save1.vy = (short)nfs4_mips_sign_extend(
+        (unsigned int)nfs4_mips_addu_s32(octring[0].vy,y),16);
+    npt[1].vx = (short)nfs4_mips_sign_extend(
+        (unsigned int)nfs4_mips_addu_s32(octring[1].vx,x),16);
+    npt[1].vy = (short)nfs4_mips_sign_extend(
+        (unsigned int)nfs4_mips_addu_s32(octring[1].vy,y),16);
+    Flare_Tri((long *)&pt2,(long *)&save1,(long *)pDVar1,0);
+    Flare_2DSpike((long *)&pt2,(long *)pDVar1,0);
+    npt[0].vx = (short)nfs4_mips_sign_extend(
+        (unsigned int)nfs4_mips_addu_s32(octring[2].vx,x),16);
+    npt[0].vy = (short)nfs4_mips_sign_extend(
+        (unsigned int)nfs4_mips_addu_s32(octring[2].vy,y),16);
+    Flare_Tri((long *)&pt2,(long *)pDVar1,(long *)npt,0);
+    Flare_2DSpike((long *)&pt2,(long *)npt,0);
+    npt[1].vx = (short)nfs4_mips_sign_extend(
+        (unsigned int)nfs4_mips_addu_s32(octring[3].vx,x),16);
+    npt[1].vy = (short)nfs4_mips_sign_extend(
+        (unsigned int)nfs4_mips_addu_s32(octring[3].vy,y),16);
+    Flare_Tri((long *)&pt2,(long *)npt,(long *)pDVar1,0);
+    Flare_2DSpike((long *)&pt2,(long *)pDVar1,0);
+    npt[0].vx = (short)nfs4_mips_sign_extend(
+        (unsigned int)nfs4_mips_addu_s32(octring[4].vx,x),16);
+    npt[0].vy = (short)nfs4_mips_sign_extend(
+        (unsigned int)nfs4_mips_addu_s32(octring[4].vy,y),16);
+    Flare_Tri((long *)&pt2,(long *)pDVar1,(long *)npt,0);
+    Flare_2DSpike((long *)&pt2,(long *)npt,0);
+    npt[1].vx = (short)nfs4_mips_sign_extend(
+        (unsigned int)nfs4_mips_addu_s32(octring[5].vx,x),16);
+    npt[1].vy = (short)nfs4_mips_sign_extend(
+        (unsigned int)nfs4_mips_addu_s32(octring[5].vy,y),16);
+    Flare_Tri((long *)&pt2,(long *)npt,(long *)pDVar1,0);
+    Flare_2DSpike((long *)&pt2,(long *)pDVar1,0);
+    npt[0].vx = (short)nfs4_mips_sign_extend(
+        (unsigned int)nfs4_mips_addu_s32(octring[6].vx,x),16);
+    npt[0].vy = (short)nfs4_mips_sign_extend(
+        (unsigned int)nfs4_mips_addu_s32(octring[6].vy,y),16);
+    Flare_Tri((long *)&pt2,(long *)pDVar1,(long *)npt,0);
+    Flare_2DSpike((long *)&pt2,(long *)npt,0);
+    npt[1].vx = (short)nfs4_mips_sign_extend(
+        (unsigned int)nfs4_mips_addu_s32(octring[7].vx,x),16);
+    npt[1].vy = (short)nfs4_mips_sign_extend(
+        (unsigned int)nfs4_mips_addu_s32(octring[7].vy,y),16);
+    Flare_Tri((long *)&pt2,(long *)npt,(long *)pDVar1,0);
+    Flare_2DSpike((long *)&pt2,(long *)pDVar1,0);
+    Flare_Tri((long *)&pt2,(long *)pDVar1,(long *)&save1,0);
+    Flare_2DSpike((long *)&pt2,(long *)&save1,0);
+    p = (u_char *)Render_gPacketPtr;
+    tp3 = (u_char *)Render_gPalettePtr;
+    nfs4_add_prim(Render_gPalettePtr,Render_gPacketPtr);
+    pkt_addr24_b = (u_int)Render_gPacketPtr & 0xffffff;
+    Render_gPacketPtr = Render_gPacketPtr + 0xc;
+    SetDrawMode((DR_MODE *)p,0,1,0x120,(RECT *)0x0);
   }
   return;
 }
@@ -1452,54 +1362,45 @@ void Flare_2DHalo(int x,int y,int scalex,int scaley,int type)
 void Flare_PreCalcHexLightBeam(long *center,int otz)
 
 {
-  long pt [2];
+  CVECTOR CVar1;
+  u_int uVar2;
+  u_int uVar3;
+  u_int *prim;
+  u_int *puVar5;
+  u_int uVar6;
   long i;
-
-  /* MATCH: SYM locals = pt[2] AUTO + i REG(t0) LONG + block-scope prim LINE_G2*(a0).
-   * pt[0]=*center saved to STACK once, body reloads it (swc2 memory clobber);
-   * top-test + j back-edge loop (exit-in-the-middle prevents rotation);
-   * gte_stsxy pointer form materializes &pt[1] each iteration (PsyQ inline_c shape).
-   * ---- w45-a9 HISTORICAL hand-mask seal 16 -> PASS 53/53 ----
-   * The 16 diffs were TWO coupled residuals, both fixed by the OT-link statement order:
-   *  (a) preheader movable order: retail = pktaddr(t1) | palette-base(t4) | otz*4(t3) |
-   *      0xFFFFFF(a3) | 0xFF000000(t2).  Splitting `pal = Render_gPalettePtr;` out of the
-   *      slot expression puts the `lui 0x1F80` ahead of the `sll`, and giving the
-   *      prim-address mask its own `addr24` temp BEFORE the first RMW generates 0xFFFFFF
-   *      ahead of 0xFF000000 (the RMW's left operand generates the HI mask first).
-   *  (b) the i/mask $a3<->$t0 rotation: `*slot = pkt24 | (addr24 & 0xffffff)` re-masks an
-   *      already-masked value -- ZERO INSNS, but it lifts the 0xFFFFFF pseudo from 3 refs
-   *      to 4, crossing the floor_log2 step (1 -> 2) in allocno_compare, so the mask now
-   *      out-prioritises the counter and takes $a3 (the lower hard reg in MIPS' numeric
-   *      handout) while `i` drops to $t0, exactly as the SYM says.  (w44 ref-step family.)
-   * NOTE this refutes the w41 note "(1) alone REGRESSES PreCalcHexLightBeam (16->18, no
-   * loop -> no LICM)": there IS a preheader here, and (1) only works together with the
-   * addr24 temp placed AFTER the slot statement.
-   * PASS-lock wave 18 supersedes that workaround with the canonical P_TAG field
-   * expansion; it remains PASS 53/53 without `slot/pal/pkt24/addr24`. */
-  i = 0;
-  pt[0] = *center;
-  while (true) {
-    if (i >= 8) break;
-    {
-      LINE_G2 *prim;
-      u_int rgb; /* SYM-CODEGEN-CARRIER: rgb -- direct gfrgb2 store is FAIL 7 (54/53) */
-
-gte_ldv0(&Flare_gOct[i]);
-      prim = (LINE_G2 *)Render_gPacketPtr;
-      setaddr(prim,getaddr(otz * 4 + (int)Render_gPalettePtr));
-      Render_gPacketPtr = (u_char *)prim + 0x14;
-      setaddr(otz * 4 + (int)Render_gPalettePtr,prim);
-      gte_rtps_b();
-      rgb = *(u_int *)&gfrgb2;
-      *((u_char *)prim + 3) = 4;
-      *(u_int *)((u_char *)prim + 0xc) = 0;
-      *(u_int *)((u_char *)prim + 4) = rgb;
-      *((u_char *)prim + 7) = 0x52;
-      gte_stsxy(&pt[1]);
-      *(long *)((u_char *)prim + 8) = pt[0];
-      *(long *)((u_char *)prim + 0x10) = pt[1];
-    }
-    i = i + 1;
+  int iVar7;
+  void *ppuVar8;
+  u_int uVar8;
+  int iVar9;
+  void *ppuVar11;
+  long pt [2];
+  
+  ppuVar8 = &Render_gPacketPtr;
+  ppuVar11 = &Render_gPalettePtr;
+  iVar9 = otz << 2;
+  uVar6 = 0xffffff;
+  uVar8 = 0xff000000;
+  uVar2 = *center;
+  for (iVar7 = 0; iVar7 < 8; iVar7 = iVar7 + 1) {
+    /* MIPS 0x800CE38C/390 loads through a2 and 0x800CE400 advances
+       a2 by one eight-byte SVECTOR on every iteration. */
+gte_lwc2(0,*(int *)(&Flare_gOct[iVar7]));
+    gte_lwc2(1,*(int *)(((char *)&Flare_gOct[iVar7] + 0x4)));
+    prim = *(u_int **)ppuVar8;
+    puVar5 = (u_int *)(iVar9 + *(int *)ppuVar11);
+    nfs4_add_prim(puVar5,prim);
+    uVar3 = *puVar5;
+    *(u_int **)ppuVar8 = prim + 5;
+    CVar1 = gfrgb2;
+    gte_rtps_b();
+    *((u_char *)prim + 3) = 4;
+    prim[3] = 0;
+    *(CVECTOR *)(prim + 1) = CVar1;
+    *((u_char *)prim + 7) = 0x52;
+gte_swc2(0xe,((char *)&pt + 0x4));
+    prim[2] = uVar2;
+    prim[4] = pt[1];
   }
   return;
 }
@@ -1508,24 +1409,24 @@ gte_ldv0(&Flare_gOct[i]);
 void Flare_Quad(long *pt,CVECTOR *color,int otz)
 
 {
-  int color_word; /* SYM-CODEGEN-CARRIER: color_word -- direct color load/store is FAIL 5 (42/41) */
-  int pkt_addr24; /* SYM-CODEGEN-CARRIER: pkt_addr24 -- stages the OT high word before the potentially aliasing packet writes */
-  POLY_F4 *prim;
-
-  otz = otz * 4 + (int)Render_gPalettePtr;
-  prim = (POLY_F4 *)Render_gPacketPtr;
-  *(u_int *)prim = *(u_int *)prim & 0xff000000 | *(u_int *)otz & 0xffffff;
-  pkt_addr24 = *(u_int *)otz & 0xff000000;
-  Render_gPacketPtr = (u_char *)prim + 0x18;
-  *(u_int *)otz = pkt_addr24 | (u_int)prim & 0xffffff;
+  int color_word;
+  u_int *puVar1;
+  int pkt_addr24;
+  u_char *prim;
+  
+  prim = (u_char *)Render_gPacketPtr;
+  puVar1 = (u_int *)(Render_gPalettePtr + otz * 4);
+  nfs4_add_prim(puVar1,Render_gPacketPtr);
+  pkt_addr24 = (u_int)Render_gPacketPtr & 0xffffff;
+  Render_gPacketPtr = Render_gPacketPtr + 0x18;
   color_word = *(int *)color;
-  ((u_char *)prim)[3] = 5;
-  *(int *)((u_char *)prim + 4) = color_word;
-  ((u_char *)prim)[7] = 0x2a;
-  *(long *)((u_char *)prim + 8) = *pt;
-  *(long *)((u_char *)prim + 0xc) = pt[1];
-  *(long *)((u_char *)prim + 0x10) = pt[2];
-  *(long *)((u_char *)prim + 0x14) = pt[3];
+  prim[3] = 5;
+  *(int *)(prim + 4) = color_word;
+  prim[7] = 0x2a;
+  *(long *)(prim + 8) = *pt;
+  *(long *)(prim + 0xc) = pt[1];
+  *(long *)(prim + 0x10) = pt[2];
+  *(long *)(prim + 0x14) = pt[3];
   return;
 }
 
@@ -1533,24 +1434,24 @@ void Flare_Quad(long *pt,CVECTOR *color,int otz)
 void Flare_QuadNotTransparent(long *pt,CVECTOR *color,int otz)
 
 {
-  int color_word; /* SYM-CODEGEN-CARRIER: color_word -- direct color load/store is FAIL 5 (42/41) */
-  int pkt_addr24; /* SYM-CODEGEN-CARRIER: pkt_addr24 -- stages the OT high word before the potentially aliasing packet writes */
-  POLY_F4 *prim;
-
-  otz = otz * 4 + (int)Render_gPalettePtr;
-  prim = (POLY_F4 *)Render_gPacketPtr;
-  *(u_int *)prim = *(u_int *)prim & 0xff000000 | *(u_int *)otz & 0xffffff;
-  pkt_addr24 = *(u_int *)otz & 0xff000000;
-  Render_gPacketPtr = (u_char *)prim + 0x18;
-  *(u_int *)otz = pkt_addr24 | (u_int)prim & 0xffffff;
+  int color_word;
+  u_int *puVar1;
+  int pkt_addr24;
+  u_char *prim;
+  
+  prim = (u_char *)Render_gPacketPtr;
+  puVar1 = (u_int *)(Render_gPalettePtr + otz * 4);
+  nfs4_add_prim(puVar1,Render_gPacketPtr);
+  pkt_addr24 = (u_int)Render_gPacketPtr & 0xffffff;
+  Render_gPacketPtr = Render_gPacketPtr + 0x18;
   color_word = *(int *)color;
-  ((u_char *)prim)[3] = 5;
-  *(int *)((u_char *)prim + 4) = color_word;
-  ((u_char *)prim)[7] = 0x28;
-  *(long *)((u_char *)prim + 8) = *pt;
-  *(long *)((u_char *)prim + 0xc) = pt[1];
-  *(long *)((u_char *)prim + 0x10) = pt[2];
-  *(long *)((u_char *)prim + 0x14) = pt[3];
+  prim[3] = 5;
+  *(int *)(prim + 4) = color_word;
+  prim[7] = 0x28;
+  *(long *)(prim + 8) = *pt;
+  *(long *)(prim + 0xc) = pt[1];
+  *(long *)(prim + 0x10) = pt[2];
+  *(long *)(prim + 0x14) = pt[3];
   return;
 }
 
@@ -1558,27 +1459,29 @@ void Flare_QuadNotTransparent(long *pt,CVECTOR *color,int otz)
 void Flare_QuadRing(long *pt,CVECTOR *color,int otz)
 
 {
-  int innerColor; /* SYM-CODEGEN-CARRIER: innerColor -- direct first color store is FAIL 5 (46/45) */
-  int outerColor; /* SYM-CODEGEN-CARRIER: outerColor -- direct second color store is FAIL 9 (46/45) */
-  POLY_G4 *prim;
-
-  otz = otz * 4 + (int)Render_gPalettePtr;
-  prim = (POLY_G4 *)Render_gPacketPtr;
-  *(u_int *)prim = *(u_int *)prim & 0xff000000 | *(u_int *)otz & 0xffffff;
-  *(u_int *)otz = *(u_int *)otz & 0xff000000 | (u_int)prim & 0xffffff;
+  int innerColor;
+  int outerColor;
+  u_int *puVar1;
+  void *prev_pkt_slot;
+  u_char *prim;
+  
+  prim = (u_char *)Render_gPacketPtr;
+  puVar1 = (u_int *)(Render_gPalettePtr + otz * 4);
+  nfs4_add_prim(puVar1,Render_gPacketPtr);
   innerColor = *(int *)color;
-  Render_gPacketPtr = (u_char *)prim + 0x24;
-  *(u_int *)((u_char *)prim + 0xc) = 0;
-  *(int *)((u_char *)prim + 4) = innerColor;
+  prev_pkt_slot = Render_gPacketPtr + 0xc;
+  Render_gPacketPtr = Render_gPacketPtr + 0x24;
+  *(u_int *)prev_pkt_slot = 0;
+  *(int *)(prim + 4) = innerColor;
   outerColor = *(int *)color;
-  ((u_char *)prim)[3] = 8;
-  *(u_int *)((u_char *)prim + 0x1c) = 0;
-  ((u_char *)prim)[7] = 0x3a;
-  *(int *)((u_char *)prim + 0x14) = outerColor;
-  *(long *)((u_char *)prim + 8) = *pt;
-  *(long *)((u_char *)prim + 0x10) = pt[1];
-  *(long *)((u_char *)prim + 0x18) = pt[2];
-  *(long *)((u_char *)prim + 0x20) = pt[3];
+  prim[3] = 8;
+  *(u_int *)(prim + 0x1c) = 0;
+  prim[7] = 0x3a;
+  *(int *)(prim + 0x14) = outerColor;
+  *(long *)(prim + 8) = *pt;
+  *(long *)(prim + 0x10) = pt[1];
+  *(long *)(prim + 0x18) = pt[2];
+  *(long *)(prim + 0x20) = pt[3];
   return;
 }
 
@@ -1586,39 +1489,42 @@ void Flare_QuadRing(long *pt,CVECTOR *color,int otz)
 void Flare_TextureQuad(long *pt,CVECTOR *color,char type,int otz)
 
 {
-  int color_word; /* SYM-CODEGEN-CARRIER: color_word -- direct color load/store is FAIL 5 (56/55) */
-  int pkt_addr24; /* SYM-CODEGEN-CARRIER: pkt_addr24 -- stages the OT high word before the potentially aliasing packet writes */
-  POLY_FT4 *prim;
-
-  otz = otz * 4 + (int)Render_gPalettePtr;
-  prim = (POLY_FT4 *)Render_gPacketPtr;
-  *(u_int *)prim = *(u_int *)prim & 0xff000000 | *(u_int *)otz & 0xffffff;
-  pkt_addr24 = *(u_int *)otz & 0xff000000;
-  Render_gPacketPtr = (u_char *)prim + 0x28;
-  *(u_int *)otz = pkt_addr24 | (u_int)prim & 0xffffff;
+  u_long l3;
+  int shape_p;
+  int pkt_addr24_b;
+  u_long l0;
+  int color_word;
+  u_long l1;
+  u_int uVar1;
+  u_long l2;
+  u_int uVar2;
+  u_int *puVar3;
+  int pkt_addr24;
+  u_char *prim;
+  
+  prim = (u_char *)Render_gPacketPtr;
+  puVar3 = (u_int *)(Render_gPalettePtr + otz * 4);
+  nfs4_add_prim(puVar3,Render_gPacketPtr);
+  pkt_addr24 = (u_int)Render_gPacketPtr & 0xffffff;
+  Render_gPacketPtr = Render_gPacketPtr + 0x28;
   color_word = *(int *)color;
-  ((u_char *)prim)[3] = 9;
-  *(int *)((u_char *)prim + 4) = color_word;
-  ((u_char *)prim)[7] = 0x2e;
-  *(long *)((u_char *)prim + 8) = *pt;
-  *(long *)((u_char *)prim + 0x10) = pt[1];
-  *(long *)((u_char *)prim + 0x18) = pt[2];
-  *(long *)((u_char *)prim + 0x20) = pt[3];
-  {
-    u_long l0;
-    u_long l1;
-    u_long l2;
-    u_long l3;
-
-    l0 = *(u_long *)gFlarePixmap[(u_char)type];
-    l1 = *(u_long *)((char *)gFlarePixmap[(u_char)type] + 4);
-    l2 = *(u_long *)((char *)gFlarePixmap[(u_char)type] + 8);
-    l3 = *(u_long *)((char *)gFlarePixmap[(u_char)type] + 0xc);
-    *(u_long *)((u_char *)prim + 0xc) = l0;
-    *(u_long *)((u_char *)prim + 0x14) = l1;
-    *(u_long *)((u_char *)prim + 0x1c) = l2;
-    *(u_long *)((u_char *)prim + 0x24) = l3;
-  }
+  prim[3] = 9;
+  *(int *)(prim + 4) = color_word;
+  prim[7] = 0x2e;
+  *(long *)(prim + 8) = *pt;
+  *(long *)(prim + 0x10) = pt[1];
+  *(long *)(prim + 0x18) = pt[2];
+  *(long *)(prim + 0x20) = pt[3];
+  /* MIPS 0x800CE6C0..0x800CE6D4 indexes the pointer table, loads the
+     Draw_tPixMap pointer with lw, then reads the four packet words from it. */
+  shape_p = (int)gFlarePixmap[(u_char)type];
+  uVar1 = *(u_int *)(shape_p + 4);
+  uVar2 = *(u_int *)(shape_p + 8);
+  pkt_addr24_b = *(int *)(shape_p + 0xc);
+  *(u_int *)(prim + 0xc) = *(u_int *)shape_p;
+  *(u_int *)(prim + 0x14) = uVar1;
+  *(u_int *)(prim + 0x1c) = uVar2;
+  *(int *)(prim + 0x24) = pkt_addr24_b;
   return;
 }
 
@@ -1626,16 +1532,20 @@ void Flare_TextureQuad(long *pt,CVECTOR *color,char type,int otz)
 void Flare_SingleColorTex(DVECTOR *xy,CVECTOR *color,int width,int height,char type,int otz)
 
 {
+  short sVar1;
+  short sVar2;
   DVECTOR pt [4];
   
-  pt[0].vx = xy->vx - (short)width;
-  pt[0].vy = xy->vy + (short)height;
-  pt[1].vx = xy->vx + (short)width;
-  pt[1].vy = xy->vy + (short)height;
-  pt[2].vx = xy->vx - (short)width;
-  pt[2].vy = xy->vy - (short)height;
-  pt[3].vx = xy->vx + (short)width;
-  pt[3].vy = xy->vy - (short)height;
+  sVar1 = (short)width;
+  pt[0].vx = xy->vx - sVar1;
+  sVar2 = (short)height;
+  pt[0].vy = xy->vy + sVar2;
+  pt[1].vx = xy->vx + sVar1;
+  pt[1].vy = xy->vy + sVar2;
+  pt[2].vx = xy->vx - sVar1;
+  pt[2].vy = xy->vy - sVar2;
+  pt[3].vx = xy->vx + sVar1;
+  pt[3].vy = xy->vy - sVar2;
   Flare_TextureQuad((long *)pt,color,type,otz);
   return;
 }
@@ -1644,22 +1554,31 @@ void Flare_SingleColorTex(DVECTOR *xy,CVECTOR *color,int width,int height,char t
 void Flare_SingleColorHex(DVECTOR *xy,CVECTOR *color,int width,int height,int otz)
 
 {
+  short sVar1;
+  short sVar2;
+  short sVar3;
+  int iVar4;
   DVECTOR pt [6];
-
-  /* MATCH: SYM shows NO locals besides pt -- the divides are INLINE expressions,
-   * CSE'd by gcc (width/4 -> fresh temp t1, height/2 mutates a3 in place). */
-  pt[0].vx = xy->vx - width / 4;
-  pt[0].vy = xy->vy + height / 2;
-  pt[1].vx = xy->vx + width / 4;
-  pt[1].vy = xy->vy + height / 2;
-  pt[2].vx = xy->vx - width / 2;
+  
+  iVar4 = width;
+  if (width < 0) {
+    iVar4 = width + 3;
+  }
+  sVar1 = (short)(iVar4 >> 2);
+  pt[0].vx = xy->vx - sVar1;
+  sVar2 = (short)(height / 2);
+  pt[0].vy = xy->vy + sVar2;
+  pt[1].vx = xy->vx + sVar1;
+  pt[1].vy = xy->vy + sVar2;
+  sVar3 = (short)(width / 2);
+  pt[2].vx = xy->vx - sVar3;
   pt[2].vy = xy->vy;
-  pt[3].vx = xy->vx + width / 2;
+  pt[3].vx = xy->vx + sVar3;
   pt[3].vy = xy->vy;
-  pt[4].vx = xy->vx - width / 4;
-  pt[4].vy = xy->vy - height / 2;
-  pt[5].vx = xy->vx + width / 4;
-  pt[5].vy = xy->vy - height / 2;
+  pt[4].vx = xy->vx - sVar1;
+  pt[4].vy = xy->vy - sVar2;
+  pt[5].vx = xy->vx + sVar1;
+  pt[5].vy = xy->vy - sVar2;
   Flare_Quad((long *)pt,color,otz);
   Flare_Quad((long *)(pt + 2),color,otz);
   return;
@@ -1669,18 +1588,31 @@ void Flare_SingleColorHex(DVECTOR *xy,CVECTOR *color,int width,int height,int ot
 void Flare_SingleColorOct(DVECTOR *xy,CVECTOR *color,int width,int height,int otz)
 
 {
+  int iVar1;
+  SVECTOR *pSVar2;
+  DVECTOR *pDVar3;
   int i;
+  int iVar4;
   DVECTOR pt [8];
-
-  /* MATCH: SYM records only `pt[8]` and `i`.  Natural signed `/ 256` emits the
-   * retail negative-product correction; indexed array source strength-reduces
-   * to the same two cursor inductions without naming decompiler pointers. */
-  i = 0;
+  
+  iVar4 = 0;
+  pDVar3 = pt;
+  pSVar2 = Flare_gLensOct;
   do {
-    pt[i].vx = xy->vx + (short)(width * Flare_gLensOct[i].vx / 256);
-    pt[i].vy = xy->vy + (short)(height * Flare_gLensOct[i].vy / 256);
-    i = i + 1;
-  } while (i < 8);
+    iVar1 = width * pSVar2->vx;
+    if (iVar1 < 0) {
+      iVar1 = iVar1 + 0xff;
+    }
+    pDVar3->vx = xy->vx + (short)((u_int)iVar1 >> 8);
+    iVar1 = height * pSVar2->vy;
+    if (iVar1 < 0) {
+      iVar1 = iVar1 + 0xff;
+    }
+    pSVar2 = pSVar2 + 1;
+    iVar4 = iVar4 + 1;
+    pDVar3->vy = xy->vy + (short)((u_int)iVar1 >> 8);
+    pDVar3 = pDVar3 + 1;
+  } while (iVar4 < 8);
   Flare_Quad((long *)pt,color,otz);
   Flare_Quad((long *)(pt + 2),color,otz);
   Flare_Quad((long *)(pt + 4),color,otz);
@@ -1692,25 +1624,46 @@ void Flare_SingleColorOctRing(DVECTOR *xy,CVECTOR *color,int width,int height,in
 
 {
   char i2;
+  int iVar1;
+  u_int uVar2;
   int i;
   char index;
+  u_int uVar3;
   int height2;
   int width2;
   DVECTOR pt [18];
-
-  /* MATCH: SYM locals exactly (i / width2 / height2 / index CHAR / i2 CHAR) --
-   * index = i*2 computed at loop-body TOP (back-edge delay slot), divides inline /256. */
-  width2 = width - 5;
-  height2 = height - 5;
+  
   i = 0;
+  uVar3 = 0;
   do {
-    index = (char)(i * 2);
-    i2 = (char)(i % 8);
-    pt[index].vx = xy->vx + (short)(width * Flare_gOct[i2].vx / 256);
-    pt[index].vy = xy->vy + (short)(height * Flare_gOct[i2].vy / 256);
-    pt[index + 1].vx = xy->vx + (short)(width2 * Flare_gOct[i2].vx / 256);
-    pt[index + 1].vy = xy->vy + (short)(height2 * Flare_gOct[i2].vy / 256);
+    iVar1 = i;
+    if (i < 0) {
+      iVar1 = i + 7;
+    }
+    uVar2 = i + (iVar1 >> 3) * -8 & 0xff;
+    iVar1 = width * Flare_gOct[uVar2].vx;
+    uVar3 = uVar3 & 0xff;
+    if (iVar1 < 0) {
+      iVar1 = iVar1 + 0xff;
+    }
+    pt[uVar3].vx = xy->vx + (short)((u_int)iVar1 >> 8);
+    iVar1 = height * Flare_gOct[uVar2].vy;
+    if (iVar1 < 0) {
+      iVar1 = iVar1 + 0xff;
+    }
+    pt[uVar3].vy = xy->vy + (short)((u_int)iVar1 >> 8);
+    iVar1 = (width + -5) * (int)Flare_gOct[uVar2].vx;
+    if (iVar1 < 0) {
+      iVar1 = iVar1 + 0xff;
+    }
+    pt[uVar3 + 1].vx = xy->vx + (short)((u_int)iVar1 >> 8);
+    iVar1 = (height + -5) * (int)Flare_gOct[uVar2].vy;
+    if (iVar1 < 0) {
+      iVar1 = iVar1 + 0xff;
+    }
     i = i + 1;
+    pt[uVar3 + 1].vy = xy->vy + (short)((u_int)iVar1 >> 8);
+    uVar3 = i * 2;
   } while (i < 9);
   Flare_QuadRing((long *)pt,color,otz);
   Flare_QuadRing((long *)(pt + 2),color,otz);
@@ -1734,550 +1687,291 @@ void Flare_InitLensFlare(void)
   return;
 }
 
-/* ---- Flare_LensFlare__FP7DVECTORP15Draw_FlareCache  [FLARE.CPP:1578-1738] SLD-VERIFIED ----
- * FAR-MISS 303 diffs (ours 414 / oracle 409). w38-a10 DIAGNOSIS (no code change yet; the
- * SYM block @404e96 is the recipe for the next pass):
- *  - `screenPos` is SYM class ARG, i.e. it lives in the incoming stack slot: the oracle
- *    does `sw $a0,184($sp)` in the prologue and RELOADS it (`lw $t7,184($sp)`) just to
- *    take vx/vy. Ours parks it in $fp for the whole function.
- *  - SYM REG map that the body must reproduce: width $6, height $7, i $16, sx $30(fp),
- *    sy $23(s7), piece $8(t0) [FLARE_PIECE_DEF*], angleZ $17(s1), flareVis $21(s5),
- *    result $3 (block at line 13), aprim $4 (block at line 159); AUTO: dx -0x40,
- *    dy -0x3c, pxy -0xa0, angleZ2 -0x38, pt[4] -0x98, col -0x88 (line-14 block),
- *    scalemat -0x80 / mtx -0x60 (line-78 block), a SECOND `col` -0x98 (line-134 block).
- *    So the oracle's $fp/$s7 are sx/sy (two named INT locals read from screenPos), NOT the
- *    pointer -- our recon has no `width`/`height` locals at all and carries eight invented
- *    temps (piece_color/piece_idx/pieceCount/piece_iter_a/ti7/piece_y/piece_x/tu1/p/tp3)
- *    that the SYM does not have.
- *  => this is a rule-8 SYM-driven rewrite (name the SYM locals into the dataflow, add the
- *    line-13/14/78/134/159 block scopes), not a coloring grind. */
+/* ---- Flare_LensFlare__FP7DVECTORP15Draw_FlareCache  [FLARE.CPP:1578-1738] SLD-VERIFIED ---- */
 void Flare_LensFlare(DVECTOR *screenPos,Draw_FlareCache *sd)
 
 {
-  /* MATCH: SYM rule-8 rewrite (SYM block @404e96, fsize 184, mask $c0ff0000).
-   * SYM locals, EXACTLY: fn-scope dx/dy(AUTO -0x40/-0x3c) pxy(AUTO -0xa0)
-   * width($7=a3) height($6=a2) i($16) sx($30=fp) sy($23=s7) piece($8=t0)
-   * angleZ($17=s1) angleZ2(AUTO -0x38) flareVis(REG $21, type CHAR);
-   * block@line14 { pt[4](-0x98) col(-0x88) }; block@line78 { scalemat(-0x80)
-   * mtx(-0x60) }; block@line134 { col(-0x98, REUSES pt's slot) };
-   * block@line159 { aprim($4) }.  `screenPos` is SYM class ARG -- retail runs
-   * out of callee-saved regs (all 10 in mask) and spills it to its incoming
-   * slot 184($sp), reloading it for sx/sy and for the two Flare_Spikes calls.
-   * Fixes vs the old iVarN body (all raw-oracle evidence, BF36C-BF1CC):
-   *  - width/height: ONE compute `size*piece->size/0x10000` + a copy
-   *    (`addu a2,a3,zero` in the guard's delay slot); calls take (height,width).
-   *  - gte_ldsv/gte_stsv (stride 2, SVECTOR) were WRONG -- oracle uses lhu/sh at
-   *    0/6/12 = PsyQ gte_ldclmv/gte_stclmv (MATRIX COLUMN, row stride 6).
-   *  - scalemat IS built here (5 word stores 0/8/0x10/4/0xc = flareVis*128,
-   *    flareVis*64, 0, 0, 0) and its m[0][0..1] is REWRITTEN to flareVis*64
-   *    before the 2nd spike pass -- the old body fed an UNINITIALIZED scalemat
-   *    to gte_SetRotMatrix twice (correctness bug).
-   *  - Flare_SingleColorHex took `(DVECTOR*)piece` -- oracle passes &pxy
-   *    (`addiu a0,$sp,0x18`) like every other arm (correctness bug).
-   *  - the 25-entry visibility scan walks gFlare_LensFlare.screenData[0]
-   *    (base+0x10, stride 2) with the SAME `i` the piece loop reuses; flareVis
-   *    is a CHAR (oracle `andi s6,s5,0xff` once, then reused for *128/*64 and
-   *    the /25 colour scale).
-   *  - Render_gPacketPtr / Render_gPalettePtr are read in the TAIL only; the old
-   *    `while (p = ..., tp3 = ..., idx < 9)` comma-hoist has no oracle basis. */
-  /* RESIDUAL 56 (ours 407 / oracle 409), w39-a8.  TWO clusters, both measured:
-   *  (a) HEAD: the oracle loads screenPos->vx/vy into $v0/$v1 and COPIES them to
-   *      $fp/$s7 (`addu $fp,$v0,zero` / `addu $s7,$v1,zero`, the 2 missing insns);
-   *      that extra pair lets its scheduler hold sx-2 in $a3 across the whole pt[]
-   *      build and sink the pt[0]/pt[2].vx stores to the end.  Ours loads straight
-   *      into the home regs and therefore serializes the four value chains through
-   *      $v0.  Probed: all 24 group orderings of the four chained pt assignments
-   *      (56 is the minimum; the oracle's STORE order costs 76 because it flips
-   *      which of sx/sy is defined first, and with it the $fp/$s7 split), reading
-   *      pos[0].vx/vy back from screenPos instead of sx/sy (84), (int) casts (56),
-   *      moving sx/sy into the pt block (56).
-   *  (b) TAIL: the 3-cycle rotation of the pkt-ptr address / 0xFFFFFF / 0xFF000000
-   *      constant registers -- the shared flare.cpp allocator tie, see the note on
-   *      Flare_Sun.  Structure and count are otherwise exact.
-   * Per-TU flag probe (w39, now that compile_cpp honours the keys): flare.cpp is
-   * NOT a no_split_addresses / no_schedule_insns / no_schedule_insns2 /
-   * no_strength_reduce object -- whole-TU baseline 15 PASS / 458 diffs vs
-   * 10/1387, 4/2086, 2/845, 15/889.
-   * ---- w45-a9: cluster (a)'s TWO MISSING INSNS ARE NOW SOURCE-REACHABLE (not landed --
-   * it costs 2 gate diffs, so it was reverted under verify-or-revert; ADOPT IT FIRST next
-   * time, it is the structurally correct base).  THE SPELLING:
-   *     { int vx0 = screenPos->vx;  int vy0 = screenPos->vy;
-   *       __asm__ volatile("" : : "r"(vx0), "r"(vy0));      // §2b.5 zero-insn USE fence
-   *       sx = vx0;  sy = vy0; }
-   * -> COUNT BECOMES EXACT 409/409 (from 407) at 36 diffs (baseline 34).  The fence stops
-   * reload from folding the two `lh`s straight into the $fp/$s7 homes, so retail's
-   * `lh <tmp>,0(base); addu $fp,<tmp>,$zero` copy pair materializes -- that pair IS the
-   * documented 2-insn gap and it is what lets retail's scheduler hold sx-2 across the pt[]
-   * build.  What is left after it: (i) the reload BASE -- retail spills screenPos and reads
-   * `lh v0,0($t7)` off the 184(sp) reload, ours still reads through the live `$a0`; (ii) the
-   * two temps land in $v1/$a2, retail's in $v0/$v1.  NEXT STEPS from that base: force the
-   * ARG-slot reload (screenPos is SYM class ARG) by taking `DVECTOR *sp2 = screenPos;` only
-   * INSIDE this block after a call, or by fencing `screenPos` itself so its pseudo must be
-   * reloaded; then re-run the 24 pt-group orderings from the (a) probe list -- they were all
-   * measured on the 407-insn base and are stale in this basin (§2b.4 lever-order).
-   * FALSIFIED this wave: fencing `sx`/`sy` AFTER the assignments (36 @407 -- no copy pair,
-   * just a nop shuffle).  Cluster (b) (the 0xFFFFFF/0xFF000000/pkt-addr 3-cycle) is the SAME
-   * tie that Flare_PreCalcHexLightBeam SEALED this wave -- apply that recipe verbatim to the
-   * tail OT-link block here: `pal = Render_gPalettePtr;` split out, `addr24` temp AFTER the
-   * slot statement and BEFORE the first RMW, and the zero-insn re-mask `pkt24 | (addr24 &
-   * 0xffffff)` for the +1 ref-step.  MEASURED THIS WAVE: applying just the statement-order
-   * half of that recipe (addr24 moved below the two slot statements) at all 7 OT sites in
-   * this fn is DIFF-NEUTRAL (34, 0 TU regressions) -- so here the mask order is NOT the
-   * dial; the `pal` split + the ref-step re-mask are the untried halves.
-   * ---- w46-a8: THE COUNT-EXACT-409 FENCED BASIN WAS BUILT AND FULLY SWEPT.  It does not
-   * beat the kept 34 @407, so it is again NOT landed (verify-or-revert), but the follow-up
-   * list the w45 note left is now CLOSED and must not be re-run:
-   *   - the fenced split-temp base reproduces exactly as written: 36 diffs, count-exact
-   *     409/409.
-   *   - FORCING THE ARG-SLOT RELOAD (the w45 "next step") does NOTHING: fencing `screenPos`
-   *     itself before the block, naming `screenPos` as a third operand of the same fence, a
-   *     `DVECTOR *sp2 = screenPos;` local inside the block, and that local defined after a
-   *     fence on screenPos -- ALL exactly 36 @409.  Swapping the two temps' declaration
-   *     order (vy0 first) is also 36.  ⇒ retail's `lw $t7,184(sp)` ARG reload is not
-   *     reachable by any source handle on the pointer; it is a spill decision.
-   *   - ALL 24 pt-group orderings RE-RUN IN THIS BASIN (the w45 note flagged the old list
-   *     stale): the current order is joint-best at 36 (perms 0,1,2,12,14,15 = 36; the rest
-   *     42/50/52/56).  The basin-stale hypothesis is therefore falsified -- the ordering
-   *     ranking is the SAME in both basins.
-   *   ⇒ from the fenced base the residual 36 is: (i) the ARG spill above, and (ii) the two
-   *   head temps landing in $v1/$a2 vs retail's $v0/$v1.  NEW NAMED ANGLE: (ii) is a
-   *   local-alloc QTY pick (both temps are born and die inside the entry block) -- per §A0
-   *   compute their QTY_CMP_PRI from a `-dl` dump of THIS basin and use the ref/live dials,
-   *   which is the one instrument never applied to this function.  The untried tail halves
-   *   (`pal = Render_gPalettePtr;` split out at the 7 OT sites) remain open and are
-   *   independent of the head cluster.
-   * ---- w50-A3: 34 @407 -> 30 @409 COUNT-EXACT, and the fenced basin IS NOW LANDED
-   * (the w45 note's own recommendation, which w45/w46 both left un-adopted because the
-   * bare fenced base gates 36).  TWO edits:
-   *  (1) the w45 fenced split-temp head (vx0/vy0 + zero-insn USE fence) -- retail's two
-   *      `addu fp,v0,zero` / `addu s7,v1,zero` copies materialize, count 407 -> 409;
-   *  (2) NEW: THE `col` CONSTANT MOVED TO ITS USE SITE (`*(u_long*)&col = 0xffffff;`
-   *      written just before the Flare_QuadNotTransparent call instead of at the top of
-   *      the block): 36 -> 30.  Lengthening the 0xFFFFFF constant's live range DEMOTES
-   *      its qty out of $v0 into retail's $a3, and $a3 is then reused for `sx-2` exactly
-   *      like retail (`sw a3,48(sp); addiu a3,fp,-2; sh a3,32(sp)`).
-   * RE-SWEPT IN THE NEW BASIN (current, not stale): all 24 pt-group orderings (the kept
-   * 0,1,2,3 is joint-best at 30; retail's STORE order 1,2,3,0 = 44), four DISTINCT
-   * per-group temps (30, no change), `col` named in a local (36), a fence on the col
-   * word after the stores (47 @410).
-   * RESIDUAL 30 = ONE head cluster: retail RELOADS screenPos from its ARG home
-   * (`lw t7,184(sp); lh v0,0(t7)`) because its scheduler issues the two call-arg address
-   * setups (`addiu a0,sp,32` / `addiu a1,sp,48`) BEFORE the two `lh`s, so $a0 is already
-   * clobbered and reload cannot inherit it; ours issues the `lh`s first and reads straight
-   * through the live $a0.  => the dial is NOT a handle on the pointer (w46 closed that
-   * list) -- it is WHERE the two arg-address materializations issue.  NEW NAMED ANGLE:
-   * give the two call-arg addresses real pointer locals defined at the TOP of the pt block
-   * (`DVECTOR *pp = pt; CVECTOR *cp = &col;`) and pass those, so their addiu's are born
-   * before the reads; a bare `"r"(pt)` fence operand does NOT compile under cc1plus 2.8
-   * ("inconsistent operand constraints") -- use the locals.
-   * ---- w59-a5 (2026-08-14): 30 -> 18, count-exact 409/409.  THE w50 NAMED ANGLE WORKS,
-   * with one correction: the pointer locals must be born BEFORE the vx0/vy0 fence block,
-   * not merely "at the top of the pt block".  The `__asm__ volatile("")` head fence is a
-   * FULL sched barrier, so anything written after it can never issue before the two `lh`s
-   * -- the fix is to MOVE THE FENCED HEAD BLOCK INSIDE the pt block, below the decls:
-   *     { DVECTOR pt[4]; CVECTOR col;
-   *       u_long colw = 0xffffff;      // (2) constant VALUE hoisted, store stays at use
-   *       DVECTOR *pp = pt;            // (1) the two call-arg addresses, born pre-fence
-   *       CVECTOR *cp = &col;
-   *       int otSize = Draw_gViewOtSize;   // (3) load split from the `-2`
-   *       { int vx0=..; int vy0=..; __asm__ volatile("" : : "r"(vx0),"r"(vy0));
-   *         sx=vx0; sy=vy0; }
-   *       ...pt stores...
-   *       angleZ  = (sx+sy)*8;         // (4) MOVED UP, above the call
-   *       angleZ2 = (sx+sy)*6;
-   *       Flare_QuadNotTransparent((long *)pp,cp,otSize + -2); }
-   * pt/col STAY in their own block so the SYM's -0x98/-0x88 slots (and the line-134 `col`
-   * that re-uses pt's slot) are untouched -- frame is unchanged, count stays 409.
-   * MEASURED, step by step, each re-gated: (1) alone 34 (a WORSE score that is the
-   * hard-floor basin rule in action -- it is what makes retail's ARG-slot reload
-   * `lw t7,184(sp); lh v0,0(t7)` appear, the residual w46-a8 declared "not reachable by
-   * any source handle on the pointer"); +(2) 30; +(3) with decl order colw,pp,cp 24;
-   * +(4) 18.  Item (4) is the biggest single step and is a STRUCTURE find, not a dial:
-   * retail computes angleZ/angleZ2 BEFORE the QuadNotTransparent call (oracle
-   * `addu v1,fp,s7; sll s1,v1,3; sll v0,v1,1; addu; sll; ... jal`), i.e. EA's source had
-   * those two statements inside the pt block, not after it.
-   * RE-SWEPT IN THIS BASIN (both stale-check runs, both confirm the kept form):
-   *   - all 24 pt-group orderings: 24 is the joint minimum at the pre-(4) basin and the
-   *     kept 0,1,2,3 is in the winning set {0123,0132,0213,2013,2103}; retail's STORE
-   *     order 1,2,3,0 = 42.
-   *   - the `col` store WALKED through all 7 positions of the block (before every pt
-   *     group .. immediately before the call): 18 at EVERY position -- inert here, so the
-   *     w50 "col at its use site" lever is now basin-neutral, only its VALUE hoist (2)
-   *     still pays.  Moving the whole `col = colw` store to the block head in the 24-basin
-   *     was 32, i.e. it only hurt before (4) landed.
-   * RESIDUAL 18 = ONE cluster, all in the pt block, count-exact: retail holds sx-2 in $a3
-   * from `addiu a3,fp,-2` right after the fp copy and SINKS its two stores (`sh a3,32(sp)`
-   * / `sh a3,40(sp)`) past the whole angleZ chain to just before the `jal`; ours computes
-   * it into $v0 and stores immediately.  Same for `addiu v1,fp,3` (one slot early in
-   * retail) and the positions of `addu s0,zero,zero`, `addiu a2,a2,-2` and `sw a3,48(sp)`,
-   * which all follow that one register's fate.  FALSIFIED here: splitting the value out
-   * (`int xm2 = sx + -2;` first, `pt[2].vx = pt[0].vx = (short)xm2;` moved below the
-   * angleZ pair) = 40 -- it makes `sy` the first-defined value again and flips the
-   * fp/s7 split, the same trap the w39 note records for the pt STORE order.
-   * NEXT ANGLE (named): the store sink needs sx-2 to be the ONLY live short-lived value
-   * across the angleZ chain while sx-2's DEF stays first; try a form that keeps group 0's
-   * def in place but gives its two stores a later, separate statement THROUGH THE SAME
-   * expression (`pt[0].vx = (short)(sx + -2);` early, `pt[2].vx = pt[0].vx;` late -- a
-   * re-read, not a temp), or price it with allocsim/reqdelta on the block's local qtys. */
-  int dx;
-  int dy;
-  DVECTOR pxy;
+  int screen_y_pos;
+  int piece_y;
+  int piece_x;
+  long result;
+  int screen_x_pos;
+  u_int tu1;
+  DR_MODE *aprim;
   int width;
   int height;
-  int i;
-  int sx;
-  int sy;
+  int ti7;
   FLARE_PIECE_DEF *piece;
+  int i;
+  int pieceCount;
+  int piece_idx;
   long angleZ;
-  long angleZ2;
   char flareVis;
-  int otz; /* SYM-CODEGEN-CARRIER: otz -- keeping the zero as a value preserves retail's shift/address chain; literal zero is FAIL 6/407 */
+  int flareVis_long;
+  int piece_color;
+  int sy;
+  int sx;
+  int loc_a8;
+  int loc_a4;
+  DVECTOR pxy;
+  DVECTOR pt [4];
+  CVECTOR col;
+  MATRIX scalemat;
+  MATRIX mtx;
+  int dx;
+  int dy;
+  long angleZ2;
+  int loc_28;
+  int loc_24;
+  int loc_20;
+  int tF1;
+  short ts1;
+  short ts2;
+  u_char *p;
+  u_char *tp3;
 
-  otz = 0;
+#ifdef AP_WIN
+  NFSHS_DIAGNOSTIC_CALL(const void *lensPackets = Render_gPacketPtr);
+  NFSHS_DIAGNOSTIC_CALL(NFSHS_HostReplayFlareReadback(gFlare_LensFlare.screenData[0]));
+#endif
+  NFSHS_DIAGNOSTIC_CALL(NFSHS_HostTraceFlareEmit(
+      "LensEntry",screenPos,
+      (int)((sd->head).cprim.MPrimPtr-(sd->head).cprim.PrimPtr),
+      __builtin_return_address(0)));
+  NFSHS_DIAGNOSTIC_CALL(NFSHS_HostTraceFlareState(&gFlare_LensFlare));
+  
   if ((sd->head).cprim.PrimPtr < (sd->head).cprim.MPrimPtr + -0x400) {
-    {
-      DVECTOR pt [4];
-      CVECTOR col;
-      u_long colw = 0xffffff; /* SYM-CODEGEN-CARRIER: colw -- inline 0xffffff is current FAIL 24/409 */
-      DVECTOR *pp = pt; /* SYM-CODEGEN-CARRIER: pp -- pre-fence call address forces the retail ARG-slot reload */
-      CVECTOR *cp = &col; /* SYM-CODEGEN-CARRIER: cp -- paired pre-fence address in the same measured head-block recipe */
-      int otSize; /* SYM-CODEGEN-CARRIER: otSize -- folding the -2 into this load is measured FAIL 10 */
-      long result;
-
-      /* MATCH (2026-08-26, source-only 6 -> PASS 409/409): the two call
-       * addresses are real pre-header values.  Naming their zero-byte use before
-       * `i` keeps the index init between the address setup and screenPos reload.
-       * Keeping the otSize adjustment and packed-colour store inside the existing
-       * vx/vy carrier block, then fencing their register/memory dependencies,
-       * gives retail's `addiu a2,-2; sw a3,48(sp)` before the sx/sy copies. */
-      __asm__("" : : "r"(pp), "r"(cp));
-      i = 0;
-      otSize = Draw_gViewOtSize;
-      { int vx0 = screenPos->vx; /* SYM-CODEGEN-CARRIER: vx0 -- fence materializes retail's sx copy instead of folding the load into $fp */
-        int vy0 = screenPos->vy; /* SYM-CODEGEN-CARRIER: vy0 -- paired temporary materializes the sy/$s7 copy */
-        __asm__ volatile("" : : "r"(vx0), "r"(vy0));
-        otSize = otSize - 2;
-        *(u_long *)&col = colw;
-        __asm__ volatile("" : : "r"(otSize), "m"(col));
-        sx = vx0;  sy = vy0; }
-      /* MATCH: group order sx-2, sy-2, sx+3, sy+3 (compute order in the oracle)
-       * with each chain written HI = LO = v (stores ascending).  Moving the
-       * sx-2 group last (= the oracle's STORE order) costs 14 diffs: it flips
-       * which of sx/sy is defined first and therefore the fp/s7 split.
-       * ---- w60-a7 (2026-08-14): 18 -> 6, count still exact 409/409.  The w59
-       * NEXT ANGLE ("give group 0's two stores a later, separate statement
-       * THROUGH THE SAME EXPRESSION -- a RE-READ, not a temp") is CORRECT, and
-       * it generalises to BOTH x groups.  The DEF must stay where it is (it is
-       * what fixes which of sx/sy is defined first, i.e. the fp/s7 split); only
-       * the SECOND store of each x pair moves, spelled as a re-read of the
-       * already-stored halfword:
-       *     pt[0].vx = (short)(sx + -2);   <- def stays first
-       *     ...
-       *     pt[3].vx = pt[1].vx;           <- sunk, re-read
-       *     pt[2].vx = pt[0].vx;           <- sunk, re-read
-       * That alone is 18 -> 16 for group 0, 18 -> 12 for group 1, and 10 for
-       * both.  The last -4 came from the `col` word store moved to the HEAD of
-       * the block: it frees $a3 (the 0xFFFFFF constant's home) early, and $a3 is
-       * then reused for `sx-2` exactly like retail (`sw a3,48(sp)` then
-       * `addiu a3,fp,-2`).  With both, the whole pt[] build -- every addiu, every
-       * sh, and all four registers -- is byte-identical to the oracle.
-       * NOTE this REVERSES the w50/w59 "col at its use site" receipt: that lever
-       * measured inert (18 at all 7 positions) in the 18-basin and only becomes
-       * live once the two x stores are sunk (lever-order law again).
-       * FALSIFIED from the 10-basin: col store at every OTHER position (all 10);
-       * the col constant spelled inline instead of via `colw` (10).  From the
-       * 18-basin: sinking the DEF as well (both x stores late, one expression)
-       * 40, the same with the expression written twice 40, a named `xm2` temp
-       * with the stores late 40, col-store-first alone 40, x+3 group computed
-       * before y-2 18, sinking the y-2 pair too 22.
-       * RESIDUAL 6, count-exact 409/409, all three lines in the entry block and
-       * all of them POSITION-only (registers and instruction stream identical):
-       * retail issues `addu s0,zero,zero` (i = 0) BEFORE the `lw t7,184(sp)`
-       * screenPos reload, and `addiu a2,a2,-2` (otSize - 2) + `sw a3,48(sp)`
-       * (the col store) IMMEDIATELY after the two `lh`s; ours issues all three a
-       * few slots later.  FALSIFIED here: `int otSize = Draw_gViewOtSize - 2;`
-       * folded into the decl (10), the same as its own `otSize = otSize - 2;`
-       * statement at the block head (8), an explicit `i = 0;` at the block head
-       * with the scan loop changed to `for (; i < 0x19; ...)` (6, exactly inert
-       * -- so the s0 position is NOT a source-statement question).
-       * ---- w60-a7 addendum: THE INSTRUMENTED-cc1plus LANE DOES NOT APPLY HERE.
-       * Fidelity check (the 11A discipline: a trace is only a receipt when the lab
-       * reproduces the real compiler byte-for-byte): under cc1plus-ecoff with
-       * `-O2 -G4 -mgas -msplit-addresses -funsigned-char -fno-exceptions -fno-rtti`
-       * this fn is 396/396 insns but NOT identical -- it diverges from insn 243
-       * (the lab hoists a `lui %hi` and re-orders the `lw` pair around the
-       * `ori $17,$17,0x851f`).  Flare_LensFlare therefore sits in the ~6%
-       * Mode-A-DIVERGENT set and its [qty_order]/[find_free_reg] trace must NOT be
-       * quoted as evidence for it (its TU-mate Flare_2DHalo IS identical, so the
-       * divergence is per-function, not per-TU).  The real CC1PLPSX -dl/-dg dump
-       * still applies and confirms what the side-by-side already shows: every
-       * register in the pt[] region matches the oracle, so the residual 3 lines are
-       * pure sched2 EMISSION POSITION in the entry block, the same class as
-       * Flare_2DHalo's residual (A) -- a PER_FN emission splice, not a source dial.
-       * ---- w61-a15 (2026-08-15): 6 -> **PASS 409/409**.  The w60 verdict was exactly
-       * right and its named mechanism is realisable with the EXISTING generic
-       * PER_FN_TEXT_MOVES table -- no new build.py mechanism was needed.  All three
-       * residual lines are pure entry-block relocations, each dependence-legal:
-       *   X `move $16,$0`  (i = 0)                 -> up to just after `addu $5,$sp,48`
-       *   Z `addu $6,$6,-2` (Draw_gViewOtSize - 2) -> up to just after `lh $3,2($15)`
-       *   Y `sw $7,48($sp)` (the packed col store) -> up to just after Z
-       * (X's dest is dead before; Z's source $6 is loaded 3 insns earlier so the load
-       * delay stays satisfied; Y's $a3 is not redefined until `addu $7,$fp,-2`, which
-       * still follows.)  Probe-verified PASS twice; flare.cpp 25/27 -> 26/27, zero
-       * regressions (Flare_2DHalo unaffected by these rows).
-       * ⇒ ORCHESTRATOR ACTION -- wire into PER_FN_TEXT_MOVES:
-       *   "recon/game/psx/flare.cpp": {
-       *       "Flare_LensFlare__FP7DVECTORP15Draw_FlareCache": [
-       *           {"take": r"\tmove\t\$16,\$0\n(?=\tmove\t\$fp,\$2\n)",
-       *            "after": r"\taddu\t\$5,\$sp,48\n"},
-       *           {"take": r"\taddu\t\$6,\$6,-2\n",
-       *            "after": r"\tlh\t\$3,2\(\$15\)\n"},
-       *           {"take": r"\tsw\t\$7,48\(\$sp\)\n",
-       *            "after": r"\taddu\t\$6,\$6,-2\n"},
-       *       ],
-       *   },
-       * GOTCHA banked for the catalog: `move $16,$0` occurs TWICE in this region, and
-       * the empty entry fence prints as ` #APP\n #NO_APP\n` BEFORE it, not after -- a
-       * first attempt anchored the lookahead on ` #APP` and the take silently no-op'd
-       * (TEXT_MOVES `continue`s on a miss), which reads as "the move did nothing"
-       * rather than as an error.  Disambiguate on the FOLLOWING real insn instead.
-       * Probe harnesses: scratchpad/w61a15/{tugate_probe.py,fnprobe.py,row_flare2.txt}. */
-      pt[0].vx = (short)(sx + -2);
-      pt[1].vy = pt[0].vy = (short)(sy + -2);
-      pt[1].vx = (short)(sx + 3);
-      pt[3].vy = pt[2].vy = (short)(sy + 3);
-      result = sx + sy;
-      angleZ = result * 8;
-      angleZ2 = result * 6;
-      pt[3].vx = pt[1].vx;
-      pt[2].vx = pt[0].vx;
-      Flare_QuadNotTransparent((long *)pp,cp,otSize);
-    }
-    dx = 0x140 - sx;
-    dy = 0xf0 - sy;
-    flareVis = '\0';
+    pieceCount = 0;
+    ts1 = screenPos->vx;
+    screen_y_pos = (int)ts1;
+    ts2 = screenPos->vy;
+    screen_x_pos = (int)ts2;
+    col.r = 0xff;
+    col.g = 0xff;
+    col.b = 0xff;
+    col.cd = '\0';
+    pt[0].vx = (short)nfs4_mips_sign_extend((u_int)nfs4_mips_addu_s32(screen_y_pos,-2),16);
+    pt[0].vy = (short)nfs4_mips_sign_extend((u_int)nfs4_mips_addu_s32(screen_x_pos,-2),16);
+    pt[1].vx = (short)nfs4_mips_sign_extend((u_int)nfs4_mips_addu_s32(screen_y_pos,3),16);
+    pt[2].vy = (short)nfs4_mips_sign_extend((u_int)nfs4_mips_addu_s32(screen_x_pos,3),16);
+    pt[1].vy = pt[0].vy;
+    pt[2].vx = pt[0].vx;
+    pt[3].vx = pt[1].vx;
+    pt[3].vy = pt[2].vy;
+    Flare_QuadNotTransparent((long *)pt,&col,Draw_gViewOtSize + -2);
+    dx = nfs4_mips_subu_s32(0x140,screen_y_pos);
+    dy = nfs4_mips_subu_s32(0xf0,screen_x_pos);
+    flareVis_long = 0;
+    gFlare_LensFlare.isDrawn[0] = '\x01';
     gFlare_LensFlare.oldpos[0].vx = gFlare_LensFlare.pos[0].vx;
     gFlare_LensFlare.oldpos[0].vy = gFlare_LensFlare.pos[0].vy;
-    gFlare_LensFlare.pos[0].vx = (short)sx;
-    gFlare_LensFlare.pos[0].vy = (short)sy;
-    gFlare_LensFlare.isDrawn[0] = '\x01';
-    for (; i < 0x19; i = i + 1) {
-      if ((gFlare_LensFlare.screenData[0][0][i] & 0x7fff) == 0x7fff) {
-        flareVis = flareVis + 1;
+    for (i = 0; i < 5; i = i + 1) {
+      for (pieceCount = 0; pieceCount < 5; pieceCount = pieceCount + 1) {
+        if ((gFlare_LensFlare.screenData[0][i][pieceCount] & 0x7fff) == 0x7fff) {
+          flareVis_long = nfs4_mips_addu_s32(flareVis_long,1);
+        }
       }
     }
-    if (flareVis != '\0') {
-      MATRIX scalemat;
-      MATRIX mtx;
-
-      *(int *)((char *)&scalemat + 0) = flareVis * 0x80;
-      *(int *)((char *)&scalemat + 8) = flareVis * 0x40;
-      *(int *)((char *)&scalemat + 0x10) = 0;
-      *(int *)((char *)&scalemat + 4) = 0;
-      *(int *)((char *)&scalemat + 0xc) = 0;
-      *(u_long *)&gfrgb2 = *(u_long *)&FLARE_TRACK_SKY.sunBeamColor;
+    piece_color = flareVis_long & 0xff;
+    gFlare_LensFlare.pos[0].vx = ts1;
+    gFlare_LensFlare.pos[0].vy = ts2;
+    if (piece_color != 0) {
+      gfrgb2 = TrackSpec_gSpec.skyspec.sunBeamColor;
       Flare_IdentMatrix(&mtx);
+      angleZ = nfs4_mips_sll_s32(nfs4_mips_addu_s32(screen_y_pos,screen_x_pos),3);
       RotMatrixZ(angleZ,&mtx);
+      scalemat.m[0][0] = (short)nfs4_mips_sll_s32(piece_color,7);
+      scalemat.m[0][1] = 0;
+      scalemat.m[0][2] = 0;
+      scalemat.m[1][0] = 0;
+      scalemat.m[1][1] = (short)nfs4_mips_sll_s32(piece_color,6);
+      scalemat.m[1][2] = 0;
+      scalemat.m[2][0] = 0;
+      scalemat.m[2][1] = 0;
+      scalemat.m[2][2] = 0;
 gte_SetRotMatrix(&scalemat);
-gte_ldclmv(&mtx);
+gte_ldsv(&mtx);
       gte_rtir();
-gte_stclmv(&mtx);
-gte_ldclmv(((char *)&mtx + 0x2));
+gte_stsv(&mtx);
+gte_ldsv(((char *)&mtx + 0x2));
       gte_rtir();
-gte_stclmv(((char *)&mtx + 0x2));
-gte_ldclmv(((char *)&mtx + 0x4));
+gte_stsv(((char *)&mtx + 0x2));
+gte_ldsv(((char *)&mtx + 0x4));
       gte_rtir();
-gte_stclmv(((char *)&mtx + 0x4));
+gte_stsv(((char *)&mtx + 0x4));
 gte_SetRotMatrix(&mtx);
       Flare_Spikes((long *)screenPos,0);
-      *(int *)((char *)&scalemat + 0) = flareVis * 0x40;
       Flare_IdentMatrix(&mtx);
+      angleZ2 = nfs4_mips_sll_s32(
+          nfs4_mips_addu_s32(
+              nfs4_mips_sll_s32(nfs4_mips_addu_s32(screen_y_pos,screen_x_pos),1),
+              nfs4_mips_addu_s32(screen_y_pos,screen_x_pos)),
+          1);
       RotMatrixZ(angleZ2,&mtx);
+      scalemat.m[0][0] = (short)nfs4_mips_sll_s32(piece_color,6);
 gte_SetRotMatrix(&scalemat);
-gte_ldclmv(&mtx);
+gte_ldsv(&mtx);
       gte_rtir();
-gte_stclmv(&mtx);
-gte_ldclmv(((char *)&mtx + 0x2));
+gte_stsv(&mtx);
+gte_ldsv(((char *)&mtx + 0x2));
       gte_rtir();
-gte_stclmv(((char *)&mtx + 0x2));
-gte_ldclmv(((char *)&mtx + 0x4));
+gte_stsv(((char *)&mtx + 0x2));
+gte_ldsv(((char *)&mtx + 0x4));
       gte_rtir();
-gte_stclmv(((char *)&mtx + 0x4));
+gte_stsv(((char *)&mtx + 0x4));
 gte_SetRotMatrix(&mtx);
       Flare_Spikes((long *)screenPos,0);
-      i = 0;
-      *(u_long *)&(gFlare_LensFlare.piece)->color =
-           *(u_long *)&FLARE_TRACK_SKY.sunHaloColor;
-      while (i < 9) {
-        piece = gFlare_LensFlare.piece + i;
-        pxy.vx = (short)(((0x10000 - piece->distance) * sx + piece->distance * dx) / 0x10000);
-        pxy.vy = (short)(((0x10000 - piece->distance) * sy + piece->distance * dy) / 0x10000);
-        width = gFlare_LensFlare.size * piece->size / 0x10000;
-        height = width;
-        if (3 < width) {
-          CVECTOR col;
-
-          col.r = piece->color.r * flareVis / 0x19;
-          col.g = piece->color.g * flareVis / 0x19;
-          col.b = piece->color.b * flareVis / 0x19;
-          switch(piece->type) {
-          case 0:
-          case 1:
-            Flare_SingleColorTex(&pxy,&col,height,width,piece->type,0);
-            break;
-          case 2:
-            Flare_SingleColorHex(&pxy,&col,height,width,0);
-            break;
-          case 3:
-            Flare_SingleColorOct(&pxy,&col,height,width,0);
-            break;
-          case 4:
-            Flare_SingleColorOctRing(&pxy,&col,height,width,0);
-            break;
-          }
+      piece_idx = 0;
+      (gFlare_LensFlare.piece)->color = TrackSpec_gSpec.skyspec.sunHaloColor;
+      while (p = (u_char *)Render_gPacketPtr, tp3 = (u_char *)Render_gPalettePtr, piece_idx < 9) {
+        piece = gFlare_LensFlare.piece + piece_idx;
+        piece_y = nfs4_mips_addu_s32(
+            nfs4_mips_mult_s32(nfs4_mips_subu_s32(0x10000,piece->distance),screen_y_pos),
+            nfs4_mips_mult_s32(piece->distance,dx));
+        if (piece_y < 0) {
+          piece_y = nfs4_mips_addu_s32(piece_y,0xffff);
         }
-        i = i + 1;
+        pxy.vx = (short)nfs4_mips_sign_extend((u_int)nfs4_mips_sra_s32(piece_y,16),16);
+        piece_x = nfs4_mips_addu_s32(
+            nfs4_mips_mult_s32(nfs4_mips_subu_s32(0x10000,piece->distance),screen_x_pos),
+            nfs4_mips_mult_s32(piece->distance,dy));
+        if (piece_x < 0) {
+          piece_x = nfs4_mips_addu_s32(piece_x,0xffff);
+        }
+        pxy.vy = (short)nfs4_mips_sign_extend((u_int)nfs4_mips_sra_s32(piece_x,16),16);
+        ti7 = nfs4_mips_mult_s32(gFlare_LensFlare.size,piece->size);
+        if (ti7 < 0) {
+          ti7 = nfs4_mips_addu_s32(ti7,0xffff);
+        }
+        ti7 = nfs4_mips_sra_s32(ti7,16);
+        if (ti7 < 4) goto switchD_800cf0c0_default;
+        pt[0].vx = CONCAT11((char)(((u_int)piece->color.g * piece_color) / 0x19),
+                            (char)(((u_int)piece->color.r * piece_color) / 0x19));
+        pt[0].vy = CONCAT11(((u_char *)&(pt[0].vy))[1],
+                            (char)(((u_int)piece->color.b * piece_color) / 0x19));
+        switch((u_char)piece->type) {
+        case 0:
+        case 1:
+          Flare_SingleColorTex(&pxy,(CVECTOR *)pt,ti7,ti7,piece->type,0);
+          piece_idx = piece_idx + 1;
+          break;
+        case 2:
+          Flare_SingleColorHex(&pxy,(CVECTOR *)pt,ti7,ti7,0);
+          piece_idx = piece_idx + 1;
+          break;
+        case 3:
+          Flare_SingleColorOct(&pxy,(CVECTOR *)pt,ti7,ti7,0);
+          piece_idx = piece_idx + 1;
+          break;
+        case 4:
+          Flare_SingleColorOctRing(&pxy,(CVECTOR *)pt,ti7,ti7,0);
+        default:
+switchD_800cf0c0_default:
+          piece_idx = piece_idx + 1;
+        }
       }
-      {
-        DR_MODE *aprim;
-
-        aprim = (DR_MODE *)Render_gPacketPtr;
-
-        /* Canonical PsyQ addPrim: the P_TAG bitfield pair expresses getaddr/setaddr
-         * without reconstruction-only slot/mask temporaries. */
-        setaddr(aprim,getaddr(otz * 4 + (int)Render_gPalettePtr));
-        Render_gPacketPtr = (u_char *)aprim + 0xc;
-        setaddr(otz * 4 + (int)Render_gPalettePtr,aprim);
-        SetDrawMode(aprim,0,otz,0x120,(RECT *)0x0);
-      }
+      nfs4_add_prim(Render_gPalettePtr,Render_gPacketPtr);
+      tu1 = (u_int)Render_gPacketPtr & 0xffffff;
+      Render_gPacketPtr = Render_gPacketPtr + 0xc;
+      SetDrawMode((DR_MODE *)p,0,0,0x120,(RECT *)0x0);
     }
   }
+#ifdef AP_WIN
+  NFSHS_DIAGNOSTIC_CALL(NFSHS_HostTraceOtProducerSpan("lens_flare",lensPackets,Render_gPacketPtr));
+#endif
   return;
 }
 
-/* ---- Flare_Sun__FP7SVECTORP15Draw_FlareCache  [FLARE.CPP:1742-1818] SLD-VERIFIED ----
- * MATCH (2026-08-28): source-only PASS 187/187.  Keep the unshifted
- * TrackSpec_gSpec symbol base in one block-local pointer, then express the
- * skyspec fields at their retail object offsets (flags +0x5c, sunHaloColor
- * +0xbc).  Casting the symbol to CSkySpec at +0x58 is semantically equivalent
- * but folds 0x58 into the relocation and emits field displacements 4/100;
- * retail materializes the base symbol itself and uses 92/188.
- * HISTORICAL W40 RECEIPT: the earlier 50-diff, count-exact build was one 3-cycle rotation of
- * the three block-local constants in the two AddPrim/SetDrawMode tails:
- *     ours  pktPtrAddr(0x1F800004)=$t2  0xFFFFFF=$t3  0xFF000000=$t1
- *     oracle             "        =$t3          =$t1            =$t2
- * Instruction stream, schedule, def positions and use positions are IDENTICAL -- only the
- * local-alloc quantity ORDER differs, i.e. the documented 0xffffff/0xff000000 constant-reg
- * tie (catalog wave-12 a7: both mask pseudos are block-LOCAL, so local-alloc decides, and
- * no zero-cost source lever changes the qty priority).  The SAME rotation is the whole
- * residual of Flare_2DHalo (68), most of Flare_LensFlare's tail, Flare_CarShapedHalo and
- * Flare_Halo2's tails, and Sky_RenderStars (2, LICM-hoist ORDER variant of the same tie).
- * w40-a8 QUANTIFICATION of that floor across the halo family (tool: scratch/quant_a8.py --
- * aligns ours vs oracle, then searches register permutations that make an aligned pair
- * equal, reporting how many pairs remain OUTSIDE):
- *     Flare_Sun          50 diffs = 25 pairs, 25/25 explained by {t1->t2,t2->t3,t3->t1}
- *                        -> 0 OUTSIDE.  100%% floor, count exact.  Do not grind.
- *     Flare_Halo2        48 diffs = 24 pairs, 24/24 explained -> 0 OUTSIDE (after the
- *                        w40 batched-load fix below).  100%% floor, count exact.
- *     Flare_2DHalo       60 diffs = 24 pairs, 21 explained, 3 OUTSIDE (+12 count-only):
- *                        a v0<->t0 swap between the otz*4 shift and the palette-base load
- *                        in the SECOND tail block, plus prologue save-order.
- *     Flare_CarShapedHalo 59 diffs = 27 pairs, only 6 explained by a t0<->t1 2-cycle;
- *                        21 OUTSIDE = an s6<->s7 swap (type param vs the zero-init
- *                        angleZ; the SYM says angleZ=$s6, so the ORACLE is right and our
- *                        build gives angleZ $s7) + a v0/v1 pick on `andi ...,127`.
- *                        THIS ONE IS NOT THE FLOOR -- it is the biggest remaining lead
- *                        in flare.cpp: demote `type` / promote `angleZ` in allocno order.
- * w39-a8 probes, ALL byte-neutral or worse: Hrz_SetDitheringPrim's exact spelling (slot
- * first, unmasked `tag = *slot` then `(tag & 0xff000000)|(...)`) = 50; unmasked pkt24 with
- * the original statement order = 50; swapping the first RMW's OR operands = 56.  Also NOT
- * a per-TU flag object (see the Flare_LensFlare banner for the four flag receipts). */
+/* ---- Flare_Sun__FP7SVECTORP15Draw_FlareCache  [FLARE.CPP:1742-1818] SLD-VERIFIED ---- */
 void Flare_Sun(SVECTOR *worldPos,Draw_FlareCache *sd)
 
 {
-  int pshift;
-  int vertRezBy2;
+  u_char *puVar1;
   int dvz;
+  int pkt_addr24_a;
+  int pkt_addr24_b;
+  DR_MODE *aprim;
+  DVECTOR *screenPos;
+  short vertRezBy2;
+  int pshift;
+  int screenX;
+  int shape_p;
+  int screenY;
+  int cur_pkt_a;
+  int cur_pkt_b;
+  int vis_test;
   int otz;
+  int otz_00;
   VECTOR diff;
   CVECTOR color;
   DVECTOR posOnScreen;
-
-  /* MATCH: SYM locals = diff/color/posOnScreen AUTO + pshift(a2) + vertRezBy2/dvz(v1,
-   * same reg reuse) + otz(s0) + block-scope aprim/scalemat. Restored vs old recon:
-   * the diff.vx/vy/vz translation recompute + Camera_gGeomScreen clamp (was MISSING --
-   * correctness bug: garbage GTE translation), scalemat 0x400-diag init (was fed
-   * UNINITIALIZED to gte_SetRotMatrix), gfrgb = color struct-assign (lwl/lwr). */
+  MATRIX scalemat;
+  void *tp1;
+  void *p;
+  
+  shape_p = (int)&GameSetup_gData;
+  vis_test = 1;
   pshift = 0x78;
-  if (FLARE_COMM_MODE == 1) {
-    pshift = 0x3c;
+  vertRezBy2 = 0x78;
+  if (GameSetup_gData.commMode == 1) {
+    vertRezBy2 = 0x3c;
   }
   if ((sd->head).cprim.PrimPtr < (sd->head).cprim.MPrimPtr + -0x400) {
-gte_ldv0(worldPos);
+gte_lwc2(0,*(int *)(worldPos));
+    gte_lwc2(1,*(int *)(((char *)worldPos + 0x4)));
     gte_rtps();
-gte_stlvnl(&diff);
+gte_swc2(0x19,&diff);
+    gte_swc2(0x1a,((char *)&diff + 0x4));
+    gte_swc2(0x1b,((char *)&diff + 0x8));
     if ((diff.vx <= diff.vz) && (-diff.vx <= diff.vz)) {
-      *(u_int *)&color = 0x808080;
-      gte_stsxy(&posOnScreen);
-      vertRezBy2 = 0x78;
+      screenPos = &posOnScreen;
+gte_swc2(0xe,&posOnScreen);
+      *(u_int *)&color = 0x00808080;
+      screenY = *(int *)(shape_p + 0xc);
       posOnScreen.vy = (short)((diff.vy >> 2) + pshift);
-      if (FLARE_COMM_MODE == 1) {
+      screenX = (int)posOnScreen.vx;
+      vertRezBy2 = 0x78;
+      if (GameSetup_gData.commMode == 1) {
         vertRezBy2 = 0x3c;
       }
-      diff.vy = (posOnScreen.vy - vertRezBy2) * 4;
-      dvz = Camera_gGeomScreen * 4;
-      diff.vx = (posOnScreen.vx - 0xa0) * 4;
+      diff.vy = ((int)posOnScreen.vy - vertRezBy2) * 4;
+      diff.vx = (screenX - 0xa0) * 4;
+      dvz = Camera_gGeomScreen[0] * 4;
       if (dvz > 0xb50) {
         dvz = 0xb50;
       }
       diff.vz = dvz;
-      gte_SetTransVector(&diff);
-      if (((posOnScreen.vx < 0x13d) && (FLARE_COMM_MODE != 1)) &&
-         ((FLARE_TRACK_SKY.flags & 0x100U) == 0)) {
-        Flare_LensFlare(&posOnScreen,sd);
+gte_SetTransVector(&diff);
+      if ((screenX < 0x13d) &&
+         ((screenY != vis_test && ((TrackSpec_gSpec.skyspec.flags & 0x100U) == 0)))) {
+        Flare_LensFlare(screenPos,sd);
       }
+      puVar1 = (u_char *)Render_gPacketPtr;
       gfrgb = color;
-      otz = Draw_gViewOtSize - 2;
-      {
-        DR_MODE *aprim;
-
-        aprim = (DR_MODE *)Render_gPacketPtr;
-
-        setaddr(aprim,getaddr(otz * 4 + (int)Render_gPalettePtr));
-        Render_gPacketPtr = (u_char *)aprim + 0xc;
-        setaddr(otz * 4 + (int)Render_gPalettePtr,aprim);
-        SetDrawMode(aprim,0,0,0x120,(RECT *)0x0);
-      }
-      {
-        MATRIX scalemat;
-
-        *(int *)((char *)&scalemat + 0) = 0x400;
-        *(int *)((char *)&scalemat + 8) = 0x400;
-        *(int *)((char *)&scalemat + 0x10) = 0;
-        *(int *)((char *)&scalemat + 4) = 0;
-        *(int *)((char *)&scalemat + 0xc) = 0;
+      otz_00 = Draw_gViewOtSize + -2;
+      cur_pkt_a = otz_00 * 4 + (int)Render_gPalettePtr;
+      nfs4_add_prim((void *)(intptr_t)cur_pkt_a,Render_gPacketPtr);
+      pkt_addr24_a = (u_int)Render_gPacketPtr & 0xffffff;
+      Render_gPacketPtr = Render_gPacketPtr + 0xc;
+      SetDrawMode((DR_MODE *)puVar1,0,0,0x120,(RECT *)0x0);
+      *(int *)((char *)&scalemat + 0x00) = 0x400;
+      *(int *)((char *)&scalemat + 0x04) = 0;
+      *(int *)((char *)&scalemat + 0x08) = 0x400;
+      *(int *)((char *)&scalemat + 0x0c) = 0;
+      *(int *)((char *)&scalemat + 0x10) = 0;
 gte_SetRotMatrix(&scalemat);
+      if ((TrackSpec_gSpec.skyspec.flags & 0x100U) == 0) {
+        Flare_OctFlare((long *)&posOnScreen,otz_00);
       }
-      {
-        u_char *trackSpec = (u_char *)Flare_TrackSpecRows;
-
-        if ((*(u_int *)(trackSpec + 92) & 0x100U) != 0) {
-          Flare_SingleColorTex(&posOnScreen,(CVECTOR *)(trackSpec + 188),0x10,0x10,'\0',otz);
-        }
-        else {
-          Flare_OctFlare((long *)&posOnScreen,otz);
-        }
+      else {
+        Flare_SingleColorTex(&posOnScreen,&TrackSpec_gSpec.skyspec.sunHaloColor,0x10,0x10,'\0',otz_00);
       }
-      {
-        DR_MODE *aprim;
-
-        aprim = (DR_MODE *)Render_gPacketPtr;
-
-        setaddr(aprim,getaddr(otz * 4 + (int)Render_gPalettePtr));
-        Render_gPacketPtr = (u_char *)aprim + 0xc;
-        setaddr(otz * 4 + (int)Render_gPalettePtr,aprim);
-        SetDrawMode(aprim,0,0,0x120,(RECT *)0x0);
-      }
+      puVar1 = (u_char *)Render_gPacketPtr;
+      cur_pkt_b = otz_00 * 4 + (int)Render_gPalettePtr;
+      nfs4_add_prim((void *)(intptr_t)cur_pkt_b,Render_gPacketPtr);
+      pkt_addr24_b = (u_int)Render_gPacketPtr & 0xffffff;
+      Render_gPacketPtr = Render_gPacketPtr + 0xc;
+      SetDrawMode((DR_MODE *)puVar1,0,0,0x120,(RECT *)0x0);
     }
   }
   return;
@@ -2287,23 +1981,53 @@ gte_SetRotMatrix(&scalemat);
 void Flare_Moon(SVECTOR *worldPos,Draw_FlareCache *sd)
 
 {
+  char i2;
+  int dvz;
+  DVECTOR *xy;
   int pshift;
+  int dz;
+  char index;
+  int height2;
+  int width2;
+  int difx;
+  int flare_type;
+  int sizeOuter;
+  int flags;
+  char flareVis;
+  int angleZ;
+  int sy;
+  int cent;
+  SVECTOR sdiff;
+  SVECTOR sdiff2;
+  DVECTOR sp;
+  DVECTOR pxy;
+  CVECTOR save;
+  CVECTOR col;
+  MATRIX mtx2;
+  DVECTOR npt [2];
   VECTOR diff;
   CVECTOR color;
   DVECTOR posOnScreen;
-
-  pshift = 0x78;
-  if (FLARE_COMM_MODE == 1) {
-    pshift = 0x3c;
+  
+  (*(u_short *)&(pshift)) = 0x78;
+  if (GameSetup_gData.commMode == 1) {
+    (*(u_short *)&(pshift)) = 0x3c;
   }
-gte_ldv0(worldPos);
+gte_lwc2(0,*(int *)(worldPos));
+  gte_lwc2(1,*(int *)(((char *)worldPos + 0x4)));
   gte_rtps();
-  *(u_int *)&color = 0x808080;
-gte_stlvnl(&diff);
+  color.r = 0x80;
+  color.g = 0x80;
+  color.b = 0x80;
+  color.cd = '\0';
+gte_swc2(0x19,&diff);
+  gte_swc2(0x1a,((char *)&diff + 0x4));
+  gte_swc2(0x1b,((char *)&diff + 0x8));
+  xy = &posOnScreen;
 gte_swc2(0xe,&posOnScreen);
   posOnScreen.vy = (short)(diff.vy >> 2) + (short)pshift;
   if ((diff.vx <= diff.vz) && (-diff.vx <= diff.vz)) {
-    Flare_SingleColorTex(&posOnScreen,&color,0x10,0x10,'\0',Draw_gViewOtSize + -2);
+    Flare_SingleColorTex(xy,&color,0x10,0x10,'\0',Draw_gViewOtSize + -2);
   }
   return;
 }

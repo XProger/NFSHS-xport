@@ -3,14 +3,14 @@
  *   1 fn @0x800E7B64.  SNDbankheadersize -- the header byte-size of loaded bank `bankId`.  Ghidra.
  */
 
-extern int sndgs[];
+extern "C" int sndgs[];
 
-extern int SNDbankheadersize(int bankId);   /* @0x800E7B64 */
+extern "C" int SNDbankheadersize(int bankId);   /* @0x800E7B64 */
 
 /* SNDbankheadersize @0x800E7B64 : bank @ sndgs[0x26]+bankId*0xc, +0 = data ptr, [data+8] = header size. */
-extern int SNDbankheadersize(int bankId)
+extern "C" int SNDbankheadersize(int bankId)
 {
-    if ((signed char)sndgs[0xf] == 0)
-        return -10;
-    return *(int *)(*(int *)(bankId * 0xc + sndgs[0x26]) + 8);
+    if ((char)sndgs[0xf] != 0)
+        return *(int *)(*(int *)(bankId * 0xc + sndgs[0x26]) + 8);
+    return -10;
 }

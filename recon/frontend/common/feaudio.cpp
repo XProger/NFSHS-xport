@@ -3,30 +3,41 @@
  */
 #include "feaudio.h"
 
+/* ---- Feaudio.obj-OWNED globals -- DEFINED here (self-contained; real NFS4.EXE bytes / .bss zero) ---- */
+int          gStopCommentaryNow;   /* @0x800514c8  (bss(zero)) */
+char         gCurrentVIV = -1;   /* @0x800514cc */
+char *allLanguages[6] = {"zEngl","zGerm","zFren","zSpan","zItal","zSwed"};   /* @0x800514d0 .rodata prefixes */
+extern "C" { SPEECHINFO   ginfo; } /* @0x800514e8  (bss(zero)) */
+LUMPYHEAD    *speechfileHeader;   /* @0x8005150c  (bss(zero)) */
+char         currentSpeechViv[40];   /* @0x80051510  (bss(zero)) */
+int          commentaryActualLevel;   /* @0x80051538  (bss(zero)) */
+
+
 /* ---- FEAudio_StartLoadPatch  [FEAUDIO.CPP:43-64] SLD-VERIFIED ---- */
 
 int FEAudio_StartLoadPatch(SPEECHINFO *info)
 
 {
+  int iVar1;
+  char *pcVar2;
   int offset;
   int length;
   
   asyncidle();
-  FeAudio_LocateBigfile(speechfileHeader[0],info->name,&offset,&length);
-  if (offset == 0) {
-    return 0;
+  FeAudio_LocateBigfile(speechfileHeader,info->name,&offset,&length);
+  iVar1 = 0;
+  if ((offset != 0) && (iVar1 = 0, length != 0)) {
+    if (info->sSpeechData != (char *)0x0) {
+      purgememadr(info->sSpeechData);
+      info->sSpeechData = (char *)0x0;
+    }
+    pcVar2 = FeAudio_StartBigfileRead("",offset,length,&info->vivHandle);
+    info->sSpeechData = pcVar2;
+    iVar1 = 1;
+    info->areLoading = '\x01';
+    info->playNextOne = '\0';
   }
-  if (length == 0) {
-    return 0;
-  }
-  if (info->sSpeechData != (char *)0x0) {
-    purgememadr(info->sSpeechData);
-    info->sSpeechData = (char *)0x0;
-  }
-  info->sSpeechData = FeAudio_StartBigfileRead("",offset,length,&info->vivHandle);
-  info->areLoading = '\x01';
-  info->playNextOne = '\0';
-  return 1;
+  return iVar1;
 }
 
 
@@ -36,27 +47,33 @@ int FEAudio_StartLoadPatch(SPEECHINFO *info)
 void Feaudio_StartPatch(SPEECHINFO *info)
 
 {
+  int iVar1;
+  char *pcVar2;
   SNDPLAYOPTS playopts;
   
   if (info->sSpeechData != (char *)0x0) {
-    if (SNDbankadd(&info->nHandle,info->sSpeechData) == 7) {
-      info->pBankHeader = reservememadr((char *)(bigBuf + 0x104),
-                                       SNDbankheadersize(info->nHandle),0x10);
-      SNDbankheadercopy(info->pBankHeader,info->nHandle);
+    iVar1 = SNDbankadd(&info->nHandle,(intptr_t)info->sSpeechData);
+    if (iVar1 == 7) {
+      iVar1 = SNDbankheadersize(info->nHandle);
+      pcVar2 = (char *)reservememadr((char *)(bigBuf + 0x104),iVar1,0x10);
+      info->pBankHeader = pcVar2;
+      SNDbankheadercopy(pcVar2,info->nHandle);
       if (info->sSpeechData != (char *)0x0) {
         purgememadr(info->sSpeechData);
         info->sSpeechData = (char *)0x0;
       }
     }
     else {
-      info->lastSpeechData = info->sSpeechData;
+      pcVar2 = info->sSpeechData;
       info->sSpeechData = (char *)0x0;
+      info->lastSpeechData = pcVar2;
     }
     SNDplaysetdef(&playopts);
     playopts.bhandle = (char)info->nHandle;
     playopts.patnum = 0;
     playopts.vol = (char)commentaryActualLevel;
-    info->nSoundHandle = SNDplay(&playopts);
+    iVar1 = SNDplay(&playopts);
+    info->nSoundHandle = iVar1;
     info->soundIsPlaying = '\x01';
     if (info->multiplay != 0) {
       if ((u_char)info->name[2] < 0x7a) {
@@ -80,14 +97,24 @@ void Feaudio_StartPatch(SPEECHINFO *info)
 void FeAudio_systemtask(int x)
 
 {
+  int ti1;
+  int rd_status;
+  u_int snd_over;
+  int tu3;
+  int i;
+  int iVar1;
+  u_int tu1;
+  
   systemtask(x);
   if ((ginfo.areLoading != '\0') &&
-     (getasyncreadstatus(ginfo.vivHandle) != 0)) {
-    ginfo.areLoading = '\0';
+     (rd_status = getasyncreadstatus(ginfo.vivHandle), tu1 = (*(u_int*)((char*)&ginfo + 16)),
+     rd_status != 0)) {
+    (*(u_short*)((char*)&ginfo + 16)) = (*(u_short*)((char*)&ginfo + 16)) & 0xff00;
+    (*(u_char*)((char*)&ginfo + 19)) = (u_char)((tu1) >> 24);
     ginfo.playNextOne = '\x01';
   }
   if ((ginfo.soundIsPlaying != '\0') &&
-     (SNDover(ginfo.nSoundHandle) != 0)) {
+     (snd_over = SNDover(ginfo.nSoundHandle), snd_over != 0)) {
     SNDautovol((void *)ginfo.nSoundHandle,0,-1);
     SNDbankremove(ginfo.nHandle);
     if (ginfo.lastSpeechData != (char *)0x0) {
@@ -99,10 +126,11 @@ void FeAudio_systemtask(int x)
       ginfo.pBankHeader = (char *)0x0;
     }
     if (ginfo.areLoading != '\0') {
-      while (getasyncreadstatus(ginfo.vivHandle) == 0) {
+      while (i = getasyncreadstatus(ginfo.vivHandle), i == 0) {
         systemtask(0);
       }
       ginfo.areLoading = '\0';
+      ginfo.soundIsPlaying = '\0';
       ginfo.playNextOne = '\x01';
     }
     ginfo.soundIsPlaying = '\0';
@@ -114,7 +142,7 @@ void FeAudio_systemtask(int x)
   if (gStopCommentaryNow != 0) {
     gCurrentVIV = -1;
     if (ginfo.areLoading != '\0') {
-      while (getasyncreadstatus(ginfo.vivHandle) == 0) {
+      while (iVar1 = getasyncreadstatus(ginfo.vivHandle), iVar1 == 0) {
         systemtask(0);
       }
     }
@@ -135,10 +163,8 @@ void FeAudio_systemtask(int x)
       purgememadr(ginfo.pBankHeader);
       ginfo.pBankHeader = (char *)0x0;
     }
-    ginfo.soundIsPlaying = '\0';
-    ginfo.playNextOne = '\0';
+    (*(u_int*)((char*)&ginfo + 16)) = (*(u_int*)((char*)&ginfo + 16)) & 0xff000000;
     gStopCommentaryNow = 0;
-    ginfo.areLoading = '\0';
   }
   if ((ginfo.playNextOne != '\0') && ((*(u_short*)((char*)&ginfo + 16)) == 0)) {
     Feaudio_StartPatch(&ginfo);
@@ -154,6 +180,8 @@ void FeAudio_systemtask(int x)
 short FeAudio_AsyncPlayCommentary(char *name)
 
 {
+  int ok;
+  
   commentaryActualLevel = gMasterFENarrationLevel * 0x6e >> 7;
   if (0x5a < commentaryActualLevel) {
     commentaryActualLevel = 0x5a;
@@ -161,7 +189,6 @@ short FeAudio_AsyncPlayCommentary(char *name)
   strncpy(ginfo.name,name,4);
   ginfo.nHandle = 0;
   ginfo.nSoundHandle = 0;
-  ginfo.multiplay = (int)(*name != 'c');
   ginfo.areLoading = '\0';
   ginfo.soundIsPlaying = '\0';
   ginfo.playNextOne = '\0';
@@ -170,7 +197,9 @@ short FeAudio_AsyncPlayCommentary(char *name)
   ginfo.lastSpeechData = (char *)0x0;
   ginfo.vivHandle = 0;
   gCurrentVIV = -1;
-  if (FEAudio_StartLoadPatch(&ginfo) != 0) {
+  ginfo.multiplay = (int)(*name != 'c');
+  ok = FEAudio_StartLoadPatch(&ginfo);
+  if (ok != 0) {
     AudioMus_Volume(gMasterMusicLevel * 0x23 >> 7);
   }
   return 1;
@@ -180,21 +209,31 @@ short FeAudio_AsyncPlayCommentary(char *name)
 
 /* ---- FeAudio_AsyncPlaySpeech  [FEAUDIO.CPP:235-247] SLD-VERIFIED ---- */
 
-short FeAudio_AsyncPlaySpeech(int type,int index)
+extern "C" short FeAudio_AsyncPlaySpeech(int type,int index)
 
 {
+  short sVar1;
+  u_char *fmt;
+  int iVar2;
   char vivname [5];
   
   if (type == 2) {
-    sprintf(vivname,(char *)(bigBuf + 0x110),99,index);
+    fmt = (u_char *)bigBuf + 0x110;
+    iVar2 = 99;
   }
   else if (type == 0) {
-    sprintf(vivname,(char *)(bigBuf + 0x118),0x61,index + 0x61);
+    fmt = (u_char *)bigBuf + 0x118;
+    iVar2 = 0x61;
+    index = index + 0x61;
   }
   else {
-    sprintf(vivname,(char *)(bigBuf + 0x118),type + 0x61,index + 0x30);
+    fmt = (u_char *)bigBuf + 0x118;
+    iVar2 = type + 0x61;
+    index = index + 0x30;
   }
-  return FeAudio_AsyncPlayCommentary(vivname);
+  sprintf(vivname,(char *)fmt,iVar2,index);
+  sVar1 = FeAudio_AsyncPlayCommentary(vivname);
+  return sVar1;
 }
 
 
@@ -205,16 +244,18 @@ char * FeAudio_StartBigfileRead(char *fname,int offset,int length,int *vivHandle
 
 {
   char *streamBuffer;
-
-  if (length == 0) {
-    return (char *)0x0;
+  int iVar1;
+  
+  if ((length == 0) ||
+     (streamBuffer = (char *)reservememadr((char *)(bigBuf + 0x120),length,0), streamBuffer == (char *)0x0
+     )) {
+    streamBuffer = (char *)0x0;
   }
-  streamBuffer = reservememadr((char *)(bigBuf + 0x120),length,0);
-  if (streamBuffer == (char *)0x0) {
-    return (char *)0x0;
+  else {
+    setasyncfile(fname);
+    iVar1 = asyncloadsegment((char *)offset,streamBuffer,length);
+    *vivHandle = iVar1;
   }
-  setasyncfile(fname);
-  *vivHandle = asyncloadsegment((char *)offset,streamBuffer,length);
   return streamBuffer;
 }
 
@@ -225,32 +266,38 @@ char * FeAudio_StartBigfileRead(char *fname,int offset,int length,int *vivHandle
 void FeAudio_LocateBigfile(LUMPYHEAD *bigfileHeader,char *name,int *offset,int *length)
 
 {
-  char *tempChar;
-  FILEINFO *info;
+  bool bVar1;
+  int iVar2;
+  u_char *tempChar;
+  LUMPYHEAD *info;
   u_int i;
   
   *offset = 0;
   *length = 0;
   if (bigfileHeader != (LUMPYHEAD *)0x0) {
-    info = (FILEINFO *)(bigfileHeader + 1);
+    info = bigfileHeader + 1;
     i = 1;
     if (bigfileHeader->num != 0) {
       do {
-        if (strcmp(name,info->name) == 0) {
-          *offset = info->offset << 0x18 | (info->offset & 0xff00) << 8 |
-                    (info->offset & 0xff0000) >> 8 | (info->offset & 0xff000000) >> 0x18;
-          *length = info->length << 0x18 | (info->length & 0xff00) << 8 |
-                    (info->length & 0xff0000) >> 8 | (info->length & 0xff000000) >> 0x18;
+        tempChar = (u_char *)&info->num;
+        iVar2 = strcmp(name,(char *)tempChar);
+        if (iVar2 == 0) {
+          i = info->type;
+          *offset = i << 0x18 | (i & 0xff00) << 8 | (i & 0xff0000) >> 8 | i >> 0x18;
+          i = info->len;
+          *length = i << 0x18 | (i & 0xff00) << 8 | (i & 0xff0000) >> 8 | i >> 0x18;
           return;
         }
-        tempChar = info->name;
-        if (*tempChar != '\0') {
+        if ((char)info->num != '\0') {
+          tempChar = (u_char *)&info->num;
           do {
             tempChar = tempChar + 1;
           } while (*tempChar != '\0');
         }
-        info = (FILEINFO *)(tempChar + 1);
-      } while (i++ < bigfileHeader->num);
+        info = (LUMPYHEAD *)(tempChar + 1);
+        bVar1 = i < bigfileHeader->num;
+        i = i + 1;
+      } while (bVar1);
     }
   }
   return;
@@ -263,81 +310,57 @@ void FeAudio_LocateBigfile(LUMPYHEAD *bigfileHeader,char *name,int *offset,int *
 LUMPYHEAD * FeAudio_InitViv(char *fname)
 
 {
-  /* PASS (109/109): the direct four-mask byte-swap form matches the retail
-     scheduler exactly.  This is the source idiom preserved by the matched
-     NFS2 PC implementation; the former carrier/fence reconstruction did not. */
   int vivHandle;
-  LUMPYHEAD lumpHead;
+  int iVar2;
   LUMPYHEAD *bigfileHeader;
-
+  u_int uVar3;
+  u_int uVar4;
+  u_int uVar5;
+  LUMPYHEAD lumpHead;
+  
   setasyncfile(fname);
   vivHandle = asyncloadsegment((char *)0x0,&lumpHead,0x10);
   do {
     systemtask(0);
-  } while (getasyncreadstatus(vivHandle) == 0);
-
-  lumpHead.type = ((lumpHead.type & 0xff) << 24) |
-                  ((lumpHead.type & 0xff00) << 8) |
-                  ((lumpHead.type & 0xff0000) >> 8) |
-                  ((lumpHead.type & 0xff000000) >> 24);
-  lumpHead.hlen = ((lumpHead.hlen & 0xff) << 24) |
-                  ((lumpHead.hlen & 0xff00) << 8) |
-                  ((lumpHead.hlen & 0xff0000) >> 8) |
-                  ((lumpHead.hlen & 0xff000000) >> 24);
-  lumpHead.num = ((lumpHead.num & 0xff) << 24) |
-                 ((lumpHead.num & 0xff00) << 8) |
-                 ((lumpHead.num & 0xff0000) >> 8) |
-                 ((lumpHead.num & 0xff000000) >> 24);
-
-  bigfileHeader = reservememadr("lumpyhead",lumpHead.hlen + 0x20,0);
+    iVar2 = getasyncreadstatus(vivHandle);
+  } while (iVar2 == 0);
+  lumpHead.type =
+       lumpHead.type << 0x18 | (lumpHead.type & 0xff00) << 8 | (lumpHead.type & 0xff0000) >> 8 |
+       lumpHead.type >> 0x18;
+  lumpHead.hlen =
+       lumpHead.hlen << 0x18 | (lumpHead.hlen & 0xff00) << 8 | (lumpHead.hlen & 0xff0000) >> 8 |
+       lumpHead.hlen >> 0x18;
+  lumpHead.num = lumpHead.num << 0x18 | (lumpHead.num & 0xff00) << 8 |
+                 (lumpHead.num & 0xff0000) >> 8 | lumpHead.num >> 0x18;
+  bigfileHeader = (LUMPYHEAD *)reservememadr((char *)(bigBuf + 0x130),lumpHead.hlen + 0x20,0);
   if (bigfileHeader == (LUMPYHEAD *)0x0) {
-    return (LUMPYHEAD *)0x0;
+    bigfileHeader = (LUMPYHEAD *)0x0;
   }
-  vivHandle = asyncloadsegment((char *)0x0,bigfileHeader,lumpHead.hlen + 0x20);
-  do {
-    systemtask(0);
-  } while (getasyncreadstatus(vivHandle) == 0);
-
-  bigfileHeader->type = ((bigfileHeader->type & 0xff) << 24) |
-                        ((bigfileHeader->type & 0xff00) << 8) |
-                        ((bigfileHeader->type & 0xff0000) >> 8) |
-                        ((bigfileHeader->type & 0xff000000) >> 24);
-  bigfileHeader->hlen = ((bigfileHeader->hlen & 0xff) << 24) |
-                        ((bigfileHeader->hlen & 0xff00) << 8) |
-                        ((bigfileHeader->hlen & 0xff0000) >> 8) |
-                        ((bigfileHeader->hlen & 0xff000000) >> 24);
-  bigfileHeader->num = ((bigfileHeader->num & 0xff) << 24) |
-                       ((bigfileHeader->num & 0xff00) << 8) |
-                       ((bigfileHeader->num & 0xff0000) >> 8) |
-                       ((bigfileHeader->num & 0xff000000) >> 24);
+  else {
+    vivHandle = asyncloadsegment((char *)0x0,bigfileHeader,lumpHead.hlen + 0x20);
+    do {
+      systemtask(0);
+      iVar2 = getasyncreadstatus(vivHandle);
+    } while (iVar2 == 0);
+    uVar3 = bigfileHeader->type;
+    uVar5 = bigfileHeader->hlen;
+    uVar4 = bigfileHeader->num;
+    bigfileHeader->type = uVar3 << 0x18 | (uVar3 & 0xff00) << 8 | (uVar3 & 0xff0000) >> 8 | uVar3 >> 0x18
+    ;
+    bigfileHeader->hlen = uVar5 << 0x18 | (uVar5 & 0xff00) << 8 | (uVar5 & 0xff0000) >> 8 | uVar5 >> 0x18
+    ;
+    bigfileHeader->num = uVar4 << 0x18 | (uVar4 & 0xff00) << 8 | (uVar4 & 0xff0000) >> 8 | uVar4 >> 0x18;
+  }
   return bigfileHeader;
 }
-
-
-/* ---- Feaudio.obj-owned globals [FEAUDIO.CPP:349-357] SYM/SLD-VERIFIED ----
- * Their original source position is between FeAudio_InitViv (ends line 347)
- * and FeAudio_InitCommentary (starts line 360). This source order emits the
- * retail .rodata sequence: "lumpyhead", the six language prefixes, "000",
- * then "%s%s.viv". */
-SPEECHINFO   ginfo;                     /* @0x800514e8 */
-LUMPYHEAD   *speechfileHeader[1];       /* @0x8005150c; SYM-CARRIER: speechfileHeader */
-char         currentSpeechViv[40];      /* @0x80051510 */
-int          commentaryActualLevel;     /* @0x80051538 */
-int          gStopCommentaryNow = 0;    /* @0x800514c8 */
-signed char  gCurrentVIV = -1;          /* @0x800514cc; SYM CHAR; SYM-TYPE-OVERRIDE: gCurrentVIV */
-char *allLanguages[6] = {"zEngl","zGerm","zFren","zSpan","zItal","zSwed"}; /* @0x800514d0 */
 
 
 
 /* ---- FeAudio_InitCommentary  [FEAUDIO.CPP:360-377] SLD-VERIFIED ---- */
 
-void FeAudio_InitCommentary(int language,int arg1)
+extern "C" void FeAudio_InitCommentary(int language,int arg1)
 
 {
-  /* SYM-CODEGEN-CARRIER: arg1 -- the `__Fii` mangling proves two source
-     arguments. SYM/m2c expose only `language` because the trailing int is
-     unused and therefore has no surviving parameter record or machine use. */
-  strcpy(ginfo.name,"000");
   ginfo.nHandle = 0;
   ginfo.multiplay = 1;
   ginfo.nSoundHandle = 0;
@@ -348,11 +371,9 @@ void FeAudio_InitCommentary(int language,int arg1)
   ginfo.sSpeechData = (char *)0x0;
   ginfo.lastSpeechData = (char *)0x0;
   ginfo.vivHandle = 0;
-  /* The volatile value read keeps the language pointer load at the call site,
-     matching retail while leaving the Paths_Paths %hi free to schedule early. */
-  sprintf(currentSpeechViv,"%s%s.viv",Paths_Paths[0x26],
-          *(char * volatile *)&allLanguages[language]);  /* H11: dest was "" (oracle 0x800160EC $a0=$s0=&currentSpeechViv @0x80051510) */
-  speechfileHeader[0] = FeAudio_InitViv(currentSpeechViv);  /* H11: arg was "" (oracle 0x8001615C $a0=$s0) */
+  *(u_int *)ginfo.name = (*(u_int*)((char*)&bigBuf + 364));
+  sprintf(currentSpeechViv,(char *)(bigBuf + 0x170),Paths_Paths[0x26],allLanguages[language]);  /* H11: dest was "" (oracle 0x800160EC $a0=$s0=&currentSpeechViv @0x80051510) */
+  speechfileHeader = FeAudio_InitViv(currentSpeechViv);  /* H11: arg was "" (oracle 0x8001615C $a0=$s0) */
   return;
 }
 
@@ -360,12 +381,18 @@ void FeAudio_InitCommentary(int language,int arg1)
 
 /* ---- FeAudio_DeInitCommentary  [FEAUDIO.CPP:385-386] SLD-VERIFIED ---- */
 
-void FeAudio_DeInitCommentary(void)
+extern "C" void FeAudio_DeInitCommentary(void)
 
 {
-  if (speechfileHeader[0] != (LUMPYHEAD *)0x0) {
-    purgememadr(speechfileHeader[0]);
-    speechfileHeader[0] = (LUMPYHEAD *)0x0;
+  char *tempChar;
+  char *streamBuffer;
+  u_int i;
+  LUMPYHEAD lumpHead;
+  char vivname [5];
+  
+  if (speechfileHeader != (LUMPYHEAD *)0x0) {
+    purgememadr(speechfileHeader);
+    speechfileHeader = (LUMPYHEAD *)0x0;
   }
   return;
 }

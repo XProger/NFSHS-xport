@@ -4,121 +4,123 @@
  *   GPU packet building via Render_gPacketPtr/Render_gPalettePtr.
  */
 #include "fetv.h"
-
-#define FETV_getaddr(p) (*(u_long *)(p) & 0x00ffffff)
-#define FETV_setaddr(p, addr) \
-  (*(u_long *)(p) = (*(u_long *)(p) & 0xff000000) | \
-                    ((u_int)(addr) & 0x00ffffff))
-#define FETV_setlen(p, len) (*((u_char *)(p) + 3) = (u_char)(len))
-#define FETV_setcachedaddr(p, tag, addr) \
-  (*(u_long *)(p) = ((tag) & 0xff000000) | \
-                    ((u_int)(addr) & 0x00ffffff))
-/* Every GPU packet begins with the same tag word.  Access it through the
-   retail POLY_F4 packet type so GCC retains aggregate-memory scheduling
-   without inventing the P_TAG typedef absent from FETv.obj's SYM graph. */
-#define setaddr(p, _addr) \
-  (((POLY_F4 *)(p))->tag = (((POLY_F4 *)(p))->tag & 0xff000000) | \
-                           ((u_long)(_addr) & 0x00ffffff))
-#define getaddr(p) (((POLY_F4 *)(p))->tag & 0x00ffffff)
-#define addPrim(ot, p) setaddr(p,getaddr(ot)), setaddr(ot,p)
-#define FETV_setXYWH(p, x, y, w, h) \
-  ((p)->x0 = (x), (p)->y0 = (y), \
-   (p)->x1 = (x) + (w), (p)->y1 = (y), \
-   (p)->x2 = (x), (p)->y2 = (y) + (h), \
-   (p)->x3 = (x) + (w), (p)->y3 = (y) + (h))
-
-/* DrawTV's SYM record has one outer scope and no packet-block locals.  These
-   wrappers restore the canonical PsyQ addPrim tag-link expansion together
-   with the packet-cursor bump.  The optimized expansion needs a transient OT
-   tag value, but it is not a DrawTV source local; moving it into the zero-cost
-   inline boundary removes the seven manual reconstruction aliases while
-   preserving the authoritative 815-instruction allocation.  SYM cannot retain
-   the private wrapper/macro spelling, so the two packet sizes remain explicit. */
-static inline void FETVLinkFT4(u_int *palette,POLY_FT4 *primitive,
-                               u_char **packetPtrSlot,u_int rgbMask)
-{
-  u_int paletteTag;
-
-  *(u_int *)primitive =
-       *(u_int *)primitive & 0xff000000 | *palette & rgbMask;
-  paletteTag = *palette;
-  *packetPtrSlot = (u_char *)primitive + 0x28;
-  *palette = paletteTag & 0xff000000 | (u_int)primitive & rgbMask;
-}
-
-static inline void FETVLinkGT4(u_int *palette,POLY_GT4 *primitive,
-                               u_char **packetPtrSlot,u_int rgbMask)
-{
-  u_int paletteTag;
-
-  *(u_int *)primitive =
-       *(u_int *)primitive & 0xff000000 | *palette & rgbMask;
-  paletteTag = *palette;
-  *packetPtrSlot = (u_char *)primitive + 0x34;
-  *palette = paletteTag & 0xff000000 | (u_int)primitive & rgbMask;
-}
+#include "../../mips_semantics.h"
 
 
 /* ---- DrawTVLines  [FETV.CPP:25-77] SLD-VERIFIED ---- */
 
-void DrawTVLines(tTVConfig &tv)
+extern "C" void DrawTVLines(tTVConfig &tv)
 
 {
-  short fxHeight;
-  short x;
-  short y;
-  POLY_F4 *videoFX;
-
-  tv.fxWide = (short)((tv.fxWide + 1) % (tv.h * 0x30));
-  tv.fxThin = (short)((tv.fxThin + 2) % (tv.h * 0x30));
-  y = tv.fxWide;
-  fxHeight = 8;
-  if ((int)tv.fxWide < (int)tv.y) {
-    fxHeight = (short)(fxHeight - ((u_int)tv.y - (u_int)y));
-    y = tv.y;
+  u_short uVar1;
+  int wrapPeriod;
+  int ti6;
+  int iVar2;
+  u_int stripe_x;
+  int fxWideAdj;
+  int fxThinAdj;
+  u_int abr;
+  short ts11;
+  int yScroll_or_break;
+  short tu12;
+  short ts5;
+  short ts1;
+  u_short tvY_orig;
+  short ts2;
+  short ts3;
+  int fxWideMod;
+  u_char *cur_pkt_thin;
+  u_char *prev_pkt_thin;
+  short ts6;
+  short ts7;
+  
+  fxWideAdj = tv.fxWide + 1;
+  wrapPeriod = tv.h * 0x30;
+  fxWideMod = fxWideAdj % wrapPeriod;
+  tu12 = (short)fxWideMod;
+  ti6 = tv.h * 0x30;
+  fxThinAdj = tv.fxThin + 2;
+  tvY_orig = tv.y;
+  tv.fxWide = tu12;
+  abr = (u_int)tv.y;
+  tv.fxThin = (short)(fxThinAdj % ti6);
+  cur_pkt_thin = Render_gPacketPtr;
+  prev_pkt_thin = Render_gPalettePtr;
+  ts11 = 8;
+  if ((int)tv.fxWide < (int)abr) {
+    yScroll_or_break = 8 - ((u_int)tvY_orig - fxWideMod);
+    tu12 = tvY_orig;
   }
   else {
-    if (tv.fxWide + 8 > (int)((u_int)tv.y + (int)tv.h)) {
-      fxHeight = (short)((u_int)tv.y - (u_int)y);
-    }
+    iVar2 = 0x80000;
+    if (tv.fxWide + 8 <= (int)(abr + (int)tv.h)) goto DrawTVLines_writeTpage;
+    yScroll_or_break = (u_int)tvY_orig - fxWideMod;
   }
-  if (0 < (fxHeight << 0x10)) {
-    videoFX = (POLY_F4 *)Render_gPacketPtr;
-    addPrim(Render_gPalettePtr,videoFX);
-    Render_gPacketPtr = (u_char *)(videoFX + 1);
-    videoFX->code = 0x2a;
-    FETV_setlen(videoFX,5);
-    FETV_setXYWH(videoFX,tv.x,y,tv.w,fxHeight);
-    videoFX->b0 = 10;
-    videoFX->g0 = 10;
-    videoFX->r0 = 10;
+  ts11 = (short)yScroll_or_break;
+  iVar2 = yScroll_or_break << 0x10;
+DrawTVLines_writeTpage:
+  if (0 < iVar2) {
+    AddPrim(prev_pkt_thin,cur_pkt_thin);
+    Render_gPacketPtr = Render_gPacketPtr + 0x18;
+    cur_pkt_thin[7] = 0x2a;
+    cur_pkt_thin[3] = 5;
+    ts2 = tv.x;
+    *(short *)(cur_pkt_thin + 10) = tu12;
+    *(short *)(cur_pkt_thin + 8) = ts2;
+    ts1 = tv.x;
+    ts3 = tv.w;
+    *(short *)(cur_pkt_thin + 0xe) = tu12;
+    *(short *)(cur_pkt_thin + 0xc) = ts1 + ts3;
+    ts6 = tv.x;
+    *(short *)(cur_pkt_thin + 0x12) = tu12 + ts11;
+    *(short *)(cur_pkt_thin + 0x10) = ts6;
+    ts6 = tv.x;
+    uVar1 = tv.w;
+    abr = (u_int)uVar1;
+    *(short *)(cur_pkt_thin + 0x16) = tu12 + ts11;
+    cur_pkt_thin[6] = 10;
+    cur_pkt_thin[5] = 10;
+    cur_pkt_thin[4] = 10;
+    *(u_short *)(cur_pkt_thin + 0x14) = ts6 + uVar1;
   }
-  y = tv.fxThin;
-  if (((int)tv.fxThin > (int)tv.y) && ((int)tv.fxThin < (int)tv.y + (int)tv.h)) {
-    videoFX = (POLY_F4 *)Render_gPacketPtr;
-    addPrim(Render_gPalettePtr,videoFX);
-    Render_gPacketPtr = (u_char *)(videoFX + 1);
-    videoFX->code = 0x2a;
-    FETV_setlen(videoFX,5);
-    FETV_setXYWH(videoFX,tv.x,y,tv.w,1);
-    videoFX->b0 = 10;
-    videoFX->g0 = 10;
-    videoFX->r0 = 10;
+  cur_pkt_thin = Render_gPacketPtr;
+  prev_pkt_thin = Render_gPalettePtr;
+  ts6 = tv.fxThin;
+  if (((int)tv.y < (int)tv.fxThin) && ((int)tv.fxThin < (int)tv.y + (int)tv.h)) {
+    AddPrim(prev_pkt_thin,cur_pkt_thin);
+    Render_gPacketPtr = Render_gPacketPtr + 0x18;
+    cur_pkt_thin[7] = 0x2a;
+    cur_pkt_thin[3] = 5;
+    ts7 = tv.x;
+    *(short *)(cur_pkt_thin + 10) = ts6;
+    *(short *)(cur_pkt_thin + 8) = ts7;
+    ts7 = tv.x;
+    ts5 = tv.w;
+    *(short *)(cur_pkt_thin + 0xe) = ts6;
+    *(short *)(cur_pkt_thin + 0xc) = ts7 + ts5;
+    ts7 = tv.x;
+    *(short *)(cur_pkt_thin + 0x12) = ts6 + 1;
+    *(short *)(cur_pkt_thin + 0x10) = ts7;
+    ts7 = tv.x;
+    uVar1 = tv.w;
+    abr = (u_int)uVar1;
+    *(short *)(cur_pkt_thin + 0x16) = ts6 + 1;
+    cur_pkt_thin[6] = 10;
+    cur_pkt_thin[5] = 10;
+    cur_pkt_thin[4] = 10;
+    *(u_short *)(cur_pkt_thin + 0x14) = ts7 + uVar1;
   }
-  FeDraw_SetABRMode(1);
+  FeDraw_SetABRMode(abr);
   if ((tv.flags & 0x20) != 0) {
-    x = (short)((u_short)tv.x + 4 & 0xfffc);
-    if ((int)x < (int)tv.x + (int)tv.w) {
-      /* SYM-CODEGEN-CARRIER: abe -- absent from SYM, but keeping the constant
-         in a loop-live short reproduces retail's s2 save and 213-insn body;
-         an inline literal compiles five instructions short with 21 diffs. */
-      short abe = 1;
+    stripe_x = (u_short)tv.x + 4 & 0xfffffffc;
+    if ((int)(short)stripe_x < (int)tv.x + (int)tv.w) {
       do {
-        PSXDrawTransSquare(0xa0a0a,(int)x,(int)tv.y,1,(int)tv.h,abe);
-        x = (short)(x + 4);
-      } while ((int)((u_int)x << 0x10) >> 0x10 < (int)tv.x + (int)tv.w);
+        abr = (u_int)(short)stripe_x;
+        PSXDrawTransSquare(0xa0a0a,(int)(short)stripe_x,(int)tv.y,1,(int)tv.h,1);
+        stripe_x = stripe_x + 4;
+      } while ((int)(stripe_x * 0x10000) >> 0x10 < (int)tv.x + (int)tv.w);
     }
-    FeDraw_SetABRMode(2);
+    FeDraw_SetABRMode(abr);
   }
   return;
 }
@@ -127,436 +129,365 @@ void DrawTVLines(tTVConfig &tv)
 
 /* ---- DrawTV  [FETV.CPP:82-284] SLD-VERIFIED ---- */
 
-/* MATCH W61 (2026-08-10): the retail state dispatch is a four-case switch.
-   The former range-folded if/else chain changed both its branch tree and the
-   rendering allocator handoff.  Restoring the discrete cases reduces the
-   authoritative residual from 151 to 135 without changing behavior.
-   W62: after each absolute-value clamp input is known nonnegative; promoting
-   the short through u_short for the multiply avoids premature sign-extension
-   and reduces DrawTV from 135 to 131 without volatile lifetime constraints.
-
-   W61-A16 (2026-08-15): the `(u_short)` promotion above was itself the last
-   truncation.  Retail doubles the clamp input with a bare `sll v0,a0,1` on the
-   UNTRUNCATED abs value and only sign-extends for the `> 0x80` compare
-   (`sll 16 / sra 16`); the u_short cast emitted an extra `andi v0,a0,65535`
-   and shifted the pair to `sll 17`.  Spelling the doubling as a SHIFT
-   (`fadeTop = fadeTop << 1;`, all four sites) drops both `andi`s and their
-   downstream fallout: 131 -> 107, count unchanged 822.
-   Measured alternatives at the same four sites: `fadeTop += fadeTop;` 107
-   (tie -- shift chosen because retail's insn IS an sll); plain
-   `fadeTop * 2` 135; `(int)fadeTop * 2` 135; `(short)(fadeTop * 2)` 135.
-
-   RESIDUAL 107 (ours 822 / oracle 815), two named clusters:
-   (a) an s4/s7 SWAP on the two function-long constants -- retail parks the
-       0x1F800004 packet-slot address in s7 and the 0x00FFFFFF rgb mask in s4,
-       we do the reverse (both are global allocnos; global.c hands the lower
-       s-reg to whichever it allocates first, so this is an allocno-priority
-       tie, not a materialisation-order one: both builds emit the ptr pair
-       BEFORE the mask pair).  Naming the mask as a local `u_int rgbmask`
-       declared either BEFORE or AFTER packetPtrSlot is exactly NEUTRAL on
-       diffs (107) while shortening us by 2 insns (820) -- i.e. the W61-A1
-       name-the-constant lever reaches the frame but not this handout.
-   (b) a +7 insn surplus: retail RE-USES the just-loaded packet pointer for
-       the bump (`addiu v1,s0,40; sw v1,0(s7)`) where we reload the slot.
-       Writing that as `*packetPtrSlot = (u_char *)texture + 0x28;` etc. does
-       close the count (822 -> 820 -> 818 -> 816) but re-basins the allocator
-       every time: 0x28-only 121, 0x34-only 175, all-sites 195, all+named mask
-        205, mask+0x28 131.  Those isolated probes were reverted at that basin.
-
-   W63 (2026-08-15): the paired allocator route reaches 77 diffs (822/815).
-   Scope the scratchpad slot per rendering arm; reuse the loaded primitive for
-   three pointer bumps but deliberately retain the first reflection's reload.
-   Price the saved-register handout with empty read-only fences: first-arm
-   rgbMask +2 refs, second-arm rgb/tag masks +1 each, and videoX +2 refs at its
-   final use.  This yields retail's {rgbMask=s4, videoX=s6, slot=s7} rotation
-   without the direct-reflection route's fadeTop a0/a1 swap.  Staging the first
-   palette tag in each arm removes two reload/schedule mismatches.  Finally,
-   two statement-local u_char pairs preserve the byte-load types while making
-   the noise shapey load precede height, closing both repeated load-order
-   swaps.  Controls: direct first-reflection reuse = 120; staging that tag =
-   135; staging the second reflection tag = 144; all reverted.  Remaining 77
-   is concentrated in first-reflection packet scheduling and the second-arm
-   reflection color/packet schedule plus two tv.v/tv.vh load-order swaps.
-
-   W71-A17 2026-08-21 -- 77 -> 2 @815/815 (COUNT-EXACT).  The whole 77 was ONE
-   repeated source-shape defect, not an allocator problem: three of the four
-   packet blocks reached the scratchpad through the RAW MACROS
-   (`*(u_int *)*packetPtrSlot`, `*(u_int *)Render_gPalettePtr`) instead of through
-   the primitive pointer and a CACHED palette pointer.  Because the packet-cursor
-   store `*packetPtrSlot = ...` may-alias the palette cell, every macro spelling
-   forced a fresh `lui 0x1F80 / lw` per use (+2 lui, +4 lw, +1 nop = the entire
-   822-vs-815 surplus).  Retail's shape, read straight off the oracle
-   (@0x800228D0 and @0x80022588), is ONE `lw sN,0(s7)` for the primitive + ONE
-   `lui a0,0x1F80; lw a0,0(a0)` for the palette POINTER, then displacement-0
-   accesses through both, with the palette VALUE re-read (`lw v0,0(a0)` twice) but
-   the POINTER cached.  Landing sequence (each gated):
-     first reflection  (cached rpal + `(u_char*)reflection + 0x34`)   77 -> 97 @818
-     second reflection (cached palette2 + `(u_char*)texture + 0x34`)  97 -> 69 @816
-     second arm's first block (cached palette)                        69 -> 62 @815
-     first reflection gets its OWN palette local `rpal`/`rtag`
-       (retail uses a0 there and a1 in the sibling block => TWO pseudos,
-        not one two-block global allocno)                             62 -> 12
-     `tv.vh - 1 + tv.v` -> `tv.v - 1 + tv.vh` (2nd-arm reflection v2/v3)
-                                                                      12 -> 4
-     2nd arm: `tagMask` declared AFTER the palette read + the fence reduced to
-       `"r"(rgbMask),"r"(rgbMask)` (mirrors the first arm) so the palette
-       ADDRESS `lui s7,0x1F80` is emitted before `lui s5,0xFF000000`  4 -> 2
-   ⚠️ THE ORDER OF THE FIRST THREE STEPS IS LCS-NON-MONOTONE (77 -> 97 -> 69 -> 62
-   while the insn count fell 822 -> 818 -> 816 -> 815 monotonically).  Judge these
-   on `tools/opcen.py` count parity, never on the gate's diff number alone.
-   RESIDUAL 2: `lw s0,0(s7)` (the first reflection's `*packetPtrSlot` read) issues
-   ONE slot after the `lw t4,36(sp)` fadeBottom spill-reload; retail issues it
-   before.  Every source position for that read was measured and is WORSE:
-   at the `if ((tv.flags & 4))` block head 5 @814; before the fadeBottom clamp
-   4 @815; a void fence `__asm__("" : : "i"(0))` in front of the block 5 @816;
-   `rpal` assigned after `reflection` (both spellings) exactly inert.  The
-   competing insn is a RELOAD, so it has no source statement to reorder against
-   -- sched1 ready-list tie, permuter/instrument territory.
-
-   W72-A5 2026-08-22 -- THE RESIDUAL-2 IS A VALIDATED PER_FN_TEXT_MOVES ROW.
-   Re-baselined 2 @815/815.  The SYM 8c block settles the question that the two
-   prior waves left open: retail's allocation is ALREADY OURS -- fadeTop REG $4
-   (a0), fadeBottom REG $8 (t0), texture/reflection BOTH REG $16 (s0), tv REGPARM
-   $18 (s2), fsize 80, mask 0xc0ff0000, and the three AUTOs (videoWidth sp+16,
-   videoHeight sp+24, do_tint sp+32) all land where we put them.  36(sp) is NOT a
-   SYM AUTO in either build -- it is the reload's own spill slot, and RETAIL
-   SPILLS THE SAME VALUE TO THE SAME OFFSET.  So there is nothing left to allocate
-   differently: the entire residual is the sched emission ORDER of two adjacent,
-   mutually independent loads inside one straight-line block.
-
-   The site in build/recon/frontend/common/fetv.cpp.s (first-reflection block,
-   after the `$L658:` fadeBottom-clamp merge):
-        ours                              retail
-        subu  $2,$7,$2                    subu  $2,$7,$2
-        lw    $12,36($sp)   <- reload     lw    $16,0($23)   <- *packetPtrSlot
-        lw    $16,0($23)                  lw    $12,36($sp)
-        lw    $4,528482304                lw    $4,528482304
-   A one-line swap.  VALIDATED SPEC (probed via tools/vprobe.py +
-   W60_TEXT_MOVES_FILE, whole TU re-gated 5/5 PASS, DrawTV PASS 815/815;
-   objdump of the produced object shows 8d8 lw s0,0(s7) / 8dc lw t4,36(sp) =
-   retail's order):
-
-     "recon/frontend/common/fetv.cpp": {
-       "DrawTV__FR9tTVConfig": [
-         {"take":  r"\tlw\t\$16,0\(\$23\)\n(?=\tlw\t\$4,528482304\n)",
-          "after": r"\tsubu\t\$2,\$7,\$2\n(?=\tlw\t\$12,36\(\$sp\)\n)"},
-       ],
-     },
-
-   Anchor notes (21E-8): numeric registers only; `lw $16,0($23)` occurs TWICE in
-   this function (the other is the second arm's texture read, followed by
-   `lw $5,528482304`) so the take carries a lookahead on `$4` to pin the first
-   reflection; the `after` lookahead names `lw $12,36($sp)`, a line the take does
-   NOT remove, so it still resolves after the take is lifted.  `subu $2,$7,$2`
-   occurs twice in the TU but only once inside this function's region.  The take
-   is a plain load in straight-line code -- no branch line, no drop_after, no
-   delay slot touched -- so the 17C brdist pairing requirement does not apply
-   (block-boundary instructions are untouched and the count stays 815).
-   Wiring is orchestrator-owned (build.py is outside this belt's file scope).
-
-   ALSO FALSIFIED W72-A5 (from the 2-diff basin, reverted): declaring
-   `reflection` block-local at its assignment (`POLY_GT4 *reflection = ...`)
-   is EXACTLY INERT (2 @815) -- the sched1 LAUNCH_PRIORITY hypothesis
-   (REG_N_SETS==1 birthing-insn boost) does not discriminate here, because the
-   fn-scope `reflection` is ALREADY single-assignment (only `texture` is written
-   three times).  The competing insn remains a reload with no source statement,
-   so no luid/source-order dial can reach it.
-
-   W71-A17 (cont.) ALSO FALSIFIED at 3 different basins (do not retry): the `noise->shapey - 1 +
-   noise->height` operand swap for the FIRST arm's reflection v2/v3 (77->85,
-   62->70, 12->20) and its block-local u_char-temp form (77->81, 12->24) -- that
-   pair's load order is already retail's; the tv.v/tv.vh pair above is the one
-   that was inverted.
-
-   SOURCE PASS 2026-08-26 (2->0, 815/815): immediately after acquiring the
-   first reflection packet, spell a zero-net pointer perturbation as
-   `reflection--; reflection++;`.  GCC removes both arithmetic operations but
-   preserves the copy-web/priority shape long enough for `lw s0,0(s7)` to issue
-   before the independent fadeBottom reload, exactly like retail.  The MGS-style
-   hidden packet temporary and a canonical assignment/call comma chain were
-   neutral at FAIL 2.  An empty identity asm moved the packet load but blocked
-   delay-slot scheduling and was FAIL 11 at 816/815.  The final solution is pure
-   C and needs no local, volatile, asm, register pin, or postcompile splice. */
-
-void DrawTV(tTVConfig &tv)
+extern "C" void DrawTV(tTVConfig &tv)
 
 {
-  POLY_FT4 *texture;
-  POLY_GT4 *reflection;
-  tTexture_ShapeInfo *noise = &gHelpShapes[0][(rand() & 3) + 0x22];
-  short videoX;
-  short videoY;
-  short videoWidth;
-  short videoHeight;
-  short fadeTop;
-  short fadeBottom;
-  u_long tint;
-  short bright;
-  bool do_tint = 1;
-
-  bright = tv.destBrightness;
-  tint = tv.tint;
-  videoX = tv.x;
-  videoY = tv.y;
-  videoWidth = tv.w;
-  videoHeight = tv.h;
-  if ((tv.flags & 2) == 0) {
-    tint = 0x808080;
-    do_tint = 0;
+  bool bVar1;
+  short ts10;
+  short ts11;
+  short ts4;
+  short ts5;
+  short ts13;
+  int rng_word;
+  int noise_select;
+  short ts12;
+  int tintRed;
+  short destBright_us;
+  int destBright_int;
+  int state;
+  u_int tu15;
+  int ti16;
+  int transStep_or_brt;
+  int ti17;
+  int tu18;
+  int destBrightness;
+  u_int tu21;
+  short tu17;
+  int ti10;
+  short ts20;
+  int videoY_2;
+  int tvY;
+  short tu20;
+  int tint_2;
+  u_int tu24;
+  u_char do_tint;
+  short tu1;
+  short ts1;
+  u_char bVar4;
+  u_short tu2;
+  u_short tu3;
+  u_char *prev_pkt_b;
+  tTexture_ShapeInfo *noiseShape;
+  u_char *cur_pkt_a;
+  u_char *tp10;
+  u_short tu4;
+  
+  rng_word = rand();
+  noiseShape = gHelpShapes;
+  noise_select = rng_word & 3;
+  destBrightness = (int)tv.destBrightness;
+  tint_2 = tv.tint;
+  ts1 = tv.x;
+  tu2 = tv.y;
+  tvY = (int)tu2;
+  ts13 = tv.w;
+  tu3 = tv.h;
+  bVar1 = (tv.flags & 2) == 0;
+  if (bVar1) {
+    tint_2 = 0x808080;
   }
-  if (tv.transition != tv.destBrightness) {
-    if ((tv.transition < tv.destBrightness) &&
-        ((u_int)(tv.state - tv_StateOn) < 2)) {
-      tv.transition += 4;
-      if (tv.destBrightness < tv.transition) {
-        tv.transition = tv.destBrightness;
+  do_tint = (u_int)!bVar1;
+  destBright_us = tv.destBrightness;
+  destBright_int = (int)(u_short)destBright_us;
+  if (tv.transition == destBright_int) {
+DrawTV_stateFetch:
+    state = tv.state;
+  }
+  else {
+    if ((tv.transition < destBright_int) &&
+        (ts12 = (short)nfs4_mips_sign_extend(
+             (u_int)nfs4_mips_addu_s32((int)(u_short)tv.transition,4),16),
+         (u_int)nfs4_mips_subu_s32(tv.state,(int)tv_StateOn) < 2U)
+       ) {
+      tv.transition = ts12;
+      bVar4 = destBright_int < ts12;
+DrawTV_brightStep:
+      if ((bool)bVar4) {
+        tv.transition = destBright_us;
+      }
+      goto DrawTV_stateFetch;
+    }
+    state = tv.state;
+    if ((state == tv_TransitionOff) || (state == tv_StateOn)) {
+      destBright_us = tv.destBrightness;
+      ts12 = (short)nfs4_mips_sign_extend(
+           (u_int)nfs4_mips_addu_s32((int)(u_short)tv.transition,-8),16);
+      tv.transition = ts12;
+      bVar4 = (int)ts12 < (int)(u_int)(u_short)destBright_us;
+      goto DrawTV_brightStep;
+    }
+  }
+  if (state == tv_StateOn) {
+DrawTV_stateOn:
+    tu4 = tv.destBrightness;
+  }
+  else {
+    if (state < 2) {
+      if (state != tv_StateOff) {
+        tintRed = (u_int)tint_2 >> 0x10 & 0xff;
+        goto DrawTV_emitTinted;
+      }
+      goto DrawTV_stateOn;
+    }
+    if (state == tv_TransitionOn) {
+      if ((int)tv.transition == (u_int)tv.destBrightness) {
+        tv.state = tv_StateOn;
       }
     }
-    else if ((tv.state == tv_TransitionOff) || (tv.state == tv_StateOn)) {
-      tv.transition -= 8;
-      if (tv.transition < tv.destBrightness) {
-        tv.transition = tv.destBrightness;
+    else {
+        if (state != tv_TransitionOff) {
+          tintRed = (u_int)tint_2 >> 0x10 & 0xff;
+          goto DrawTV_emitTinted;
+      }
+      if ((int)tv.transition == (u_int)tv.destBrightness) {
+        tv.state = tv_StateOff;
       }
     }
-  }
-  switch (tv.state) {
-  case tv_StateOn:
-    bright = tv.destBrightness;
-    break;
-  case tv_StateOff:
-    bright = tv.destBrightness;
-    break;
-  case tv_TransitionOn:
     do_tint = 1;
-    if (tv.transition == tv.destBrightness) {
-      tv.state = tv_StateOn;
-    }
-    bright = tv.transition;
-    break;
-  case tv_TransitionOff:
-    do_tint = 1;
-    if (tv.transition == tv.destBrightness) {
-      tv.state = tv_StateOff;
-    }
-    bright = tv.transition;
-    break;
+    tu4 = tv.transition;
   }
-  fadeTop = (short)((u_int)tint >> 0x10 & 0xff);
-  tint = ((u_int)(fadeTop * bright) >> 7) << 0x10 |
-         (((u_int)tint >> 8 & 0xff) * bright >> 7) << 8 |
-         (tint & 0xffU) * bright >> 7;
+  destBrightness = (int)tu4;
+  tintRed = (u_int)tint_2 >> 0x10 & 0xff;
+DrawTV_emitTinted:
+  videoY_2 = nfs4_mips_sra_s32(nfs4_mips_sll_s32(destBrightness,0x10),0x10);
+  tu18 = (tint_2 & 0xffU) * videoY_2 >> 7;
+  tu24 = ((u_int)(tintRed * videoY_2) >> 7) << 0x10 |
+         (((u_int)tint_2 >> 8 & 0xff) * videoY_2 >> 7) << 8 | tu18;
   if ((tv.flags & 8) == 0) {
     DrawTVLines(tv);
   }
+  tp10 = Render_gPacketPtr;
+  cur_pkt_a = Render_gPalettePtr;
   if ((tv.flags & 0x10) == 0) {
     if (tv.state != tv_StateOn) {
-      /* SYM-CODEGEN-CARRIER: packetPtrSlot -- spelling the four accesses with
-         Render_gPacketPtr directly measures FAIL 92 (819/815) from this basin;
-         the shared address is required for retail's s7 scratchpad anchor. */
-      u_char **packetPtrSlot = (u_char **)0x1f800004;
-      /* SYM-CODEGEN-CARRIER: rgbMask -- the two zero-instruction references
-         are the measured W63/W71 priority price that assigns 0x00ffffff to s4;
-         inlining the literal rotates the function-long saved-register pair. */
-      u_int rgbMask = 0xffffff;
-      __asm__("" : : "r"(rgbMask), "r"(rgbMask));
-
-      texture = (POLY_FT4 *)*packetPtrSlot;
-      FETVLinkFT4((u_int *)Render_gPalettePtr,texture,packetPtrSlot,rgbMask);
-      *(u_int *)&texture->r0 =
-           (0x40 - (bright >> 1)) * 0x10000 |
-           (0x40 - (bright >> 1)) * 0x100 |
-           (0x40 - (bright >> 1));
-      SetPolyFT4(texture);
-      SetSemiTrans(texture,1);
-      SetShadeTex(texture,0);
-      texture->x0 = videoX;
-      texture->y0 = videoY;
-      texture->x1 = videoX + videoWidth;
-      texture->y1 = videoY;
-      texture->x2 = videoX;
-      texture->y2 = videoY + videoHeight;
-      texture->x3 = videoX + videoWidth;
-      texture->y3 = videoY + videoHeight;
-      texture->u0 = ((int)noise->shapex - (int)(short)(noise->shapex & 0xffc0)) * 0x10 /
-                    (int)noise->depth;
-      texture->v0 = noise->shapey;
-      texture->u1 = noise->width +
-                    ((int)noise->shapex - (int)(short)(noise->shapex & 0xffc0)) * 0x10 /
-                    (int)noise->depth;
-      texture->v1 = noise->shapey;
-      texture->u2 = ((int)noise->shapex - (int)(short)(noise->shapex & 0xffc0)) * 0x10 /
-                    (int)noise->depth;
-      {
-        /* SYM-CODEGEN-CARRIER: noiseHeight
-           SYM-CODEGEN-CARRIER: noiseShapeY -- direct byte-cast addition or a
-           zero-local inline accessor keeps the count but changes both retail
-           load/register pairs (DrawTV residual 2 -> 10); an inline two-local
-           helper still leaves 6.  The statement-local pair is the measured
-           compiler scheduling carrier for the required height-before-shapey
-           loads and is absent from the function's sole SYM scope. */
-        u_char noiseHeight;
-        u_char noiseShapeY;
-        noiseShapeY = noise->shapey;
-        noiseHeight = noise->height;
-        texture->v2 = noiseHeight + noiseShapeY;
-      }
-      texture->u3 = noise->width +
-                    ((int)noise->shapex - (int)(short)(noise->shapex & 0xffc0)) * 0x10 /
-                    (int)noise->depth;
-      {
-        u_char noiseHeight;
-        u_char noiseShapeY;
-        noiseShapeY = noise->shapey;
-        noiseHeight = noise->height;
-        texture->v3 = noiseHeight + noiseShapeY;
-      }
-      texture->tpage =
-           ((u_char)(*((u_char *)noise + 9)) & 3) << 7 |
-           ((short)(noise->shapey & 0x100U) >> 4 | 0x60U) |
-           (u_short)(((u_short)noise->shapex & 0x3c0) >> 6) |
-           (noise->shapey & 0x200U) << 2;
-      texture->clut =
-           GetClut((noise->clutID & 0x3fU) << 4, noise->clutID >> 6);
+      AddPrim(cur_pkt_a,tp10);
+      Render_gPacketPtr = Render_gPacketPtr + 0x28;
+      tu15 = (u_int)nfs4_mips_subu_s32(
+           0x40,nfs4_mips_sra_s32(nfs4_mips_sll_s32(destBrightness,0x10),0x11));
+      *(u_int *)(tp10 + 4) = tu15 * 0x10000 | tu15 * 0x100 | tu15;
+      SetPolyFT4((POLY_FT4 *)tp10);
+      SetSemiTrans(tp10,1);
+      SetShadeTex(tp10,0);
+      *(short *)(tp10 + 8) = ts1;
+      *(u_short *)(tp10 + 10) = tu2;
+      *(u_short *)(tp10 + 0x12) = tu2;
+      *(short *)(tp10 + 0x18) = ts1;
+      *(short *)(tp10 + 0x10) = ts1 + ts13;
+      *(short *)(tp10 + 0x20) = ts1 + ts13;
+      tu20 = (short)(tvY + (u_int)tu3);
+      *(short *)(tp10 + 0x1a) = tu20;
+      *(short *)(tp10 + 0x22) = tu20;
+      tu15 = (u_int)(u_char)noiseShape[noise_select + 0x22].depth;
+      ti16 = ((int)noiseShape[noise_select + 0x22].shapex -
+             (int)(short)(noiseShape[noise_select + 0x22].shapex & 0xffc0)) * 0x10;
+      tp10[0xc] = (char)(ti16 / (int)tu15);
+      tp10[0xd] = (char)noiseShape[noise_select + 0x22].shapey;
+      tu15 = (u_int)(u_char)noiseShape[noise_select + 0x22].depth;
+      transStep_or_brt =
+           ((int)noiseShape[noise_select + 0x22].shapex -
+           (int)(short)(noiseShape[noise_select + 0x22].shapex & 0xffc0)) * 0x10;
+      tp10[0x14] = (char)noiseShape[noise_select + 0x22].width +
+                   (char)(transStep_or_brt / (int)tu15);
+      tp10[0x15] = (char)noiseShape[noise_select + 0x22].shapey;
+      tu15 = (u_int)(u_char)noiseShape[noise_select + 0x22].depth;
+      ti17 = ((int)noiseShape[noise_select + 0x22].shapex -
+             (int)(short)(noiseShape[noise_select + 0x22].shapex & 0xffc0)) * 0x10;
+      tp10[0x1c] = (char)(ti17 / (int)tu15);
+      tp10[0x1d] = (char)noiseShape[noise_select + 0x22].height +
+                   (char)noiseShape[noise_select + 0x22].shapey;
+      tu15 = (u_int)(u_char)noiseShape[noise_select + 0x22].depth;
+      ti17 = ((int)noiseShape[noise_select + 0x22].shapex -
+             (int)(short)(noiseShape[noise_select + 0x22].shapex & 0xffc0)) * 0x10;
+      tp10[0x24] = (char)noiseShape[noise_select + 0x22].width + (char)(ti17 / (int)tu15);
+      tp10[0x25] = (char)noiseShape[noise_select + 0x22].height +
+                   (char)noiseShape[noise_select + 0x22].shapey;
+      *(u_short *)(tp10 + 0x16) =
+           ((u_char)(*((u_char *)&noiseShape[noise_select + 0x22] + 9)) & 3) << 7 |
+           (short)(noiseShape[noise_select + 0x22].shapey & 0x100U) >> 4 | 0x60U |
+           (u_short)(((u_short)noiseShape[noise_select + 0x22].shapex & 0x3c0) >> 6) |
+           (noiseShape[noise_select + 0x22].shapey & 0x200U) << 2;
+      ts10 = GetClut((noiseShape[noise_select + 0x22].clutID & 0x3fU) << 4,
+                        noiseShape[noise_select + 0x22].clutID >> 6);
+      *(short *)(tp10 + 0xe) = ts10;
+      prev_pkt_b = Render_gPacketPtr;
+      cur_pkt_a = Render_gPalettePtr;
       if ((tv.flags & 4) != 0) {
-        fadeTop = tv.flip_axis - videoY + 1;
-        if (fadeTop < 0) {
-          fadeTop = -fadeTop;
+        ti17 = nfs4_mips_addu_s32(
+             nfs4_mips_subu_s32((int)(u_short)tv.flip_axis,tvY),1);
+        if (nfs4_mips_sll_s32(ti17,0x10) < 0) {
+          ti17 = nfs4_mips_negu_s32(ti17);
         }
-        fadeTop = fadeTop << 1;
-        if (fadeTop > 0x80) {
-          fadeTop = 0x80;
+        ts12 = (short)nfs4_mips_sra_s32(
+             nfs4_mips_sll_s32(nfs4_mips_sll_s32(ti17,1),0x10),0x10);
+        if (0x80 < (int)ts12) {
+          ts12 = 0x80;
         }
-        fadeBottom = tv.flip_axis - (videoY + videoHeight) + 1;
-        if (fadeBottom < 0) {
-          fadeBottom = -fadeBottom;
+        ti17 = nfs4_mips_addu_s32(
+             nfs4_mips_subu_s32((int)(u_short)tv.flip_axis,
+                  nfs4_mips_addu_s32(tvY,(int)(u_short)tu3)),1);
+        if (nfs4_mips_sll_s32(ti17,0x10) < 0) {
+          ti17 = nfs4_mips_negu_s32(ti17);
         }
-        fadeBottom = fadeBottom << 1;
-        if (fadeBottom > 0x80) {
-          fadeBottom = 0x80;
+        ts11 = (short)nfs4_mips_sra_s32(
+             nfs4_mips_sll_s32(nfs4_mips_sll_s32(ti17,1),0x10),0x10);
+        if (0x80 < (int)ts11) {
+          ts11 = 0x80;
         }
-        reflection = (POLY_GT4 *)*packetPtrSlot;
-        reflection--;
-        reflection++;
-        FETVLinkGT4((u_int *)Render_gPalettePtr,reflection,packetPtrSlot,rgbMask);
-        *(u_int *)&reflection->r0 = *(u_int *)&reflection->r1 =
-             (((0x80 - bright) * (0x80 - fadeTop) / 0x80) << 0x10) |
-             (((0x80 - bright) * (0x80 - fadeTop) / 0x80) << 8) |
-             ((0x80 - bright) * (0x80 - fadeTop) / 0x80);
-        *(u_int *)&reflection->r2 = *(u_int *)&reflection->r3 =
-             (((0x80 - bright) * (0x80 - fadeBottom) / 0x80) << 0x10) |
-             (((0x80 - bright) * (0x80 - fadeBottom) / 0x80) << 8) |
-             ((0x80 - bright) * (0x80 - fadeBottom) / 0x80);
-        reflection->code = 0x3e;
-        ((u_char *)reflection)[3] = 0xc;
-        reflection->x0 = videoX;
-        reflection->y0 = tv.flip_axis * 2 - videoY;
-        reflection->x1 = videoX + videoWidth;
-        reflection->y1 = tv.flip_axis * 2 - videoY;
-        reflection->x2 = videoX;
-        reflection->y2 = (tv.flip_axis * 2 - videoY) - videoHeight;
-        reflection->x3 = videoX + videoWidth;
-        reflection->y3 = (tv.flip_axis * 2 - videoY) - videoHeight;
-        reflection->u0 = ((int)noise->shapex - (int)(short)(noise->shapex & 0xffc0)) * 0x10 /
-                         (int)noise->depth;
-        reflection->v0 = noise->shapey - 1;
-        reflection->u1 = noise->width +
-                         ((int)noise->shapex - (int)(short)(noise->shapex & 0xffc0)) * 0x10 /
-                         (int)noise->depth;
-        reflection->v1 = noise->shapey - 1;
-        reflection->u2 = ((int)noise->shapex - (int)(short)(noise->shapex & 0xffc0)) * 0x10 /
-                         (int)noise->depth;
-        reflection->v2 = noise->shapey - 1 + noise->height;
-        reflection->u3 = noise->width +
-                         ((int)noise->shapex - (int)(short)(noise->shapex & 0xffc0)) * 0x10 /
-                         (int)noise->depth;
-        reflection->v3 = noise->shapey - 1 + noise->height;
-        reflection->tpage =
-             ((u_char)(*((u_char *)noise + 9)) & 3) << 7 |
-             ((short)(noise->shapey & 0x100U) >> 4 | 0x60U) |
-             (u_short)(((u_short)noise->shapex & 0x3c0) >> 6) |
-             (noise->shapey & 0x200U) << 2;
-        reflection->clut =
-             GetClut((noise->clutID & 0x3fU) << 4, noise->clutID >> 6);
+        ti17 = nfs4_mips_mult_s32(nfs4_mips_subu_s32(0x80,videoY_2),
+                                  nfs4_mips_subu_s32(0x80,(int)ts12));
+        AddPrim(cur_pkt_a,prev_pkt_b);
+        Render_gPacketPtr = Render_gPacketPtr + 0x34;
+        if (ti17 < 0) {
+          ti17 = nfs4_mips_addu_s32(ti17,0x7f);
+        }
+        tu15 = (u_int)nfs4_mips_sra_s32(ti17,7);
+        ti17 = nfs4_mips_mult_s32(nfs4_mips_subu_s32(0x80,videoY_2),
+                                  nfs4_mips_subu_s32(0x80,(int)ts11));
+        tu15 = tu15 << 0x10 | tu15 << 8 | tu15;
+        *(u_int *)(prev_pkt_b + 0x10) = tu15;
+        *(u_int *)(prev_pkt_b + 4) = tu15;
+        if (ti17 < 0) {
+          ti17 = nfs4_mips_addu_s32(ti17,0x7f);
+        }
+        tu15 = (u_int)nfs4_mips_sra_s32(ti17,7);
+        tu15 = tu15 << 0x10 | tu15 << 8 | tu15;
+        *(u_int *)(prev_pkt_b + 0x28) = tu15;
+        *(u_int *)(prev_pkt_b + 0x1c) = tu15;
+        prev_pkt_b[7] = 0x3e;
+        prev_pkt_b[3] = 0xc;
+        *(short *)(prev_pkt_b + 8) = ts1;
+        tu1 = tv.flip_axis;
+        *(short *)(prev_pkt_b + 0x14) = ts1 + ts13;
+        *(u_short *)(prev_pkt_b + 10) = tu1 * 2 - tu2;
+        tu4 = tv.flip_axis;
+        *(short *)(prev_pkt_b + 0x20) = ts1;
+        *(u_short *)(prev_pkt_b + 0x16) = tu4 * 2 - tu2;
+        tu4 = tv.flip_axis;
+        *(short *)(prev_pkt_b + 0x2c) = ts1 + ts13;
+        *(u_short *)(prev_pkt_b + 0x22) = (tu4 * 2 - tu2) - tu3;
+        *(u_short *)(prev_pkt_b + 0x2e) = (tv.flip_axis * 2 - tu2) - tu3;
+        tu15 = (u_int)(u_char)noiseShape[noise_select + 0x22].depth;
+        ti17 = ((int)noiseShape[noise_select + 0x22].shapex -
+               (int)(short)(noiseShape[noise_select + 0x22].shapex & 0xffc0)) * 0x10;
+        prev_pkt_b[0xc] = (char)(ti17 / (int)tu15);
+        prev_pkt_b[0xd] = (char)noiseShape[noise_select + 0x22].shapey + -1;
+        tu15 = (u_int)(u_char)noiseShape[noise_select + 0x22].depth;
+        ti17 = ((int)noiseShape[noise_select + 0x22].shapex -
+               (int)(short)(noiseShape[noise_select + 0x22].shapex & 0xffc0)) * 0x10;
+        prev_pkt_b[0x18] = (char)noiseShape[noise_select + 0x22].width + (char)(ti17 / (int)tu15);
+        prev_pkt_b[0x19] = (char)noiseShape[noise_select + 0x22].shapey + -1;
+        tu15 = (u_int)(u_char)noiseShape[noise_select + 0x22].depth;
+        ti17 = ((int)noiseShape[noise_select + 0x22].shapex -
+               (int)(short)(noiseShape[noise_select + 0x22].shapex & 0xffc0)) * 0x10;
+        prev_pkt_b[0x24] = (char)(ti17 / (int)tu15);
+        prev_pkt_b[0x25] =
+             (char)noiseShape[noise_select + 0x22].height +
+             (char)noiseShape[noise_select + 0x22].shapey + -1;
+        tu15 = (u_int)(u_char)noiseShape[noise_select + 0x22].depth;
+        ti17 = ((int)noiseShape[noise_select + 0x22].shapex -
+               (int)(short)(noiseShape[noise_select + 0x22].shapex & 0xffc0)) * 0x10;
+        prev_pkt_b[0x30] = (char)noiseShape[noise_select + 0x22].width + (char)(ti17 / (int)tu15);
+        prev_pkt_b[0x31] =
+             (char)noiseShape[noise_select + 0x22].height +
+             (char)noiseShape[noise_select + 0x22].shapey + -1;
+        *(u_short *)(prev_pkt_b + 0x1a) =
+             ((u_char)(*((u_char *)&noiseShape[noise_select + 0x22] + 9)) & 3) << 7 |
+             (short)(noiseShape[noise_select + 0x22].shapey & 0x100U) >> 4 | 0x60U |
+             (u_short)(((u_short)noiseShape[noise_select + 0x22].shapex & 0x3c0) >> 6) |
+             (noiseShape[noise_select + 0x22].shapey & 0x200U) << 2;
+        ts4 = GetClut((noiseShape[noise_select + 0x22].clutID & 0x3fU) << 4,
+                         noiseShape[noise_select + 0x22].clutID >> 6);
+        *(short *)(prev_pkt_b + 0xe) = ts4;
       }
     }
+    tp10 = Render_gPacketPtr;
+    cur_pkt_a = Render_gPalettePtr;
     if (tv.state != tv_StateOff) {
-      u_char **packetPtrSlot = (u_char **)0x1f800004;
-      u_int rgbMask = 0xffffff;
-      __asm__("" : : "r"(rgbMask), "r"(rgbMask));
-
-      texture = (POLY_FT4 *)*packetPtrSlot;
-      FETVLinkFT4((u_int *)Render_gPalettePtr,texture,packetPtrSlot,rgbMask);
-      *(u_int *)&texture->r0 = tint;
-      SetPolyFT4(texture);
-      SetSemiTrans(texture,0);
-      SetShadeTex(texture,do_tint ^ 1);
-      texture->x0 = videoX;
-      texture->y0 = videoY;
-      texture->x1 = videoX + videoWidth;
-      texture->y1 = videoY;
-      texture->x2 = videoX;
-      texture->y2 = videoY + videoHeight;
-      texture->x3 = videoX + videoWidth;
-      texture->y3 = videoY + videoHeight;
-      texture->u0 = tv.u;
-      texture->v0 = tv.v;
-      texture->u1 = tv.u + tv.uw;
-      texture->v1 = tv.v;
-      texture->u2 = tv.u;
-      texture->v2 = tv.v + tv.vh;
-      texture->u3 = tv.u + tv.uw;
-      texture->v3 = tv.v + tv.vh;
-      texture->tpage = tv.tpage;
-      texture->clut = tv.clut;
+      AddPrim(cur_pkt_a,tp10);
+      Render_gPacketPtr = Render_gPacketPtr + 0x28;
+      *(u_int *)(tp10 + 4) = tu24;
+      SetPolyFT4((POLY_FT4 *)tp10);
+      SetSemiTrans(tp10,0);
+      SetShadeTex(tp10,do_tint ^ 1);
+      *(short *)(tp10 + 8) = ts1;
+      *(u_short *)(tp10 + 10) = tu2;
+      ts20 = ts1 + ts13;
+      *(short *)(tp10 + 0x10) = ts20;
+      *(u_short *)(tp10 + 0x12) = tu2;
+      *(short *)(tp10 + 0x18) = ts1;
+      *(short *)(tp10 + 0x20) = ts20;
+      tu17 = (short)(tvY + (u_int)tu3);
+      *(short *)(tp10 + 0x1a) = tu17;
+      *(short *)(tp10 + 0x22) = tu17;
+      tp10[0xc] = tv.u;
+      tp10[0xd] = tv.v;
+      tp10[0x14] = tv.u + tv.uw;
+      tp10[0x15] = tv.v;
+      tp10[0x1c] = tv.u;
+      tp10[0x1d] = tv.v + tv.vh;
+      tp10[0x24] = tv.u + tv.uw;
+      tp10[0x25] = tv.v + tv.vh;
+      *(u_short *)(tp10 + 0x16) = tv.tpage;
+      *(u_short *)(tp10 + 0xe) = tv.clut;
+      tp10 = Render_gPacketPtr;
+      cur_pkt_a = Render_gPalettePtr;
       if ((tv.flags & 4) != 0) {
-        fadeTop = tv.flip_axis - videoY + 1;
-        if (fadeTop < 0) {
-          fadeTop = -fadeTop;
+        ti17 = nfs4_mips_addu_s32(
+             nfs4_mips_subu_s32((int)(u_short)tv.flip_axis,tvY),1);
+        if (nfs4_mips_sll_s32(ti17,0x10) < 0) {
+          ti17 = nfs4_mips_negu_s32(ti17);
         }
-        fadeTop = fadeTop << 1;
-        if (fadeTop > 0x80) {
-          fadeTop = 0x80;
+        ts5 = (short)nfs4_mips_sra_s32(
+             nfs4_mips_sll_s32(nfs4_mips_sll_s32(ti17,1),0x10),0x10);
+        if (0x80 < (int)ts5) {
+          ts5 = 0x80;
         }
-        fadeBottom = tv.flip_axis - (videoY + videoHeight) + 1;
-        if (fadeBottom < 0) {
-          fadeBottom = -fadeBottom;
+        ti17 = nfs4_mips_addu_s32(
+             nfs4_mips_subu_s32((int)(u_short)tv.flip_axis,
+                  nfs4_mips_addu_s32(tvY,(int)(u_short)tu3)),1);
+        if (nfs4_mips_sll_s32(ti17,0x10) < 0) {
+          ti17 = nfs4_mips_negu_s32(ti17);
         }
-        fadeBottom = fadeBottom << 1;
-        if (fadeBottom > 0x80) {
-          fadeBottom = 0x80;
+        ts13 = (short)nfs4_mips_sra_s32(
+             nfs4_mips_sll_s32(nfs4_mips_sll_s32(ti17,1),0x10),0x10);
+        if (0x80 < (int)ts13) {
+          ts13 = 0x80;
         }
-        texture = (POLY_FT4 *)*packetPtrSlot;
-        FETVLinkGT4((u_int *)Render_gPalettePtr,(POLY_GT4 *)texture,
-                    packetPtrSlot,rgbMask);
-        ((u_char *)texture)[3] = 0xc;
-        *(u_int *)&((POLY_GT4 *)texture)->r0 = *(u_int *)&((POLY_GT4 *)texture)->r1 =
-             (((tint >> 16 & 0xff) * (0x80 - fadeTop) >> 7) << 16) |
-             (((tint >> 8 & 0xff) * (0x80 - fadeTop) >> 7) << 8) |
-             ((tint & 0xff) * (0x80 - fadeTop) >> 7);
-        *(u_int *)&((POLY_GT4 *)texture)->r2 = *(u_int *)&((POLY_GT4 *)texture)->r3 =
-             (((tint >> 16 & 0xff) * (0x80 - fadeBottom) >> 7) << 16) |
-             (((tint >> 8 & 0xff) * (0x80 - fadeBottom) >> 7) << 8) |
-             ((tint & 0xff) * (0x80 - fadeBottom) >> 7);
-        ((POLY_GT4 *)texture)->code = 0x3c;
-        ((POLY_GT4 *)texture)->x0 = videoX;
-        ((POLY_GT4 *)texture)->y0 = tv.flip_axis * 2 - videoY;
-        ((POLY_GT4 *)texture)->x1 = videoX + videoWidth;
-        ((POLY_GT4 *)texture)->y1 = tv.flip_axis * 2 - videoY;
-        ((POLY_GT4 *)texture)->x2 = videoX;
-        ((POLY_GT4 *)texture)->y2 = (tv.flip_axis * 2 - videoY) - videoHeight;
-        ((POLY_GT4 *)texture)->x3 = videoX + videoWidth;
-        __asm__("" : : "r"(videoX), "r"(videoX));
-        ((POLY_GT4 *)texture)->y3 = (tv.flip_axis * 2 - videoY) - videoHeight;
-        ((POLY_GT4 *)texture)->u0 = tv.u;
-        ((POLY_GT4 *)texture)->v0 = tv.v - 1;
-        ((POLY_GT4 *)texture)->u1 = tv.u + tv.uw;
-        ((POLY_GT4 *)texture)->v1 = tv.v - 1;
-        ((POLY_GT4 *)texture)->u2 = tv.u;
-        ((POLY_GT4 *)texture)->v2 = tv.v - 1 + tv.vh;
-        ((POLY_GT4 *)texture)->u3 = tv.u + tv.uw;
-        ((POLY_GT4 *)texture)->v3 = tv.v - 1 + tv.vh;
-        ((POLY_GT4 *)texture)->tpage = tv.tpage;
-        ((POLY_GT4 *)texture)->clut = tv.clut;
+        tu15 = tu24 >> 0x10 & 0xff;
+        ti17 = 0x80 - ts5;
+        tu21 = tu24 >> 8 & 0xff;
+        ti10 = 0x80 - ts13;
+        AddPrim(cur_pkt_a,tp10);
+        Render_gPacketPtr = Render_gPacketPtr + 0x34;
+        tp10[3] = 0xc;
+        tu24 = (tu15 * ti17 >> 7) << 0x10 | (tu21 * ti17 >> 7) << 8 | (tu18 & 0xffU) * ti17 >> 7;
+        *(short *)(tp10 + 8) = ts1;
+        *(u_int *)(tp10 + 0x10) = tu24;
+        *(u_int *)(tp10 + 4) = tu24;
+        tu24 = (tu15 * ti10 >> 7) << 0x10 | (tu21 * ti10 >> 7) << 8 | (tu18 & 0xffU) * ti10 >> 7;
+        *(u_int *)(tp10 + 0x28) = tu24;
+        *(u_int *)(tp10 + 0x1c) = tu24;
+        tp10[7] = 0x3c;
+        tu4 = tv.flip_axis;
+        *(short *)(tp10 + 0x14) = ts20;
+        *(u_short *)(tp10 + 10) = tu4 * 2 - tu2;
+        tu4 = tv.flip_axis;
+        *(short *)(tp10 + 0x20) = ts1;
+        *(u_short *)(tp10 + 0x16) = tu4 * 2 - tu2;
+        tu4 = tv.flip_axis;
+        *(short *)(tp10 + 0x2c) = ts20;
+        *(u_short *)(tp10 + 0x22) = (tu4 * 2 - tu2) - tu3;
+        *(u_short *)(tp10 + 0x2e) = (tv.flip_axis * 2 - tu2) - tu3;
+        tp10[0xc] = tv.u;
+        tp10[0xd] = tv.v + 0xff;
+        tp10[0x18] = tv.u + tv.uw;
+        tp10[0x19] = tv.v + 0xff;
+        tp10[0x24] = tv.u;
+        tp10[0x25] = tv.v + tv.vh + 0xff;
+        tp10[0x30] = tv.u + tv.uw;
+        tp10[0x31] = tv.v + tv.vh + 0xff;
+        *(u_short *)(tp10 + 0x1a) = tv.tpage;
+        *(u_short *)(tp10 + 0xe) = tv.clut;
       }
     }
   }
@@ -567,42 +498,50 @@ void DrawTV(tTVConfig &tv)
 
 /* ---- InitTV  [FETV.CPP:287-309] SLD-VERIFIED ---- */
 
-void InitTV(tTVConfig &tv,tTexture_ShapeInfo *textures,short index)
+extern "C" void InitTV(tTVConfig &tv,tTexture_ShapeInfo *textures,short index)
 
 {
-  /* SYM records no locals.  Direct textures[index] expressions let GCC form
-     the retail $s0 indexed base without a source pointer/byte-offset local.
-     SLD lines 304..309 put both rand assignments before tint/flip/transition/
-     brightness; that order lets the second remainder stay live while those
-     independent stores fill its divide latency and is exact PASS 132/132. */
+  u_char uVar1;
+  u_short uVar2;
+  u_int uVar3;
+  int iVar4;
+  int iVar5;
+  tTexture_ShapeInfo &texture = textures[(int)index];
   
   tv.state = tv_StateOff;
   tv.flags = 0;
-  tv.x = -textures[index].centerx;
-  tv.y = -textures[index].centery;
-  tv.w = textures[index].width;
-  tv.h = textures[index].height;
-  tv.u = (u_char)((((int)textures[index].shapex -
-          (int)(short)(textures[index].shapex & 0xffc0)) * 0x10) /
-          (int)(u_char)textures[index].depth);
-  tv.v = (u_char)textures[index].shapey;
-  tv.uw = (u_char)tv.w;
+  tv.x = -texture.centerx;
+  tv.y = -texture.centery;
+  tv.w = texture.width;
+  tv.h = texture.height;
+  uVar3 = (u_int)(u_char)texture.depth;
+  iVar4 = ((int)texture.shapex -
+          (int)(short)((u_short)texture.shapex & 0xffc0)) * 0x10;
+  tv.u = (u_char)(iVar4 / (int)uVar3);
+  uVar1 = (u_char)texture.shapey;
   tv.vh = (u_char)tv.h;
-  tv.shapex = textures[index].shapex;
-  tv.shapey = textures[index].shapey;
-  tv.clutID = textures[index].clutID;
-  tv.shapeType = textures[index].type & 3;
-  tv.clut = GetClut((tv.clutID & 0x3f) << 4,(u_int)(tv.clutID >> 6));
-  tv.tpage = ((u_char)textures[index].type & 3) << 7 |
-              (short)(textures[index].shapey & 0x100) >> 4 |
-              (u_short)((textures[index].shapex & 0x3c0) >> 6) |
-              (textures[index].shapey & 0x200) << 2;
-  tv.fxWide = (short)(rand() % (tv.h * 0x30));
-  tv.fxThin = (short)(rand() % (tv.h * 0x30));
-  tv.tint = 0x808080;
+  tv.uw = (u_char)tv.w;
+  tv.v = uVar1;
+  tv.shapex = (u_short)texture.shapex;
+  tv.shapey = (u_short)texture.shapey;
+  tv.clutID = (u_short)texture.clutID;
+  tv.shapeType = (u_char)texture.type & 3;
+  uVar2 = GetClut((tv.clutID & 0x3f) << 4,(u_int)(tv.clutID >> 6));
+  tv.clut = uVar2;
+  uVar2 = (u_short)texture.shapey;
+  tv.tpage = ((u_char)texture.type & 3) << 7 | (short)(uVar2 & 0x100) >> 4 |
+              (u_short)(((u_short)texture.shapex & 0x3c0) >> 6) |
+              (uVar2 & 0x200) << 2;
+  iVar4 = rand();
+  iVar5 = tv.h * 0x30;
+  tv.fxWide = (short)(iVar4 % iVar5);
+  iVar4 = rand();
+  iVar5 = tv.h * 0x30;
   tv.flip_axis = 0;
   tv.transition = 0;
+  tv.tint = 0x808080;
   tv.destBrightness = 0x80;
+  tv.fxThin = (short)(iVar4 % iVar5);
   return;
 }
 
@@ -610,7 +549,7 @@ void InitTV(tTVConfig &tv,tTexture_ShapeInfo *textures,short index)
 
 /* ---- TurnOffTV  [FETV.CPP:313-315] SLD-VERIFIED ---- */
 
-void TurnOffTV(tTVConfig &tv)
+extern "C" void TurnOffTV(tTVConfig &tv)
 
 {
   tv.state = tv_TransitionOff;
@@ -622,7 +561,7 @@ void TurnOffTV(tTVConfig &tv)
 
 /* ---- TurnOnTV  [FETV.CPP:319-321] SLD-VERIFIED ---- */
 
-void TurnOnTV(tTVConfig &tv)
+extern "C" void TurnOnTV(tTVConfig &tv)
 
 {
   

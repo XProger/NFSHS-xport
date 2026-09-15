@@ -6,42 +6,39 @@
  *   play-info `info`: [0] = patch index, [1] = bank id (byte).
  *   bank @ (bankid*0xc + sndgs[0x26]): +4 type(b), +6 patch count(u16), +0xc/+0x14 patch ptr table.
  */
+#include "../../../nfs4_types.h"
 
-extern int sndgs[];
-extern int iSNDvalidbank(int bankid);                /* sbvalid */
-extern int iSNDplaytaggedpatch(int patch, int info); /* stagpat */
+extern "C" int sndgs[];
+extern "C" int iSNDvalidbank(int bankid);                /* sbvalid */
+extern "C" int iSNDplaytaggedpatch(unsigned char *patch, int *info); /* stagpat */
 
-extern int  cSNDplay(int *info, int recurse);   /* @0x800E7A68 ; a1 always 0 at every call */
-extern int  SNDplay(int *info);             /* @0x800E7A30 */
+extern "C" int  cSNDplay(int *info);            /* @0x800E7A68 */
+extern "C" void SNDplay(int *info);             /* @0x800E7A30 */
 
-/* SNDplay @0x800E7A30 : play `info` if the audio system is up; -10 if down. */
-extern int SNDplay(int *info)
+/* SNDplay @0x800E7A30 : play `info` if the audio system is up. */
+extern "C" void SNDplay(int *info)
 {
-    if ((signed char)sndgs[0xf] == 0)
-        return -10;
-    return cSNDplay(info, 0);
+    if ((char)sndgs[0xf] != 0)
+        cSNDplay(info);
 }
 
-/* cSNDplay @0x800E7A68 : resolve the play-info's (bank, patch) to a tagged patch and play it.
- * MATCH: 3 FLAT early-returns `if (!cond) return -8;` (not a nested if-body / goto-fail) reproduces
- * the oracle's exact basic-block layout for the in-range test (branch-polarity + which path needs the
- * extra `j`-trampoline); a nested `if (cond) { body }` or an explicit `goto fail;` both left the
- * in-range test's branch inverted (7-diff residual) even though they're semantically identical. */
-extern int cSNDplay(int *info, int recurse)
+/* cSNDplay @0x800E7A68 : resolve the play-info's (bank, patch) to a tagged patch and play it. */
+extern "C" int cSNDplay(int *info)
 {
-    int patch, bank, pp;
-    (void)recurse;
-    if (iSNDvalidbank((int)(signed char)info[1]) < 0)
-        return -8;
-    patch = info[0];
-    bank = *(int *)((signed char)info[1] * 0xc + sndgs[0x26]);
-    if (patch < 0)
-        return -8;
-    if (!(patch < (int)(unsigned)*(unsigned short *)(bank + 6)))
-        return -8;
-    if (*(char *)(bank + 4) == 4)
-        pp = *(int *)((bank + (patch << 2)) + 0x14);
-    else
-        pp = *(int *)((bank + (patch << 2)) + 0xc);
-    return iSNDplaytaggedpatch(pp, (int)info);
+    int patch, bank;
+    intptr_t pp;
+    if (-1 < iSNDvalidbank((int)(char)info[1])) {
+        patch = info[0];
+        bank = *(int *)((char)info[1] * 0xc + sndgs[0x26]);
+        if (patch < 0)
+            return -8;
+        if (patch < (int)(unsigned)*(unsigned short *)(bank + 6)) {
+            if (*(char *)(bank + 4) == 4)
+                pp = *(int *)(bank + patch * 4 + 0x14);
+            else
+                pp = *(int *)(bank + patch * 4 + 0xc);
+            return iSNDplaytaggedpatch((unsigned char *)pp, info);
+        }
+    }
+    return -8;
 }

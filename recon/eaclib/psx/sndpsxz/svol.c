@@ -1,4 +1,4 @@
-/* eaclib/psx/sndpsxz/svol.cpp -- RECONSTRUCTED from nfs4-f.exe. NOT original source.
+/* eaclib/psx/sndpsxz/svol.c -- RECONSTRUCTED from nfs4-f.exe. NOT original source.
  *   Source obj : nfs4\eaclib\psx\svol.obj (SNDPSXZ.LIB).  2 fns: iSNDunsafevol@0x800E69D0,
  *   SNDvol@0x800E6A94.  FULL reconstruction (disasm-v3 MIPS); NOT stubs.  Uses lib/snd.h.
  *
@@ -7,42 +7,33 @@
  *   the voice's left base volume @+0x2D.  SNDvol is the locked public wrapper (-10 when disabled).
  */
 #include "../../../lib/snd.h"
+#include "../../../mips_semantics.h"
 
-extern int iSNDunsafevol(int handle, int vol)   /* @0x800E69D0 */
+extern "C" int iSNDunsafevol(int handle, int vol)   /* @0x800E69D0 */
 {
     int chan = iSNDgetchan(handle);
-    int iter;
-    int level;
-    SndState *state;
     if (chan < 0)
-        goto done;
-    iter = -1;
-    state = SND;
-    level = vol << 16;
-    /* MATCH: the shared `done` return and explicit state-base local keep the early-exit delay slot,
-     * voice-table base, and level calculation in the oracle's order. */
+        return chan;
+    int iter = -1;
+    int level = nfs4_mips_sll_s32(vol,16);
     while (iSNDpatchkey(chan, &iter)) {
-        SndVoice *v = &state->voices[iter];
+        SndVoice *v = &SND->voices[iter];
         if (v->f1C == level)
-            return 0;                       /* already this level -> done (Ghidra: explicit `return 0;`,
-                                              * NOT a break-to-shared-tail -- oracle's beq delay slot sets
-                                              * v0=0 here, not v0=chan) */
+            break;                          /* already this level -> done */
         v->f1C = level;
-        v->f14 = 0;                         /* sunk into the iSNDcalcvol jal delay slot */
         iSNDcalcvol(iter);
+        v->f14 = 0;
         iSNDvol(iter, v->vol_l);
     }
-done:
     return chan;
 }
 
-extern int SNDvol(int handle, int vol)   /* @0x800E6A94 */
+extern "C" int SNDvol(int handle, int vol)   /* @0x800E6A94 */
 {
-    int r;
     if (SND->enabled == 0)
         return -10;
     iSNDenteraudio();
-    r = iSNDunsafevol(handle, vol);
+    int r = iSNDunsafevol(handle, vol);
     iSNDleaveaudio();
     return r;
 }

@@ -2,14 +2,9 @@
  *   7 fns: Stats_DoPlayerGlue/ClearPosition/GetPosition/GetNumOpponents/TrackStats/
  *   ExtrapolateOpponentTimes/TrackEndGame. GTE-free. Full SYM-locals applied.
  */
-#include "stats_types.h"
+#include "../../nfs4_types.h"
 #include "stats_externs.h"
-
-/* stats.obj-owned race-order scratch table.
- * SYM: EXT Stats_tPosition[6], 96 bytes at 0x8011E0E0.  The retail image is
- * entirely zero-initialized, and CC1PLPSX emits this tentative aggregate in
- * .data; the reconstruction linker substitutes it for only that residual run. */
-Stats_tPosition Stats_racePosition[6];
+#include "../../mips_semantics.h"
 
 /* ---- intra-TU forward declarations (auto-emitted, signature-exact) ---- */
 void Stats_DoPlayerGlue(void);
@@ -25,65 +20,90 @@ void Stats_TrackEndGame(void);
 void Stats_DoPlayerGlue(void)
 
 {
-  int i;
+  int iVar1;
   int dist;
+  Car_tObj *pCVar2;
+  Car_tObj **ppCVar3;
+  int i;
+  int iVar4;
+  Stats_tPosition *pSVar5;
   int humanLeader;
-
-  humanLeader = 99;
-  for (i = 0; i < Cars_gNumRaceCars; i++) {
-    Cars_gRaceCarList[i]->stats.position =
-        Stats_GetPosition(Cars_gRaceCarList[i]);
-    if ((Stats_racePosition[i].isHuman != 0) && (humanLeader == 99)) {
-      humanLeader = i;
-    }
+  int iVar6;
+  
+  iVar6 = 99;
+  iVar4 = 0;
+  if (0 < Cars_gNumRaceCars) {
+    pSVar5 = Stats_racePosition;
+    ppCVar3 = Cars_gRaceCarList;
+    do {
+      iVar1 = Stats_GetPosition(*ppCVar3);
+      ((*ppCVar3)->stats).position = iVar1;
+      if ((pSVar5->isHuman != 0) && (iVar6 == 99)) {
+        iVar6 = iVar4;
+      }
+      pSVar5 = pSVar5 + 1;
+      iVar4 = iVar4 + 1;
+      ppCVar3 = ppCVar3 + 1;
+    } while (iVar4 < Cars_gNumRaceCars);
   }
-
-  if ((STATS_CATCHUP_LOGIC != 0) && (STATS_COMMMODE == 1)) {
+  if ((GameSetup_gData.catchupLogic != 0) && (GameSetup_gData.commMode == 1)) {
+    ppCVar3 = Cars_gHumanRaceCarList;
     if (((Cars_gHumanRaceCarList[0]->stats).finishType == 2) ||
        ((Cars_gHumanRaceCarList[1]->stats).finishType == 2)) {
       Cars_gHumanRaceCarList[0]->glue = 0x10000;
       Cars_gHumanRaceCarList[1]->glue = 0x10000;
     }
     else {
-      for (i = 0; i < Cars_gNumHumanRaceCars; i++) {
-        dist = Stats_racePosition[humanLeader].slice -
-               Cars_gHumanRaceCarList[i]->stats.sliceTotal;
-        if (dist < 5) {
-          Cars_gHumanRaceCarList[i]->glue = 0x10000;
-        }
-        else {
-          if (dist < 10) {
-            Cars_gHumanRaceCarList[i]->glue = 0x10666;
-          }
-          else if (dist < 30) {
-            Cars_gHumanRaceCarList[i]->glue = 0x10ccc;
-          }
-          else if (dist < 60) {
-            Cars_gHumanRaceCarList[i]->glue = 0x11333;
+      iVar4 = 0;
+      if (0 < Cars_gNumHumanRaceCars) {
+        do {
+          pCVar2 = *ppCVar3;
+          iVar1 = Stats_racePosition[iVar6].slice - (pCVar2->stats).sliceTotal;
+          if (iVar1 < 5) {
+            pCVar2->glue = 0x10000;
           }
           else {
-            Cars_gHumanRaceCarList[i]->glue = 0x11999;
+            if (iVar1 < 10) {
+              iVar1 = 0x10666;
+            }
+            else if (iVar1 < 0x1e) {
+              iVar1 = 0x10ccc;
+            }
+            else if (iVar1 < 0x3c) {
+              iVar1 = 0x11333;
+            }
+            else {
+              iVar1 = 0x11999;
+            }
+            pCVar2->glue = iVar1;
           }
-        }
+          iVar4 = iVar4 + 1;
+          ppCVar3 = ppCVar3 + 1;
+        } while (iVar4 < Cars_gNumHumanRaceCars);
       }
     }
   }
+  return;
 }
 
 /* ---- Stats_ClearPosition__Fv  [STATS.CPP:112-120] SLD-VERIFIED ---- */
 void Stats_ClearPosition(void)
 
 {
+  Stats_tPosition *pSVar1;
+  int iVar2;
   int i;
-
-  i = 0;
+  
+  iVar2 = 0;
+  pSVar1 = Stats_racePosition;
   do {
-    Stats_racePosition[i].car = -1;
-    Stats_racePosition[i].slice = -99999;
-    Stats_racePosition[i].sliceTime = 0;
-    Stats_racePosition[i].isHuman = 0;
-    i = i + 1;
-  } while (i < 6);
+    pSVar1->car = -1;
+    pSVar1->slice = -99999;
+    pSVar1->sliceTime = 0;
+    pSVar1->isHuman = 0;
+    iVar2 = iVar2 + 1;
+    pSVar1 = pSVar1 + 1;
+  } while (iVar2 < 6);
   return;
 }
 
@@ -91,154 +111,160 @@ void Stats_ClearPosition(void)
 int Stats_GetPosition(Car_tObj *carObj)
 
 {
+  Stats_tPosition *pSVar1;
+  int iVar2;
+  int i;
   int position;
   int carindex;
-
-  position = 0;
-  carindex = carObj->carIndex;
-  {
-    int i;
-
-    for (i = 0; i < Cars_gNumRaceCars; i++) {
-      if (Stats_racePosition[i].car == carindex) {
-        position = i + 1;
-        break;
+  
+  iVar2 = 0;
+  if (0 < Cars_gNumRaceCars) {
+    pSVar1 = Stats_racePosition;
+    do {
+      if (pSVar1->car == carObj->carIndex) {
+        return iVar2 + 1;
       }
-    }
+      iVar2 = iVar2 + 1;
+      pSVar1 = pSVar1 + 1;
+    } while (iVar2 < Cars_gNumRaceCars);
   }
-  return position;
+  return 0;
 }
 
 /* ---- Stats_GetNumOpponents__Fv  [STATS.CPP:145-155] SLD-VERIFIED ---- */
 int Stats_GetNumOpponents(void)
 
 {
-  int i;
+  Stats_tPosition *pSVar1;
+  int iVar2;
   int numCars;
+  int iVar3;
+  int i;
   
-  numCars = 0;
-  for (i = 0; i < Cars_gNumRaceCars; i++) {
-    if (Stats_racePosition[i].car != -1) {
-      numCars = numCars + 1;
-    }
+  iVar3 = 0;
+  iVar2 = 0;
+  if (0 < Cars_gNumRaceCars) {
+    pSVar1 = Stats_racePosition;
+    do {
+      if (pSVar1->car != -1) {
+        iVar2 = iVar2 + 1;
+      }
+      iVar3 = iVar3 + 1;
+      pSVar1 = pSVar1 + 1;
+    } while (iVar3 < Cars_gNumRaceCars);
   }
-  return numCars;
+  return iVar2;
 }
 
 /* ---- Stats_TrackStats__FP8Car_tObj  [STATS.CPP:161-273] SLD-VERIFIED ---- */
 void Stats_TrackStats(Car_tObj *carObj)
 
 {
-  if ((STATS_GAME_TICKS & 1U) == 0) {
-    int trackSlices;
-    int currentTime;
-
-    trackSlices = gNumSlices;
-    currentTime = STATS_GAME_TICKS;
-    if (((carObj->stats).lap < 4) &&
-        ((carObj->linearVel_ch).z >
-         (carObj->stats).topSpeed[(carObj->stats).lap])) {
-      if (((carObj->carFlags & 8U) != 0) && (carObj->carInfo->carType < 0x13)) {
-        (carObj->stats).topSpeed[(carObj->stats).lap] =
-            Cars_topSpeedCap[carObj->carInfo->carType] - rand() * 3 <
-                    (carObj->linearVel_ch).z
-                ? Cars_topSpeedCap[carObj->carInfo->carType] - rand() * 3
-                : (carObj->linearVel_ch).z;
-      }
-      else {
+  int roadSlice;
+  int *piVar1;
+  int iVar2;
+  u_int uVar3;
+  int r1;
+  int iVar4;
+  int r2;
+  int iVar5;
+  int iVar6;
+  int r3;
+  int iVar7;
+  int r4;
+  int iVar8;
+  Stats_tPosition *pSVar9;
+  int j;
+  Stats_tPosition *pSVar10;
+  int i;
+  int currentTime;
+  int trackSlices;
+  
+  iVar5 = gNumSlices;
+  iVar6 = simGlobal.gameTicks;
+  if ((simGlobal.gameTicks & 1U) == 0) {
+    r2 = (carObj->stats).lap;
+    if ((r2 < 4) && ((carObj->stats).topSpeed[r2] < (carObj->linearVel_ch).z)) {
+      if (((carObj->carFlags & 8U) == 0) || (0x12 < carObj->carInfo->carType)) {
         (carObj->stats).topSpeed[(carObj->stats).lap] = (carObj->linearVel_ch).z;
       }
+      else {
+        iVar2 = rand();
+        iVar4 = (carObj->linearVel_ch).z;
+        if (Cars_topSpeedCap[carObj->carInfo->carType] + iVar2 * -3 < iVar4) {
+          iVar2 = rand();
+          iVar4 = Cars_topSpeedCap[carObj->carInfo->carType] + iVar2 * -3;
+        }
+        (carObj->stats).topSpeed[r2] = iVar4;
+      }
     }
-    if (((carObj->stats).lap != carObj->lap) &&
-        ((carObj->stats).finishType == 0)) {
-      if (((STATS_RACE_TYPE == RaceType_HotPursuit) || (STATS_RACE_TYPE == RaceType_Id5)) &&
+    iVar2 = (carObj->stats).lap;
+    if ((iVar2 != carObj->lap) && ((carObj->stats).finishType == 0)) {
+      if (((GameSetup_gData.raceType == 1) || (GameSetup_gData.raceType == 5)) &&
          (((Cars_gHumanRaceCarList[0]->carFlags & 0x200U) != 0 ||
           ((Cars_gNumHumanRaceCars == 2 && ((Cars_gHumanRaceCarList[1]->carFlags & 0x200U) != 0)))))
          ) {
-        (carObj->stats).time[(carObj->stats).lap] = 99999;
+        (carObj->stats).time[iVar2] = 99999;
       }
       else {
-        (carObj->stats).time[(carObj->stats).lap] =
-            currentTime - (carObj->stats).lapTime;
+        (carObj->stats).time[(carObj->stats).lap] = iVar6 - (carObj->stats).lapTime;
       }
-      (carObj->stats).lapTime = currentTime;
-      (carObj->stats).lap = carObj->lap;
-      if (((carObj->stats).lap == STATS_NUM_LAPS) &&
-         (((STATS_RACE_TYPE != RaceType_HotPursuit && (STATS_RACE_TYPE != RaceType_Id5)) ||
+      iVar2 = carObj->lap;
+      (carObj->stats).lapTime = iVar6;
+      (carObj->stats).lap = iVar2;
+      if ((iVar2 == GameSetup_gData.numLaps) &&
+         (((GameSetup_gData.raceType != 1 && (GameSetup_gData.raceType != 5)) ||
           (((Cars_gHumanRaceCarList[0]->carFlags & 0x200U) == 0 &&
            ((Cars_gNumHumanRaceCars != 2 || ((Cars_gHumanRaceCarList[1]->carFlags & 0x200U) == 0))))
           )))) {
+        (carObj->stats).sliceTime = iVar6;
         (carObj->stats).finishType = 2;
-        (carObj->stats).sliceTime = currentTime;
-        (carObj->stats).lapTime -= 0x200;
-        (carObj->stats).sliceTotal =
-            ((carObj->stats).lap + 1) * trackSlices;
+        (carObj->stats).lapTime = (carObj->stats).lapTime + -0x200;
+        (carObj->stats).sliceTotal = ((carObj->stats).lap + 1) * iVar5;
       }
     }
-    {
-      int roadSlice;
-
-      if (STATS_REVERSE_TRACK != 0) {
-        roadSlice = trackSlices - (carObj->N).simRoadInfo.slice - 1;
-      }
-      else {
-        roadSlice = (int)(carObj->N).simRoadInfo.slice;
-      }
-      if ((carObj->stats).slice != roadSlice) {
-        (carObj->stats).slice = roadSlice;
-        if ((carObj->stats).finishType == 0) {
-          (carObj->stats).sliceTime = currentTime;
-          (carObj->stats).sliceTotal =
-              ((carObj->stats).lap - carObj->unlap) * trackSlices +
-              (carObj->stats).slice;
-        }
-      }
+    if (GameSetup_gData.reverseTrack == 0) {
+      iVar2 = (int)(carObj->N).simRoadInfo.slice;
     }
-    {
-      int i;
-
-      for (i = 0; i < Cars_gNumRaceCars; i++) {
-        int sliceTotal = (carObj->stats).sliceTotal;
-        int raceSlice = Stats_racePosition[i].slice;
-
-        if ((raceSlice < sliceTotal) ||
-            ((sliceTotal == raceSlice) &&
-             ((carObj->stats).sliceTime < Stats_racePosition[i].sliceTime))) {
-          int j;
-
-          for (j = Cars_gNumRaceCars - 2; i <= j; j--) {
-            int r1;
-            int r2;
-            int r3;
-            int r4;
-
-            r1 = Stats_racePosition[j].car;
-            r2 = Stats_racePosition[j].slice;
-            r3 = Stats_racePosition[j].sliceTime;
-            r4 = Stats_racePosition[j].isHuman;
-            Stats_racePosition[j + 1].car = r1;
-            Stats_racePosition[j + 1].slice = r2;
-            Stats_racePosition[j + 1].sliceTime = r3;
-            Stats_racePosition[j + 1].isHuman = r4;
-          }
-          {
-            int r1;
-            int r2;
-            int r3;
-            int r4;
-
-            r1 = carObj->carIndex;
-            r2 = (carObj->stats).sliceTotal;
-            r3 = (carObj->stats).sliceTime;
-            r4 = carObj->carFlags & 4;
-            Stats_racePosition[i].car = r1;
-            Stats_racePosition[i].slice = r2;
-            Stats_racePosition[i].sliceTime = r3;
-            Stats_racePosition[i].isHuman = r4;
-          }
-          return;
+    else {
+      iVar2 = (iVar5 - (carObj->N).simRoadInfo.slice) + -1;
+    }
+    if (((carObj->stats).slice != iVar2) &&
+       ((carObj->stats).slice = iVar2, (carObj->stats).finishType == 0)) {
+      iVar2 = carObj->unlap;
+      (carObj->stats).sliceTime = iVar6;
+      (carObj->stats).sliceTotal = ((carObj->stats).lap - iVar2) * iVar5 + (carObj->stats).slice;
+    }
+    pSVar10 = Stats_racePosition;
+    for (iVar6 = 0; iVar6 < Cars_gNumRaceCars; iVar6 = iVar6 + 1) {
+      iVar5 = (carObj->stats).sliceTotal;
+      iVar2 = Cars_gNumRaceCars + -2;
+      if ((pSVar10->slice < iVar5) ||
+         ((iVar5 == pSVar10->slice && ((carObj->stats).sliceTime < pSVar10->sliceTime)))) {
+        pSVar9 = Stats_racePosition + iVar2;
+        iVar5 = iVar2 * 0x10 + 0x10;
+        for (; iVar6 <= iVar2; iVar2 = iVar2 + -1) {
+          piVar1 = &pSVar9->car;
+          iVar4 = pSVar9->slice;
+          iVar7 = pSVar9->sliceTime;
+          iVar8 = pSVar9->isHuman;
+          pSVar9 = pSVar9 + -1;
+          *(int *)((int)&Stats_racePosition[0].car + iVar5) = *piVar1;
+          *(int *)((int)&Stats_racePosition[0].slice + iVar5) = iVar4;
+          *(int *)((int)&Stats_racePosition[0].sliceTime + iVar5) = iVar7;
+          *(int *)((int)&Stats_racePosition[0].isHuman + iVar5) = iVar8;
+          iVar5 = iVar5 + -0x10;
         }
+        iVar6 = (carObj->stats).sliceTotal;
+        uVar3 = carObj->carFlags;
+        iVar5 = (carObj->stats).sliceTime;
+        pSVar10->car = carObj->carIndex;
+        pSVar10->slice = iVar6;
+        pSVar10->sliceTime = iVar5;
+        pSVar10->isHuman = uVar3 & 4;
+        return;
       }
+      pSVar10 = pSVar10 + 1;
     }
   }
   return;
@@ -246,703 +272,356 @@ void Stats_TrackStats(Car_tObj *carObj)
 
 /* ---- Stats_ExtrapolateOpponentTimes__Fi  [STATS.CPP:278-463] SLD-VERIFIED ---- */
 void Stats_ExtrapolateOpponentTimes(int type)
+
 {
-  int i;
   int j;
+  int startingTime;
+  int sliceTotal;
+  int m;
+  int *piVar1;
+  bool bVar2;
+  int iVar3;
+  int iVar4;
+  int averageLap;
+  int iVar5;
+  int iVar6;
+  int y;
+  Car_tObj *pCVar7;
+  int position;
+  int iVar8;
+  Car_tObj **ppCVar9;
+  int x;
   int extrapolatedTime;
+  Car_tObj **ppCVar10;
+  int i;
   int quick_finish;
-
-  quick_finish = Input_Interface(3,0) != 0;
-  for (i = 0; i < Cars_gNumHumanRaceCars; i++) {
-    if (Cars_gHumanRaceCarList[i]->stats.finishType != 2) {
-      int sliceTotal;
-      int startingTime;
-
-      sliceTotal = Cars_gHumanRaceCarList[i]->stats.sliceTotal;
-      if (sliceTotal < 1) {
-        sliceTotal = 1;
+  int iVar11;
+  
+  iVar3 = Input_Interface(3,0);
+  bVar2 = iVar3 != 0;
+  ppCVar10 = Cars_gHumanRaceCarList;
+  for (iVar3 = 0; iVar3 < Cars_gNumHumanRaceCars; iVar3 = iVar3 + 1) {
+    pCVar7 = *ppCVar10;
+    if ((pCVar7->stats).finishType != 2) {
+      iVar5 = (pCVar7->stats).sliceTotal;
+      if (iVar5 < 1) {
+        iVar5 = 1;
       }
-      startingTime = Cars_gHumanRaceCarList[i]->stats.sliceTime - 0x200;
-      if (sliceTotal < 100) {
-        startingTime = sliceTotal * 13;
+      iVar8 = (pCVar7->stats).sliceTime + -0x200;
+      if (iVar5 < 100) {
+        iVar8 = iVar5 * 0xd;
       }
-      extrapolatedTime =
-          startingTime * (gNumSlices * STATS_NUM_LAPS +
-                          Cars_gHumanRaceCarList[i]->stats.extractSlice) /
-          sliceTotal;
-      if (quick_finish) {
-        Cars_gHumanRaceCarList[i]->stats.lapTime = extrapolatedTime;
+      iVar8 = iVar8 * (gNumSlices * GameSetup_gData.numLaps + (pCVar7->stats).extractSlice);
+      iVar11 = iVar8 / iVar5;
+      if (iVar5 == 0) {
+        trap(0x1c00);
+      }
+      if ((iVar5 == -1) && (iVar8 == -0x80000000)) {
+        trap(0x1800);
+      }
+      if (bVar2) {
+        (pCVar7->stats).lapTime = iVar11;
       }
       else {
-        Cars_gHumanRaceCarList[i]->stats.lapTime = extrapolatedTime << 1;
+        (pCVar7->stats).lapTime = iVar11 << 1;
       }
-      if (STATS_RACE_TYPE != RaceType_Tournament) {
-        if (quick_finish) {
-          Cars_gHumanRaceCarList[i]->stats.finishType = 2;
+      if ((GameSetup_gData.raceType != 2) || (GameSetup_gData.localCar == iVar3)) {
+        if (bVar2) {
+          ((*ppCVar10)->stats).finishType = 2;
         }
         else {
-          Cars_gHumanRaceCarList[i]->stats.finishType = 1;
-        }
-      }
-      else if (STATS_LOCAL_CAR == i) {
-        if (quick_finish) {
-          Cars_gHumanRaceCarList[i]->stats.finishType = 2;
-        }
-        else {
-          Cars_gHumanRaceCarList[i]->stats.finishType = 1;
+          ((*ppCVar10)->stats).finishType = 1;
         }
       }
     }
-
     if (type == 1) {
-      if (STATS_RACE_TYPE != RaceType_Tournament) {
-        if (quick_finish) {
-          Cars_gHumanRaceCarList[i]->stats.finishType = 2;
-        }
-        else if (Cars_gHumanRaceCarList[i]->stats.finishType != 2) {
-          Cars_gHumanRaceCarList[i]->stats.finishType = 1;
-        }
-      }
-      else {
-        if ((Cars_gHumanRaceCarList[i]->stats.finishType != 2) &&
-            (STATS_LOCAL_CAR == i)) {
-          if (quick_finish) {
-            Cars_gHumanRaceCarList[i]->stats.finishType = 2;
+      if (GameSetup_gData.raceType == 2) {
+        pCVar7 = *ppCVar10;
+        if (((pCVar7->stats).finishType != 2) && (GameSetup_gData.localCar == iVar3)) {
+          if (bVar2) {
+            (pCVar7->stats).finishType = 2;
           }
           else {
-            Cars_gHumanRaceCarList[i]->stats.finishType = 1;
+            (pCVar7->stats).finishType = 1;
           }
         }
       }
-
-      Cars_gHumanRaceCarList[i]->stats.finalPosition =
-          Stats_GetPosition(Cars_gHumanRaceCarList[i]);
-      Cars_gHumanRaceCarList[i]->stats.finalTotalTime =
-          Cars_gHumanRaceCarList[i]->stats.lapTime;
-      for (j = 0; j < STATS_NUM_LAPS; j++) {
-        Cars_gHumanRaceCarList[i]->stats.finalLapTime[j] =
-            Cars_gHumanRaceCarList[i]->stats.time[j];
+      else if (bVar2) {
+        ((*ppCVar10)->stats).finishType = 2;
+      }
+      else if (((*ppCVar10)->stats).finishType != 2) {
+        ((*ppCVar10)->stats).finishType = 1;
+      }
+      iVar5 = Stats_GetPosition(*ppCVar10);
+      ((*ppCVar10)->stats).finalPosition = iVar5;
+      ((*ppCVar10)->stats).finalTotalTime = ((*ppCVar10)->stats).lapTime;
+      iVar5 = 0;
+      if (0 < GameSetup_gData.numLaps) {
+        do {
+          ((*ppCVar10)->stats).finalLapTime[iVar5] = ((*ppCVar10)->stats).time[iVar5];
+          iVar5 = iVar5 + 1;
+        } while (iVar5 < GameSetup_gData.numLaps);
       }
     }
-
-    Cars_gHumanRaceCarList[i]->stats.finalPosition =
-        Stats_GetPosition(Cars_gHumanRaceCarList[i]);
-    Cars_gHumanRaceCarList[i]->stats.finalPosition =
-        Stats_GetPosition(Cars_gHumanRaceCarList[i]);
-    Cars_gHumanRaceCarList[i]->stats.finalTotalTime =
-        Cars_gHumanRaceCarList[i]->stats.lapTime;
-    Cars_gHumanRaceCarList[i]->stats.finalFinishType =
-        Cars_gHumanRaceCarList[i]->stats.finishType;
-    Cars_gHumanRaceCarList[i]->stats.finalBestLap =
-        Cars_gHumanRaceCarList[i]->stats.time[0];
-    Cars_gHumanRaceCarList[i]->stats.finalNumWarnings =
-        Cars_gHumanRaceCarList[i]->stats.numWarnings;
-    Cars_gHumanRaceCarList[i]->stats.finalNumFines =
-        Cars_gHumanRaceCarList[i]->stats.numFines;
-    Cars_gHumanRaceCarList[i]->stats.finalNumArrests =
-        Cars_gHumanRaceCarList[i]->stats.numArrests;
-    Cars_gHumanRaceCarList[i]->stats.finalDamage = 0;
-    {
-      int m;
-      for (m = 0; m < 10; m++) {
-        Cars_gHumanRaceCarList[i]->stats.finalDamage +=
-            Cars_gHumanRaceCarList[i]->N.damage[m];
-      }
+    iVar5 = Stats_GetPosition(*ppCVar10);
+    ((*ppCVar10)->stats).finalPosition = iVar5;
+    iVar5 = Stats_GetPosition(*ppCVar10);
+    ((*ppCVar10)->stats).finalPosition = iVar5;
+    ((*ppCVar10)->stats).finalTotalTime = ((*ppCVar10)->stats).lapTime;
+    ((*ppCVar10)->stats).finalFinishType = ((*ppCVar10)->stats).finishType;
+    ((*ppCVar10)->stats).finalBestLap = ((*ppCVar10)->stats).time[0];
+    ((*ppCVar10)->stats).finalNumWarnings = ((*ppCVar10)->stats).numWarnings;
+    ((*ppCVar10)->stats).finalNumFines = ((*ppCVar10)->stats).numFines;
+    iVar5 = 0;
+    ((*ppCVar10)->stats).finalNumArrests = ((*ppCVar10)->stats).numArrests;
+    ((*ppCVar10)->stats).finalDamage = 0;
+    do {
+      pCVar7 = *ppCVar10;
+      piVar1 = (pCVar7->N).damage + iVar5;
+      iVar5 = iVar5 + 1;
+      (pCVar7->stats).finalDamage = (pCVar7->stats).finalDamage + *piVar1;
+    } while (iVar5 < 10);
+    iVar5 = 0;
+    if (0 < GameSetup_gData.numLaps) {
+      do {
+        ((*ppCVar10)->stats).finalLapTime[iVar5] = ((*ppCVar10)->stats).time[iVar5];
+        pCVar7 = *ppCVar10;
+        iVar8 = (pCVar7->stats).finalLapTime[iVar5];
+        if ((iVar8 < (pCVar7->stats).finalBestLap) && (iVar8 != 0)) {
+          (pCVar7->stats).finalBestLap = iVar8;
+        }
+        iVar5 = iVar5 + 1;
+      } while (iVar5 < GameSetup_gData.numLaps);
     }
-    for (j = 0; j < STATS_NUM_LAPS; j++) {
-      Cars_gHumanRaceCarList[i]->stats.finalLapTime[j] =
-          Cars_gHumanRaceCarList[i]->stats.time[j];
-      if ((Cars_gHumanRaceCarList[i]->stats.finalLapTime[j] <
-           Cars_gHumanRaceCarList[i]->stats.finalBestLap) &&
-          (Cars_gHumanRaceCarList[i]->stats.finalLapTime[j] != 0)) {
-        Cars_gHumanRaceCarList[i]->stats.finalBestLap =
-            Cars_gHumanRaceCarList[i]->stats.finalLapTime[j];
-      }
-    }
+    ppCVar10 = ppCVar10 + 1;
   }
-
-  for (i = 0; i < Cars_gNumAIRaceCars; i++) {
-    if (Cars_gAIRaceCarList[i]->stats.finishType != 2) {
-      int sliceTotal;
-      int startingTime;
-
-      sliceTotal = Cars_gAIRaceCarList[i]->stats.sliceTotal;
-      if (sliceTotal < 1) {
-        sliceTotal = 1;
+  ppCVar10 = Cars_gAIRaceCarList;
+  for (iVar3 = 0; iVar5 = Cars_gNumRaceCars, iVar3 < Cars_gNumAIRaceCars; iVar3 = iVar3 + 1) {
+    pCVar7 = *ppCVar10;
+    if ((pCVar7->stats).finishType != 2) {
+      iVar5 = (pCVar7->stats).sliceTotal;
+      if (iVar5 < 1) {
+        iVar5 = 1;
       }
-      startingTime = Cars_gAIRaceCarList[i]->stats.sliceTime - 0x200;
-      if (sliceTotal < 100) {
-        startingTime = sliceTotal * 13;
+      iVar8 = (pCVar7->stats).sliceTime + -0x200;
+      if (iVar5 < 100) {
+        iVar8 = iVar5 * 0xd;
       }
-      extrapolatedTime =
-          startingTime * (gNumSlices * STATS_NUM_LAPS +
-                          Cars_gAIRaceCarList[i]->stats.extractSlice) /
-          sliceTotal;
-      if (!quick_finish &&
-          (Cars_gHumanRaceCarList[0]->stats.finishType != 2)) {
-        Cars_gAIRaceCarList[i]->stats.lapTime =
-            extrapolatedTime +
-            STATS_NUM_LAPS * rand() / 0x80;
+      iVar8 = iVar8 * (gNumSlices * GameSetup_gData.numLaps + (pCVar7->stats).extractSlice);
+      iVar11 = iVar8 / iVar5;
+      if (iVar5 == 0) {
+        trap(0x1c00);
+      }
+      if ((iVar5 == -1) && (iVar8 == -0x80000000)) {
+        trap(0x1800);
+      }
+      if ((bVar2) || ((Cars_gHumanRaceCarList[0]->stats).finishType == 2)) {
+        ((*ppCVar10)->stats).lapTime = iVar11;
       }
       else {
-        Cars_gAIRaceCarList[i]->stats.lapTime = extrapolatedTime;
-      }
-      Cars_gAIRaceCarList[i]->stats.finishType = 2;
-    }
-
-    Cars_gAIRaceCarList[i]->stats.finalPosition =
-        Stats_GetPosition(Cars_gAIRaceCarList[i]);
-    Cars_gAIRaceCarList[i]->stats.finalTotalTime =
-        Cars_gAIRaceCarList[i]->stats.lapTime;
-    Cars_gAIRaceCarList[i]->stats.finalFinishType =
-        Cars_gAIRaceCarList[i]->stats.finishType;
-    Cars_gAIRaceCarList[i]->stats.finalNumArrests =
-        Cars_gAIRaceCarList[i]->stats.numArrests;
-    Cars_gAIRaceCarList[i]->stats.finalBestLap = 99999;
-    for (j = 0; j < STATS_NUM_LAPS; j++) {
-      if ((Cars_gAIRaceCarList[i]->stats.finalBestLap >
-           Cars_gAIRaceCarList[i]->stats.time[j]) &&
-          (Cars_gAIRaceCarList[i]->stats.time[j] > 0)) {
-        Cars_gAIRaceCarList[i]->stats.finalBestLap =
-            Cars_gAIRaceCarList[i]->stats.time[j];
-      }
-    }
-
-    {
-      int averageLap;
-
-      averageLap =
-          Cars_gAIRaceCarList[i]->stats.finalTotalTime /
-              STATS_NUM_LAPS -
-          rand() / 0x30;
-      if (averageLap < Cars_gAIRaceCarList[i]->stats.finalBestLap) {
-        Cars_gAIRaceCarList[i]->stats.finalBestLap = averageLap;
-      }
-    }
-
-    for (j = 0; j < STATS_NUM_LAPS; j++) {
-      Cars_gAIRaceCarList[i]->stats.finalLapTime[j] =
-          Cars_gAIRaceCarList[i]->stats.time[j];
-      if ((Cars_gAIRaceCarList[i]->stats.finalLapTime[j] <
-           Cars_gAIRaceCarList[i]->stats.finalBestLap) &&
-          (Cars_gAIRaceCarList[i]->stats.finalLapTime[j] != 0)) {
-        Cars_gAIRaceCarList[i]->stats.finalBestLap =
-            Cars_gAIRaceCarList[i]->stats.finalLapTime[j];
-      }
-    }
-  }
-
-  if (!quick_finish) {
-    for (int x = 0; x < Cars_gNumRaceCars; x++) {
-      int position = 1;
-
-      for (int y = 0; y < Cars_gNumRaceCars; y++) {
-        if (x != y) {
-          if ((Cars_gRaceCarList[x]->stats.finalTotalTime >
-               Cars_gRaceCarList[y]->stats.finalTotalTime) ||
-              ((Cars_gRaceCarList[x]->stats.finalTotalTime ==
-                Cars_gRaceCarList[y]->stats.finalTotalTime) &&
-               (y < x))) {
-            position++;
-            /* MATCH (reqdelta receipt): p772(position) refs 10->16 flips the
-             * a2/a3 handout vs the y-walk giv p839. Two depth-3 refs, 0 insns. */
-            __asm__("" : : "r"(position), "r"(position));
-          }
+        iVar5 = rand();
+        iVar5 = GameSetup_gData.numLaps * iVar5;
+        if (iVar5 < 0) {
+          iVar5 = iVar5 + 0x7f;
         }
+        ((*ppCVar10)->stats).lapTime = iVar11 + (iVar5 >> 7);
       }
-
-      Cars_gRaceCarList[x]->stats.finalPosition = position;
+      ((*ppCVar10)->stats).finishType = 2;
+    }
+    iVar5 = Stats_GetPosition(*ppCVar10);
+    ((*ppCVar10)->stats).finalPosition = iVar5;
+    ((*ppCVar10)->stats).finalTotalTime = ((*ppCVar10)->stats).lapTime;
+    ((*ppCVar10)->stats).finalFinishType = ((*ppCVar10)->stats).finishType;
+    ((*ppCVar10)->stats).finalNumArrests = ((*ppCVar10)->stats).numArrests;
+    ((*ppCVar10)->stats).finalBestLap = 99999;
+    iVar5 = 0;
+    if (0 < GameSetup_gData.numLaps) {
+      do {
+        pCVar7 = *ppCVar10;
+        iVar8 = (pCVar7->stats).time[iVar5];
+        if ((iVar8 < (pCVar7->stats).finalBestLap) && (0 < iVar8)) {
+          (pCVar7->stats).finalBestLap = iVar8;
+        }
+        iVar5 = iVar5 + 1;
+      } while (iVar5 < GameSetup_gData.numLaps);
+    }
+    iVar5 = rand();
+    pCVar7 = *ppCVar10;
+    iVar8 = (pCVar7->stats).finalTotalTime;
+    if (GameSetup_gData.numLaps == 0) {
+      trap(0x1c00);
+    }
+    if ((GameSetup_gData.numLaps == -1) && (iVar8 == -0x80000000)) {
+      trap(0x1800);
+    }
+    iVar5 = iVar8 / GameSetup_gData.numLaps - iVar5 / 0x30;
+    if (iVar5 < (pCVar7->stats).finalBestLap) {
+      (pCVar7->stats).finalBestLap = iVar5;
+    }
+    iVar5 = 0;
+    if (0 < GameSetup_gData.numLaps) {
+      do {
+        ((*ppCVar10)->stats).finalLapTime[iVar5] = ((*ppCVar10)->stats).time[iVar5];
+        pCVar7 = *ppCVar10;
+        iVar8 = (pCVar7->stats).finalLapTime[iVar5];
+        if ((iVar8 < (pCVar7->stats).finalBestLap) && (iVar8 != 0)) {
+          (pCVar7->stats).finalBestLap = iVar8;
+        }
+        iVar5 = iVar5 + 1;
+      } while (iVar5 < GameSetup_gData.numLaps);
+    }
+    ppCVar10 = ppCVar10 + 1;
+  }
+  iVar3 = 0;
+  if (!bVar2) {
+    ppCVar10 = Cars_gRaceCarList;
+    for (; iVar8 = 1, iVar3 < iVar5; iVar3 = iVar3 + 1) {
+      iVar11 = 0;
+      ppCVar9 = Cars_gRaceCarList;
+      if (0 < iVar5) {
+        do {
+          if (iVar3 != iVar11) {
+            iVar6 = ((*ppCVar10)->stats).finalTotalTime;
+            iVar4 = ((*ppCVar9)->stats).finalTotalTime;
+            if ((iVar4 < iVar6) || ((iVar6 == iVar4 && (iVar11 < iVar3)))) {
+              iVar8 = iVar8 + 1;
+            }
+          }
+          iVar11 = iVar11 + 1;
+          ppCVar9 = ppCVar9 + 1;
+        } while (iVar11 < Cars_gNumRaceCars);
+      }
+      pCVar7 = *ppCVar10;
+      ppCVar10 = ppCVar10 + 1;
+      (pCVar7->stats).finalPosition = iVar8;
     }
   }
+  return;
 }
 
-/* ---- Stats_TrackEndGame__Fv  [STATS.CPP:470-550] SLD-VERIFIED ----
-   W57-A12 05A(SLD)+rule-8(SYM 8c) pass: 113 -> 80 diffs (231 -> 226 insns / oracle 232).
-   SYM 8c @800b8db8 (fsize 72, mask $c0ff0000 = s0-s7+fp+ra) local list, block by block:
-     fn scope : i (REG $6=$a2), Stats_PlayersFinishedRace (AUTO -0x38 = 16(sp))
-     line 11  : trackSlices (REG $5=$a1)
-     line 14  : PlayerSlice (AUTO -0x34 = 20(sp)), PlayerPosition (REG $0x15=$s5),
-                DesiredComparison (REG $0x12=$s2), DesiredSlice (REG $0x17=$s7),
-                DesiredSpeed (REG $0x14=$s4)
-     line 31  : j (REG $0x11=$s1)
-   Applied: (a) the invented `Car_tObj **raceCar` walk local is NOT in the SYM -> dropped; the
-   oracle's `addiu s0,s0,4` is gcc's own GIV off `Cars_gRaceCarList[j]`, and the SURVIVING
-   `sll s6,s1,2` index proves the source used the INDEX form (06A eliminated-biv tell).
-   (b) SLD 492-497 is a three-arm if/else-if/else (`li s2,1` carries its own line 495), not
-   default+override. (c) SLD 485 and 505 are each ONE statement = a MIN ternary (the oracle
-   assigns the result in BOTH arms from a temp). (d) SLD 507 is ONE statement = abs()>>16 over
-   the index form -> __builtin_abs. (e) SLD 500/512 = TOP test + UNCONDITIONAL `j` back-edge ->
-   exit-in-the-middle while(1)/break (a `for` lets gcc prove entry and rotate; measured 97 vs 80).
-   W59-A14: 80 -> 44 diffs, INSN COUNT NOW EXACT 232/232, and the W57-A12 "PlayerSlice is an
-   allocator SPILL choice" verdict is REFUTED -- PlayerSlice now spills to 20(sp) by itself.
-   ROOT CAUSE of the whole 6-insn gap was ONE over-CSE: gcc merged the abs arm's
-   `Cars_gRaceCarList[j]` with the sliceTotal read above it (ours `lw v0,1056(a0)`, 1 insn, vs
-   retail's 5-insn base+index rematerialization), so our build had ONE FEWER global allocno
-   than retail -- and that spare callee-saved register is exactly what PlayerSlice took.
-   (f) THE UN-MERGE DEVICE = an IDENTITY FENCE on the index at the LOOP-BODY TOP
-   (`jj = j; __asm__("" : "=r"(jj) : "0"(jj));` then index with `jj`): laundering j makes the
-   arm's address cse-opaque AND loop.c-opaque, so it materializes base+scaled-index like retail
-   and adds the missing allocno. Placement is the dial: the SAME fence INSIDE the arm scores 82
-   (the `sll` then sits in the arm, not the loop head).
-   (g) SLD 485 (the FIRST min) is an OVERRIDE, not a ternary: `PlayerSlice = trackSlices;
-   if (trackSlices >= sliceTotal) PlayerSlice = sliceTotal;` -- that puts the then-store in the
-   `bnez` delay slot and both stores on the slot, exactly like retail (54 -> 44).
-   FALSIFIED here (do not retry): cast-int address arithmetic on the abs (folds back, 80);
-   `Car_tObj *volatile *` view (breaks the load cse but keeps the WALKER address, 66/228);
-   arm-swap `if (PlayerPosition != 1)` polarity (109, trackSlices leaves $a1); the same
-   override shape on the SECOND min at SLD 505 (115, frame grows to 80); a named `sliceTot`
-   temp for the second min (coalesced, diff-neutral 44); `jj = j << 2` + cast-int address
-   (150-154, frame grows to 80 -- the scaled launder costs a whole extra allocno);
-   swapping the `DesiredSlice = 0 / DesiredSpeed = 0` order (54); moving the identity fence
-   from the loop-body TOP down into the matched `if` block (65, and ours goes 1 insn short).
-   RESIDUAL (44) = a PRICED 4-way callee-saved permutation, allocsim MATCH 31/31 (model valid):
-     ours   p101 PlayerPosition=s4  p103 DesiredSlice=s5  p104 DesiredSpeed=s6  p130 jj=s7
-     retail p104 DesiredSpeed=s4    p101 PlayerPosition=s5 p130 temp=s6         p103 DesiredSlice=s7
-   REQUIRED DELTA (verified by allocsim --what-if, no SINGLE-pseudo dial exists at +-40):
-     p101 live 28 -> 29  AND  p103 live 41 -> 43   (equivalently p103 refs 13 -> 12)
-   i.e. two ZERO-INSN dials at once; every fence that buys refs also buys the wrong priority
-   step here (p130 refs 5->6 jumps pri to 1.09 and steals $s3). Next lever = a live-range-only
-   dial (def moved one insn earlier / last use one insn later) on PlayerPosition + one weighted
-   ref removed from DesiredSlice. Dumps: scratch/rtl/stats.i.{greg,lreg}.
-
-   W62-A12 (2026-08-15) -- QUANTIFIED HARDNESS CERTIFICATE (12A form).  Re-gated 44.
-   Pseudo numbering has drifted +6 since W59-A14: PlayerPosition=p107(refs 9,live 29),
-   DesiredSlice=p109(13,42), DesiredSpeed=p110(13,42), jj=p136(5,11), and the s3 holder
-   p305(19,80).  allocsim MATCH 30/30 (model valid).  RETAIL'S HANDOUT IS EXACTLY
-   REACHED at p110=(refs 14,live 45) or (15,48) with p109 demoted below p136 --
-   verified by allocsim --what-if, which prints the full retail band
-   p305=s3 p110=s4 p107=s5 p136=s6 p109=s7.  So the target is a SINGLE CELL, and:
-     * p110 CANNOT stay at refs 13.  Its window is (pri p107, pri p305) =
-       (0.9310, 0.9500); 39/41=0.9512 and 39/42=0.9286 straddle it, no integer live
-       exists.  A refs change is mandatory.
-     * every ref this function can buy is worth TWO (loop depth), measured not
-       assumed: one read-only fence OPERAND on DesiredSpeed moves refs 13 -> 15.
-       refs 14 is therefore UNREACHABLE from inside the i-loop.
-     * so the only cell left is refs 15 / live 48, and EVERY statement boundary in
-       the guard block was measured: fence before the guard 43, then-arm head 43,
-       after the divide 44, then-arm tail 46, else-arm head 43, else-arm tail 47,
-       loop tail 50-51.  48 is not on the list.
-     * and each fence is an RTL insn: it lengthens p305 (80->81->82), dropping the
-       s3 holder's priority to 0.9382 then 0.9268 and closing the window further.
-   MEASURED THIS WAVE (all real gate runs, all restored):
-     DesiredSlice fence at the loop tail alone (p109 -> s7, correct!) ....... 58 @232
-     + DesiredSpeed operand, 5 positions ................................. 58-62 @232-234
-     2-operand single fence at the tail ................................... 58 @232
-     second-min as a two-store override + named temp (the retail SHAPE, 11D
-       joint-pair re-test of two individually-falsified axes) ............ 115 @229
-     same without braces 115 @229; opposite polarity 44; named temp + ternary 44;
-     named temp + if/else both-arms 45 @233
-     SCALED identity launder `jj = j << 2` with the abs read as
-       `*(Car_tObj **)(jj + (int)Cars_gRaceCarList)` -- NOTE this now holds the
-       count EXACT (232/232, the W59 "frame grows to 80" note is stale) but 150;
-       base-term-first 150; raw byte-offset field 156; joint with the override 91 @229.
-   ORACLE FACTS worth keeping (read off the sbs, they constrain any future attempt):
-   retail's s6 holds `j << 2` (`sll s6,s1,2` in the loop-guard's delay slot) and
-   rematerializes the Cars_gRaceCarList base per use (`lui t5` in the `beq` slot,
-   then `addiu t5,t5 ; addu v0,s6,t5`); retail's second min loads sliceTotal into a
-   TEMP ($v1) and stores the result TWICE (`addu s7,a1,zero` in the `bnez` slot,
-   `addu s7,v1,zero` on the fall-through), where ours loads straight into the result
-   register and stores once.
-   ROUTE: not a fence dial -- the cell is closed.  Either a structural change that
-   moves DesiredSpeed's live range by 3 WITHOUT adding an insn, or the 06E
-   local-alloc/qtytrace instrument.  Do not spend more fence positions.
-
-   🔴 W64-A15 (2026-08-15) -- THE W62 CERTIFICATE IS CORRECT BUT AIMED AT THE WRONG
-   PSEUDO.  W62 proved only that *DesiredSpeed's* cell is empty; it never enumerated
-   the OTHER band members.  A complete two-pseudo sweep over the band
-   (scratchpad/w64a15/statscells.py -- allocsim/reqdelta directly; multidial's
-   --search is greedy AND refs-only, so it cannot see a live-only pair) finds
-   **180 solution cells**, and every cheap one is on PlayerPosition + DesiredSlice,
-   not DesiredSpeed.  Current numbering (re-dumped, drifted BACK to the W59 set):
-     p285=s3 (19,78)  p101=PlayerPosition=s4 (9,28)  p103=DesiredSlice=s5 (13,41)
-     p104=DesiredSpeed=s6 (13,41)  p130=jj=s7 (5,11)   want p104=s4 p101=s5 p130=s6 p103=s7
-   SOLO cells: NONE (confirmed by exhaustive single-pseudo sweep, refs +-4 x live -6..+8).
-   CHEAPEST PAIRS (cost = 2*|dRefs| + |dLive|):
-     cost 3   p101 live +1  AND  p103 refs -1
-     cost 3   p101 live +1  AND  p103 live +2
-     cost 4   p101 live +1  AND  p103 refs -1 live +-1
-     cost 8   p103 refs -1  AND  p104 live -4          (the only pair NOT touching p101)
-   `p101 live +1` appears in every cell under cost 8 -- it is effectively mandatory,
-   and it is a razor (live 30 already breaks the band: p101 falls under p130).
-   MEASURED (each a real gate run + a fresh -dl/-dg dump, all restored):
-     (1) FOREIGN-OPERAND FENCE, zero-insn, aimed at p101's live range --
-         `__asm__("" : : "r"(trackSlices));` immediately after PlayerPosition's def
-         (operand chosen OUTSIDE the band so no band ref moves):
-           gate 52 @232/232 (COUNT STAYS EXACT), and the handout becomes
-           p103=s3(13,40) p104=s4(13,40) p285=s5(19,79) p130=s6(5,11) p101=s7(9,31)
-         => **p104=s4 and p130=s6 are now RETAIL-CORRECT (2 of 4, was 0 of 4).**
-         🔴 AND THE 15A "+1 live for everything live across it" MODEL IS WRONG HERE:
-         measured deltas are p101 +3, p103 -1, p104 -1, p285 +1 -- the fence RE-TIMES
-         several ranges, it does not uniformly lengthen them.  Any future live dial on
-         this fn must be re-measured from the dump, never predicted from the +1 rule.
-     (2) second-min through a fenced `sliceTot` temp (to buy p103 refs -1):
-         153 @233 -- the identity fence MATERIALIZES here (+1 insn), so it is not a
-         zero-cost ref dial at this site.  Paired with (1): 157 @233.
-   NOT LANDED (52/153/157 all > 44).  ROUTE, sharpened: from the (1) basin the
-   remaining question is only `p101 live 31 -> 29` and `p103 below p130`, with p285
-   restored above p104 -- i.e. re-run statscells.py ON THE (1) DUMP (the cell table is
-   basin-relative, 04Z) and look for a fence POSITION whose measured re-timing lands
-   that cell.  Do NOT go back to DesiredSpeed: its cell really is closed.
-
-   ===== W71-A22 (2026-08-21).  Re-gated 44 @232/232.  Fresh -dl/-dg dump: the
-   numbering is UNCHANGED from W64-A15 (p285=s3 19/78, p101=s4 9/28, p103=s5 13/41,
-   p104=s6 13/41, p130=s7 5/11) and allocsim still MATCHes.  reqdelta on the full
-   want `p104=s4,p101=s5,p130=s6,p103=s7`: no single-pseudo dial at +-40 and no
-   same-pseudo refs+live pair -- W64-A15's two-PSEUDO cell table stands.
-   THE CELL ARITHMETIC, written out so nobody re-derives it:
-     p101 live 28->29 -> pri 27/29 = 0.9310 ; p103 refs 13->12 -> pri 36/41 = 0.8780
-     gives the order p285 .9743 > p104 .9512 > p101 .9310 > p130 .9090 > p103 .8780
-     = s3 s4 s5 s6 s7 = EXACTLY retail's band.
-   🔴 LAW CORRECTION (gcc source, not inference) -- the W62 premise
-   "every ref this function can buy is worth TWO (loop depth)" is FALSE HERE:
-   flow.c:1969/2218/2404/2616 do `REG_N_REFS (regno) += loop_depth`, and
-   find_basic_blocks starts `depth = 1` (flow.c:402), so a ref costs
-   1 outside any loop, 2 in the i-loop, and **3 in the inner j-loop**.  A +-1 ref
-   delta on p103 IS therefore constructible -- trade ONE j-loop (depth-3) ref for
-   ONE i-loop (depth-2) ref.  MEASURED construction: assign DesiredSlice ONCE in
-   the j-loop through a temp (-3) + a read-only fence operand on DesiredSlice at
-   i-loop level (+2) = refs 12.  It reaches the ref cell and STILL fails, because
-   the temp-min form drops the insn count to 230 (SA/SB 76@230, SC/SD 92@230).
-   So the blocker is not the ref arithmetic; it is that no spelling holds 232
-   while giving DesiredSlice one fewer weighted ref.
-   🏆 NEW BEST BASIN, NAMED AND MEASURED (not landed -- see why):
-     a ZERO-OPERAND fence placed IMMEDIATELY AFTER the second-min statement,
-     `__asm__("" : : "i"(0));`, gates **25 @233** and pulls p285/p101/p104 onto
-     retail's s3/s4/s5 -- 19 of the 44 diffs gone in one line.  An identity
-     launder on DesiredComparison at the same point measures IDENTICALLY (25@233),
-     so the effect is NOT the barrier property (20B): it is the extra RTL insn's
-     re-timing of the band.
-     RESIDUAL IN THE 25-BASIN = exactly three things: (a) DesiredSlice s6 vs
-     retail s7 swapped with the jj carrier; (b) retail's carrier holds `j << 2`
-     (`sll s6,s1,2`) where ours holds `j`; (c) the +1 insn is the second min's
-     `beqz` DELAY-SLOT NOP -- retail fills it with the DEFAULT store of an
-     override (`bnez ...; addu s7,a1,zero` then `addu s7,v1,zero`).
-     🔴 NOT LANDED: 233 vs the oracle's 232.  Count-exactness is the stronger
-     invariant (the project rejects lower-diff/count-inexact forms), and the
-     baseline is count-EXACT.  The 25-basin's remaining ask is precise: keep this
-     allocation AND get the min's default store into the branch slot without
-     losing the two stores.
-   FALSIFIED THIS WAVE (every one a real gate run, all restored):
-     temp-min (assign DesiredSlice once) 76@230; the same with a sliceTot temp
-     76@230; either + an i-loop DesiredSlice fence 92@230; that fence alone
-     62@232; a read-only fence on PlayerSlice right after PlayerPosition's def
-     125@233; all three together 77@231.
-     Retail-shaped OVERRIDE for the second min, four spellings (temp/plain/
-     `>=`/`<=`), each with AND without the 25-basin fence: 115@229 without,
-     81@231 with -- gcc merges the two stores in every one, so the override
-     cannot be reached from source in either basin.  Swapped-operand ternary
-     (`sliceTotal < trackSlices ? sliceTotal : trackSlices`) 81@231.
-     Foreign-operand fence POSITION sweep (operand `trackSlices`, 6 positions):
-     j-loop head 45@233, after-min 25@233, before-break 56@232, after-j++ 47@233,
-     after-the-j-block 62@232, after `DesiredSlice = 0` 64@232.
-     OPERAND sweep at the winning after-min position: i 105@231, j 55@233,
-     jj 71@233, PlayerSlice 104@234, DesiredComparison 25@233, PlayerPosition
-     63@233, DesiredSlice 63@233, `"i"(0)` 25@233.
-     In the 25-basin: SCALED carrier `jj = j << 2` + cast-int address, index-first
-     151@233 and base-first 151@233; dropping the carrier entirely 81@227;
-     a second fence 140@234.
-
-   ===== W72-A13 (2026-08-22).  Re-gated 44 @232/232 -- KEPT.  A NEW, BETTER-SHAPED
-   basin was found and the count question is now DIAGNOSED rather than guessed.
-   🏆 THE SECOND MIN IS REACHABLE WITHOUT ANY FENCE -- 19 @233, six better than W71's
-   25@233 and it needs no `"i"(0)` scaffolding.  Spell the FALSE ARM's read through a
-   volatile view (either arm read or the compare read works, both measure 19@233):
-       DesiredSlice = trackSlices < Cars_gRaceCarList[j]->stats.sliceTotal ?
-                      trackSlices :
-                      *(volatile int *)&Cars_gRaceCarList[j]->stats.sliceTotal;
-   That reproduces retail's min BYTE-FOR-BYTE, including the branch polarity and the
-   delay-slot store the whole W59..W71 stack was chasing:
-       bnez v0,T / addu s7,a1,zero [slot] / addu s7,v1,zero
-   MECHANISM (measured, not inferred): retail loads sliceTotal into a CALLER-SAVED temp
-   ($v1) and then COPIES it into DesiredSlice; ours expands the COND_EXPR's false arm
-   DIRECTLY INTO THE TARGET (`lw s5,848(v0)` where s5 IS DesiredSlice), so there is no
-   copy to keep and the true arm's store is the only one left.  The volatile view makes
-   the arm read un-mergeable with the target, so both stores exist.
-   🔴 WHY IT IS STILL NOT LANDED, and this is the real finding: **the kept 44 basin is
-   count-exact only because TWO ERRORS CANCEL.**  Ours is (-1) one store short at the
-   min AND (+1) one instruction long in the abs arm: retail parks `j << 2` in the
-   loop-guard's delay slot (`sll s6,s1,2`) and therefore has the `%hi` of
-   Cars_gRaceCarList free to fill the `beq PlayerPosition==1` slot (`lui t5,0`), so its
-   arm is `addiu t5,t5,0 / addu v0,s6,t5 / lw / lw`; ours puts the `sll` in the guard
-   slot and pays `lui / addiu / addu / lw / lw`.  Fixing the min alone therefore ALWAYS
-   lands 233.  ⇒ the two halves must be landed TOGETHER, and the open half is precisely
-   "get `j << 2` into the loop-guard delay slot without the cast-int address penalty".
-   MEASURED THIS WAVE (every one a real gate run, all restored; `V` = the volatile-view
-   min above):
-     V (compare-read volatile) 19@233 . V (arm-read volatile) 19@233 (bit-identical) .
-     V + scaled carrier `jj = j<<2` + cast-int address, index-first 151@233, base-first
-     151@233, char*-base 151@233 . V + `(int)base + (jj<<2)` (unscaled jj) 19@233
-     BIT-IDENTICAL (fold rebuilds the ARRAY_REF -- the cast-int lever cannot reach this
-     site) . V without the jj launder 93@233 . V + launder moved inside the matched
-     guard 76@232 . launder-inside-the-guard alone 65@231 .
-     V + the W71 `"i"(0)` fence 130@234 (the two devices are ANTAGONISTIC -- do not
-     stack them) .
-     20B ZERO-INSN HARD-REG CLOBBER on a `sliceTot` temp
-     (`__asm__("" : "=r"(t) : "0"(t) : "$21"/"$22"/"$23")`): 70/64/64, all COUNT-EXACT
-     232 -- it moves DesiredSlice's HOME (s5 -> s3) but does NOT split the load from it,
-     which PROVES the merge is not a global_alloc copy-preference (20B's target) but an
-     EXPAND-time store-into-target.  Read-only clobber fences on the same temp
-     206-210@234.
-     Plain `sliceTot` temp + ternary 44 (bit-identical to base); the same with a
-     volatile LOAD into the temp 44 (bit-identical) -- a temp cannot reach it, only a
-     volatile at the USE site can.  Read-only fence on the temp after the ternary
-     120@234, before it 126@234.  Override spellings re-confirmed: plain 115@229,
-     `>=` 115@229, through a temp 115@229, swapped-operand ternary 115@229.
-
-   🏆 ===== W74-A8 (2026-08-23) -- 44 -> 12, COUNT STILL EXACT 232/232.  THE TWO
-   HALVES W72-A13 SAID "MUST LAND TOGETHER" ARE NOW BOTH LANDED.
-   Half 1 = W72-A13's volatile-view min, kept verbatim (it is what reproduces
-     retail's `bnez / addu s7,a1,zero [slot] / addu s7,v1,zero` two-store shape).
-   Half 2 = THE `jj` IDENTITY LAUNDER IS THE +1 INSN.  W72-A13 named the open half
-     as "get `j << 2` into the loop-guard delay slot"; the RTL says the slot was
-     never free: our launder MATERIALISES `jj = j` as `addu s7,s1,zero`, and that
-     copy is exactly what sits in retail's `sll s6,s1,2` slot.  Delete the carrier
-     and the slot frees itself.
-   THE REPLACEMENT UN-MERGE DEVICE = a ZERO-INSN 'm'-OPERAND FENCE (catalog 21A-5)
-     on the ARRAY ELEMENT, placed inside the `PlayerPosition == 1` arm:
-         __asm__("" : : "m"(Cars_gRaceCarList[j]));
-     It buys refs on the element's ADDRESS (the %hi pseudo) without adding an insn
-     and without a carrier pseudo, so the arm still rematerializes base+scaled-index
-     like retail while the guard slot keeps the `sll`.  This retires the whole
-     W59(f)/W62/W71/W72 "scaled carrier" line of attack (`jj = j << 2` + every
-     cast-int address spelling measured 150-156; they were all paying for a carrier
-     that should not exist).
-   RESULT (re-gated twice): 12 @232/232.  Everything outside a 4-instruction window
-   is byte-exact, INCLUDING retail's `sll s6,s1,2` in the loop-guard slot, the
-   `lui t5,0` in the `beq PlayerPosition==1` slot, the two-store min, and the whole
-   s3/s4/s5/s6/s7 callee-saved band (the W59..W71 "priced 4-way permutation" is
-   GONE -- it was a symptom of the carrier, not an allocator cell).
-   RESIDUAL 12 = 4 instructions, all one cause -- the min's false arm RE-LOADS
-   where retail COPIES a register:
-        ours   lw a0,0(s0) / lw v0,848(a0) / slt v0,a1,v0 / ... / lw s7,848(a0)
-        retail lw v0,0(s0) / lw v1,848(v0) / slt v0,a1,v1 / ... / addu s7,v1,zero
-   The `volatile` at the false-arm use site is what forbids the merge into the
-   target, and it also forbids sharing ONE load with the compare; retail reads
-   sliceTotal ONCE into a caller-saved temp ($v1) that survives the `slt` (which
-   reuses $v0).  The two register renames (a0-vs-v0, v0-vs-v1) are downstream of
-   the base pointer having to stay live for that second load.
-   MEASURED THIS WAVE (every one a real gate run, all restored unless landed):
-     V + 'm'-fence in the arm ......................... 12 @232/232  [LANDED]
-     V + 'm'-fence in the arm, compare-read volatile ... 12 @232/232 (identical)
-     V + laundered POINTER carrier inside the arm ...... 12 @232/232 (equivalent;
-        `Car_tObj **q = &Cars_gRaceCarList[j]; launder(q); q[0]->...`)
-     V + `jj` launder (the old body) ................... 19 @233/232
-     V + laundered pointer carrier at the LOOP TOP ..... 166 @234
-     V + pointer carrier before the min ................ 45 @229
-     V + 'm'-fence at the LOOP TOP ..................... 93 @233
-     V + `jj` launder + 'm'-fence (stacked) ............ 157 @239  (antagonistic)
-     V alone, no un-merge device ....................... 93 @233
-     launder `j` IN PLACE (no carrier, no copy): with V 72 @228, plain 103 @227,
-        after the GetPosition call 195 @227 / 178 @226 -- an in-place launder does
-        NOT un-merge (same pseudo feeds both reads).
-     PLAIN min + 'm'-fence ............................. 76 @226  (6 SHORT: the
-        volatile in the min is also what forces the arm's base rematerialization)
-     temp-min spellings re-priced FROM THIS BASIN (04Z): plain temp + 'm' 81 @227,
-        volatile-read temp + 'm' 81 @227, temp + read-only fence after the ternary
-        81 @227, temp + launder 76 @226, temp + 'm'-fence + fence 70 @228,
-        volatile override 95-99 @223.
-     arm base through a `Car_tObj *volatile *` view: with a plain min 70 @228,
-        with a temp min 70 @228, +fence 63-75 @229, with V 12 @232 (== T4, the
-        volatile base view is then redundant).
-   ROUTE for the last 12: a SINGLE non-volatile read of sliceTotal whose temp does
-   NOT coalesce into DesiredSlice (gcc expands a COND_EXPR arm straight into the
-   target -- W72-A13's mechanism), while still denying the arm's base merge.  Every
-   temp/fence/launder spelling tried loses the 6-insn base rematerialization with
-   it, so the two properties are currently carried by the SAME volatile.  Next
-   instruments: a base un-merge that is independent of the min statement (an 'm'
-   fence that actually reaches the arm's address without the volatile -- measured
-   ineffective alone here), or the 06E local-alloc/qtytrace lane.
-
-   ===== W75-A10 (2026-08-23).  Re-gated 12 @232/232 -- KEPT (nothing landed).
-   The W74 route was run to its end; the result is a QUANTIFIED BOUNDARY plus one
-   new law.
-   NEW DIAGNOSTIC -- with the min's volatile removed the build is 76 @226, and the
-   SIX missing instructions are now enumerated off the sbs instead of guessed:
-     -4  the abs arm's INDEX-FORM base rematerialization.  retail
-         `addiu t5,t5,0 / addu v0,s6,t5 / lw v0,0(v0) / nop / lw v0,1056(v0)`;
-         ours collapses to ONE `lw v0,1056(v1)` re-using the min's own element
-         pointer.
-     -1  the min's SECOND store.  Without the volatile gcc uses the TARGET as the
-         compare temp -- `lw s3,848(v1) / slt v0,a1,s3 / beqz / addu s3,a1,zero`
-         -- one load, one store, no copy (W72-A13's expand-into-target, sharpened:
-         it is not only the arm that expands into the target, the COMPARE reads
-         through it too).
-     -1  the `lui t5,0` retail parks in the `beq PlayerPosition==1` delay slot.
-   and the ENTIRE s3/s4/s5/s6/s7/fp band rotates with them (PlayerSlice stops
-   spilling to 20(sp)).  So the volatile is not one of two carriers -- it carries
-   the whole basin.
-   EVERY ALTERNATIVE UN-MERGE DEVICE LANDS ON THE SAME 228 PLATEAU (4 short, band
-   rotated).  MEASURED THIS WAVE (every one a real gate run, all restored):
-     plain min ............................................... 76 @226
-     plain-temp min .......................................... 76 @226
-     plain-temp + `"memory"` clobber at the abs-arm head ...... 78 @228
-     plain-temp + `"memory"` right after the min .............. 65 @229
-     plain-temp + `"memory"` after the min, 'm'-fence deleted . 79 @229
-     plain min + `"memory"` at the arm head + 'm'-fence ....... 78 @228
-     plain min + volatile ELEMENT view in the abs arm ......... 78 @228
-     plain min + both ........................................ 78 @228
-     volatile ELEMENT view INSIDE the min (`Car_tObj *car =
-       *(Car_tObj *volatile *)&Cars_gRaceCarList[j];`) ........ 78 @228
-     the same through a `Car_tObj *volatile *slot` local ...... 78 @228
-     compare-read volatile + plain false arm ................. 100 @236
-     temp + 20B tied launder with "$23" / "$22" clobber ....... 72 @226
-     temp + read-only fence with "$23" ....................... 69 @227
-     temp + read-only fence with "$23","$22","$21","$20" ..... 107 @227
-   *** NEW LAW (why the plateau exists): the volatile at the sliceTotal USE SITE is
-   the ONLY device that produces the abs arm's INDEX form.  A `"memory"` clobber
-   or a volatile ELEMENT view does force the arm to RE-LOAD the element, but it
-   re-loads through the loop's GIV WALKER (`lw v0,0(s0)`), never through
-   `(j<<2) + base`.  Only an unmovable volatile MEM at the min's use site stops
-   loop.c strength-reducing that second address into the walker -- and only then
-   does the 'm'-fence (21A-5) have a %hi pseudo to dial.  This retires the whole
-   "find another un-merge device" line of attack.
-   DEVICE-REMOVAL RE-TEST (23B-3, run as asked): dropping the 'm'-fence from the
-   shipped basin is W74's 93 @233; dropping the volatile is 76 @226.  Neither
-   device is redundant -- both are load-bearing.
-   => THE OPEN ASK IS NOW SINGULAR: force the ABS ARM's element address into the
-   INDEX form while the min is PLAIN.  Cast-int spellings cannot (fold rebuilds
-   the ARRAY_REF, W72-A13), so the lever is loop.c-side -- an index expression
-   loop.c cannot strength-reduce (a non-BIV-derived index), or the 06E
-   local-alloc/qtytrace lane run on the 228 dump. */
-/* MATCH (W77-root): PASS 232/232, from the authoritative 12-diff baseline.
-   The measured basin path was 12 -> 75 -> 34 -> 29 -> 10 -> 6 -> 3 -> PASS.
-   Retail's second min is reconstructed by the narrow source-ASM block below;
-   it forces the proven v0/v1 load/compare carriers without any post-compile
-   modification.  PlayerPosition=s5, DesiredSlice=s7, and raceIndex=s6 follow
-   the IDA/SYM homes.  The in-place raceIndex launder prevents loop.c from
-   collapsing the abs arm back to the s0 walker; splitting raceCar and keeping
-   raceIndex live through its load lets reorg steal the address lui into the
-   conditional branch delay slot.  Finally, keeping DesiredSlice live after the
-   checkpoint store prevents destructive s7 coalescing and mints retail's v1
-   subtraction. */
+/* ---- Stats_TrackEndGame__Fv  [STATS.CPP:470-550] SLD-VERIFIED ---- */
 void Stats_TrackEndGame(void)
 
 {
+  int iVar1;
+  int iVar2;
+  int iVar3;
+  int r1;
+  int iVar4;
+  int averageLap;
+  Car_tObj *pCVar5;
+  int y;
+  int trackSlices;
+  int startingTime;
   int i;
+  int iVar6;
+  int carindex;
+  int x;
+  int extrapolatedTime;
+  Car_tObj **ppCVar7;
+  int j;
+  int iVar8;
+  int DesiredComparison;
+  int iVar9;
+  int quick_finish;
+  Car_tObj **ppCVar10;
+  int DesiredSpeed;
+  int PlayerPosition;
+  int DesiredSlice;
+  int iVar11;
   int Stats_PlayersFinishedRace;
-
+  int PlayerSlice;
+  
   Stats_PlayersFinishedRace = 0;
-  if (Cars_gNumRaceCars > 1) {
-    if ((STATS_GAME_TICKS % 64) == 1) {
-      int trackSlices;
-
-      trackSlices = STATS_NUM_LAPS * gNumSlices;
-      for (i = 0; i < Cars_gNumHumanRaceCars; i++) {
-        int PlayerSlice;
-        register int PlayerPosition asm("$21");
-        int DesiredComparison;
-        register int DesiredSlice asm("$23");
-        int DesiredSpeed;
-
-        /* SLD 485: ONE statement -- a MIN (both arms assign, oracle stores each to the slot). */
-        PlayerSlice = trackSlices;
-        if (trackSlices >= Cars_gHumanRaceCarList[i]->stats.sliceTotal) {
-          PlayerSlice = Cars_gHumanRaceCarList[i]->stats.sliceTotal;
+  if (1 < Cars_gNumRaceCars) {
+    iVar1 = simGlobal.gameTicks;
+    if (simGlobal.gameTicks < 0) {
+      iVar1 = nfs4_mips_addu_s32(simGlobal.gameTicks,0x3f);
+    }
+    if (nfs4_mips_sll_s32(nfs4_mips_sra_s32(iVar1,6),6) ==
+        nfs4_mips_addu_s32(simGlobal.gameTicks,-1)) {
+      iVar1 = nfs4_mips_mult_s32(GameSetup_gData.numLaps,gNumSlices);
+      ppCVar10 = Cars_gHumanRaceCarList;
+      for (iVar6 = 0; iVar6 < Cars_gNumHumanRaceCars; iVar6 = iVar6 + 1) {
+        iVar4 = ((*ppCVar10)->stats).sliceTotal;
+        PlayerSlice = iVar1;
+        if (iVar4 <= iVar1) {
+          PlayerSlice = iVar4;
         }
-        PlayerPosition = Stats_GetPosition(Cars_gHumanRaceCarList[i]);
-        DesiredSlice = 0;
-        DesiredSpeed = 0;
-
-        /* MATCH/SLD 492-497: a three-arm if/else-if/else (the `li s2,1` carries SLD 495 = its
-           OWN source line), NOT `DesiredComparison = 1;` + an override test. */
-        if (PlayerPosition == 1) {
-          DesiredComparison = 2;
-        }
-        else if (STATS_CHECKPOINT_TYPE == 1) {
-          DesiredComparison = 1;
+        iVar2 = Stats_GetPosition(*ppCVar10);
+        iVar11 = 0;
+        iVar4 = 0;
+        if (iVar2 == 1) {
+          iVar9 = 2;
         }
         else {
-          DesiredComparison = PlayerPosition - 1;
-        }
-
-        {
-          int j;
-          register int raceIndex asm("$22");
-
-          /* SLD 500/512: TOP test + UNCONDITIONAL `j` back-edge -> exit-in-the-middle
-             (a `for` lets gcc prove entry and ROTATE to a bottom test). */
-          j = 0;
-          while (1) {
-            if (j >= Cars_gNumRaceCars) {
-              break;
-            }
-            raceIndex = j << 2;
-            if (Stats_GetPosition(Cars_gRaceCarList[j]) == DesiredComparison) {
-              /* MATCH (W77-root): exact eight-instruction retail min.  The
-                 source-level block is the last-resort carrier for v0/v1/s7;
-                 detailed verify_asm confirms the whole function, not merely
-                 this local sequence. */
-              {
-                register Car_tObj *sliceCar asm("$2");
-                register int sliceTotal asm("$3");
-
-                __asm__("lw %1,%3\n\tnop\n\tlw %2,848(%1)\n\tnop\n\t"
-                        "slt %1,%4,%2\n\tbnez %1,1f\n\t"
-                        "addu %0,%4,$0\n\taddu %0,%2,$0\n1:"
-                        : "=r"(DesiredSlice), "=r"(sliceCar), "=r"(sliceTotal)
-                        : "m"(Cars_gRaceCarList[j]), "r"(trackSlices));
-              }
-
-              __asm__("" : "+r"(raceIndex)
-                      : "m"(*(Car_tObj **)((char *)Cars_gRaceCarList +
-                                           raceIndex)));
-              if (PlayerPosition == 1) {
-                /* The pre-branch identity launder makes raceIndex opaque to
-                   loop.c.  This split keeps s6 live just through the pointer
-                   load, then leaves the abs shift free for the jump slot. */
-                Car_tObj *raceCar =
-                    *(Car_tObj **)((char *)Cars_gRaceCarList + raceIndex);
-                __asm__("" : : "r"(raceIndex));
-                /* SLD 507: ONE statement -- abs()>>16 over the INDEX form. */
-                DesiredSpeed = __builtin_abs(raceCar->linearVel_ch.z) >> 16;
-              }
-              else {
-                DesiredSpeed =
-                    *(short *)((char *)&Cars_gHumanRaceCarList[i]->linearVel_ch.z + 2);
-              }
-              break;
-            }
-            j++;
+          iVar9 = 1;
+          if (GameSetup_gData.checkpointType != 1) {
+            iVar9 = nfs4_mips_addu_s32(iVar2,-1);
           }
         }
-
-        {
-          int checkpointUpdate;
-          Cars_gHumanRaceCarList[i]->stats.checkpointUpdate =
-              (checkpointUpdate = DesiredSlice - PlayerSlice,
-               checkpointUpdate);
-          __asm__("" : : "r"(DesiredSlice));
+        ppCVar7 = Cars_gRaceCarList;
+        for (iVar8 = 0; iVar8 < Cars_gNumRaceCars; iVar8 = iVar8 + 1) {
+          iVar3 = Stats_GetPosition(*ppCVar7);
+          if (iVar3 == iVar9) {
+            iVar4 = ((*ppCVar7)->stats).sliceTotal;
+            iVar11 = iVar1;
+            if (iVar4 <= iVar1) {
+              iVar11 = iVar4;
+            }
+            if (iVar2 == 1) {
+              iVar4 = (Cars_gRaceCarList[iVar8]->linearVel_ch).z;
+              if (iVar4 < 0) {
+                iVar4 = nfs4_mips_negu_s32(iVar4);
+              }
+              iVar4 = nfs4_mips_sra_s32(iVar4,0x10);
+            }
+            else {
+              iVar4 = nfs4_mips_sra_s32((*ppCVar10)->linearVel_ch.z,0x10);
+            }
+            break;
+          }
+          ppCVar7 = ppCVar7 + 1;
         }
-        if ((DesiredSpeed >= 16) &&
-            (Cars_gHumanRaceCarList[i]->stats.finishType != 2)) {
-          Cars_gHumanRaceCarList[i]->stats.checkpointDifference =
-              Cars_gHumanRaceCarList[i]->stats.checkpointUpdate * 0x180 /
-              DesiredSpeed;
-          Cars_gHumanRaceCarList[i]->stats.checkpointDisplay = 1;
+        ((*ppCVar10)->stats).checkpointUpdate = nfs4_mips_subu_s32(iVar11,PlayerSlice);
+        if ((iVar4 < 0x10) || (pCVar5 = *ppCVar10, (pCVar5->stats).finishType == 2)) {
+          ((*ppCVar10)->stats).checkpointDifference = 0;
+          ((*ppCVar10)->stats).checkpointDisplay = 0;
         }
         else {
-          Cars_gHumanRaceCarList[i]->stats.checkpointDifference = 0;
-          Cars_gHumanRaceCarList[i]->stats.checkpointDisplay = 0;
+          iVar11 = nfs4_mips_mult_s32((pCVar5->stats).checkpointUpdate,0x180);
+          if (iVar4 == 0) {
+            trap(0x1c00);
+          }
+          if ((iVar4 == -1) && (iVar11 == -0x80000000)) {
+            trap(0x1800);
+          }
+          (pCVar5->stats).checkpointDifference = iVar11 / iVar4;
+          ((*ppCVar10)->stats).checkpointDisplay = 1;
         }
+        ppCVar10 = ppCVar10 + 1;
       }
     }
   }
-
-  if (STATS_END_SIM_GAME == 0) {
-    for (i = 0; i < Cars_gNumHumanRaceCars; i++) {
-      if ((Cars_gHumanRaceCarList[i]->stats.finishType > 1) &&
-          (Cars_gHumanRaceCarList[i]->stats.sliceTime + 0x140 <
-           STATS_GAME_TICKS) &&
-          (((CopSpeak_gQueuePlay == CopSpeak_gQueueHead) &&
-            (CopSpeak_gSpchHandle == -1)) ||
-           (Cars_gHumanRaceCarList[i]->stats.sliceTime + 0x280 <
-            STATS_GAME_TICKS))) {
-        Stats_PlayersFinishedRace++;
-      }
+  if (simVar.endSimGame == 0) {
+    iVar1 = 0;
+    if (0 < Cars_gNumHumanRaceCars) {
+      ppCVar10 = Cars_gHumanRaceCarList;
+      do {
+        pCVar5 = *ppCVar10;
+        if (((1 < pCVar5->stats.finishType) &&
+            (iVar6 = pCVar5->stats.sliceTime,
+             nfs4_mips_addu_s32(iVar6,0x140) < simGlobal.gameTicks)) &&
+           (((CopSpeak_gQueuePlay == CopSpeak_gQueueHead && (CopSpeak_gSpchHandle == -1)) ||
+            (nfs4_mips_addu_s32(iVar6,0x280) < simGlobal.gameTicks)))) {
+          Stats_PlayersFinishedRace = nfs4_mips_addu_s32(Stats_PlayersFinishedRace,1);
+        }
+        iVar1 = nfs4_mips_addu_s32(iVar1,1);
+        ppCVar10 = ppCVar10 + 1;
+      } while (iVar1 < Cars_gNumHumanRaceCars);
     }
-
     if (Stats_PlayersFinishedRace == Cars_gNumHumanRaceCars) {
-      STATS_END_SIM_GAME = 1;
+      simVar.endSimGame = 1;
       Stats_ExtrapolateOpponentTimes(2);
     }
   }

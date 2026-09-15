@@ -1,4 +1,4 @@
-/* eaclib/psx/eacpsxz/locatbig.cpp -- RECONSTRUCTED from nfs4-f.exe. NOT original source.
+/* eaclib/psx/eacpsxz/locatbig.c -- RECONSTRUCTED from nfs4-f.exe. NOT original source.
  *   Source obj : nfs4\eaclib\psx\locatbig.obj ; archive C:\nfs4\EACLIB\PSX\EACPSXZ.LIB (xlsx col10)
  *   7 fns @ [0x800E5F1C, 0x800E62CC): typeofbigfile, sizeofbigfileheader, locatebigentryz,
  *   locatebigentry, locatebigoffset, locatebig, bigcount -- EA "BIG" archive directory locator.
@@ -15,16 +15,16 @@
  *   overwrites $v0); likewise the per-entry counter++ is the loop-back branch delay slot.
  */
 
-extern unsigned getm   (void *ptr, int nbytes);          /* @0x800F3024 big-endian reader   */
-extern int      stricmp(const char *a, const char *b);   /* @0x800FE520 0 == match           */
-extern unsigned strlen (const char *s);                  /* eacpsxz @0x800E9F74              */
+extern "C" unsigned getm   (void *ptr, int nbytes);          /* @0x800F3024 big-endian reader   */
+extern "C" int nfs4_stricmp(const unsigned char *a, const unsigned char *b);   /* @0x800FE520 0 == match           */
+extern "C" unsigned strlen (const char *s);                  /* eacpsxz @0x800E9F74              */
 
 /* intra-obj forward decls (C-linkage) */
-extern int   typeofbigfile      (void *buf);
-extern int   sizeofbigfileheader(void *buf);
-extern char *locatebigentryz    (void *buf, char *name, int index, int *offset, int *size);
-extern char *locatebigentry     (void *buf, char *name, int index, int *offset, int *size);
-extern int   locatebigoffset    (void *buf, char *name);
+extern "C" int   typeofbigfile      (void *buf);
+extern "C" int   sizeofbigfileheader(void *buf);
+extern "C" char *locatebigentryz    (void *buf, char *name, int index, int *offset, int *size);
+extern "C" char *locatebigentry     (void *buf, char *name, int index, int *offset, int *size);
+extern "C" int   locatebigoffset    (void *buf, char *name);
 
 /* write-only sink for the discarded "size" out-param of locatebigoffset (@0x8013DE64, obj-local) */
 static int gLocatebigSizeSink;
@@ -32,32 +32,37 @@ static int gLocatebigSizeSink;
 /* ===================================================================== *
  *  typeofbigfile @0x800E5F1C : 1 (0xC0FB), 2 ("BIGF"), or 0 (not a BIG). *
  * ===================================================================== */
-extern int typeofbigfile(void *buf)
+extern "C" int typeofbigfile(void *buf)
 {
-    /* MATCH: result-FUNNEL var (s0, init 0 in the prologue) set per branch, ONE return --
-     * early returns emit a different tail; the else-getm's a0 rides the first bne's slot. */
-    int type = 0;
     if (getm(buf, 2) == 0xC0FB)
-        type = 1;
-    else if (getm(buf, 4) == 0x42494746u)   /* "BIGF" */
-        type = 2;
-    return type;
+        return 1;
+    if (getm(buf, 4) == 0x42494746u)        /* "BIGF" */
+        return 2;
+    return 0;
 }
 
 /* ===================================================================== *
  *  sizeofbigfileheader @0x800E5F84 : total file size from the header.    *
  * ===================================================================== */
-extern int sizeofbigfileheader(void *buf)
+extern "C" int sizeofbigfileheader(void *buf)
 {
-    /* MATCH: result funnel + SWITCH dispatch (two forward beq's to out-of-line case
-     * blocks, default j to the shared return; else-if inlines the bodies instead).
-     * r=0 fills the typeofbigfile jal slot. */
-    int r = 0;
     switch (typeofbigfile(buf)) {
-    case 1:  r = (int)getm((char *)buf + 2, 2) + 4;  break;
-    case 2:  r = (int)getm((char *)buf + 0xC, 4);    break;
+    case 1:  return (int)getm((char *)buf + 2, 2) + 4;
+    case 2:  return (int)getm((char *)buf + 0xC, 4);
+    default: return 0;
     }
-    return r;
+}
+
+/* ===================================================================== *
+ *  bigcount @0x800E6258 : number of entries in the directory.           *
+ * ===================================================================== */
+extern "C" int bigcount(void *buf)
+{
+    switch (typeofbigfile(buf)) {
+    case 1:  return (int)getm((char *)buf + 4, 2);
+    case 2:  return (int)getm((char *)buf + 8, 4);
+    default: return 0;
+    }
 }
 
 /* ===================================================================== *
@@ -66,72 +71,31 @@ extern int sizeofbigfileheader(void *buf)
  *  size through `offset`/`size` (when non-NULL) and return a pointer to  *
  *  the entry's name; on a miss zero them and return NULL.                *
  * ===================================================================== */
-extern char *locatebigentryz(void *buf, char *name, int index, int *offset, int *size)
+extern "C" char *locatebigentryz(void *buf, char *name, int index, int *offset, int *size)
 {
-    /* MATCH: the oracle does NOT parameterize width/hdr/nameoff into a single loop -- it
-     * emits TWO literal, fully-duplicated scan loops (one per type), dispatched by a
-     * beq/beq cascade on typeofbigfile()'s result, both funneling into ONE shared "found"
-     * exit (v0=ename) and ONE shared "not found" tail (null offset/size, return 0). A
-     * parameterized single loop compiles ~18 insns SHORTER (93 vs 111) -- structural, not
-     * a coloring residual. */
-    /* MATCH: counter=0 is materialized EARLY, before either setup call (prologue-adjacent),
-     * not after -- oracle order is s1=counter=0 then the sizeofbigfileheader/typeofbigfile
-     * calls. */
-    int   counter = 0;
     char *end  = (char *)buf + sizeofbigfileheader(buf);   /* delay slot before typeofbigfile */
     int   type = typeofbigfile(buf);
 
-    /* MATCH: dispatch is a real `switch` (li 1/beq, li 2/beq, j default) -- same shape as
-     * the sibling sizeofbigfileheader/bigcount switch dispatch in this file -- NOT an
-     * if/else-if chain (which condenses to a single bne/fallthrough). */
-    switch (type) {
-    case 1: {
-        char *p = (char *)buf + 6;
-        if (p < end) {
-            do {
-                /* MATCH: `ename` (p+6) is NOT cached -- it's re-derived fresh at EACH use
-                 * site (stricmp arg, strlen arg, the return) exactly as the oracle's
-                 * `addiu _,s0,6` appears three separate times; caching it costs an extra
-                 * saved register (8 s-regs vs oracle's 7). Also: direct branch cascade
-                 * (bnez name / beq counter,index / stricmp), not a materialized ternary. */
-                if (name == 0) {
-                    if (counter != index)
-                        goto next1;
-                } else {
-                    if (stricmp(p + 6, name) != 0)
-                        goto next1;
-                }
-                if (offset) *offset = (int)getm(p, 3);
-                if (size)   *size   = (int)getm(p + 3, 3);
-                return p + 6;
-            next1:
-                { int len = (int)strlen(p + 6); p = p + len + 7; }  /* next entry */
-                counter++;                                  /* loop-back delay slot */
-            } while (p < end);
+    int width, hdr;
+    if (type == 1)      { width = 3; hdr = 6;    }
+    else if (type == 2) { width = 4; hdr = 0x10; }
+    else                { width = 0; hdr = 0;    }   /* falls through to not-found */
+
+    char *p = (char *)buf + hdr;
+    int   counter = 0;
+    int   nameoff = width * 2;                          /* {off, size} then name */
+
+    while (type != 0 && p < end) {
+        char *ename = p + nameoff;
+        int   matched = (name == 0) ? (counter == index)
+                                    : (nfs4_stricmp((const unsigned char *)ename, (const unsigned char *)name) == 0);
+        if (matched) {
+            if (offset) *offset = (int)getm(p, width);
+            if (size)   *size   = (int)getm(p + width, width);
+            return ename;
         }
-        break;
-    }
-    case 2: {
-        char *p = (char *)buf + 0x10;
-        if (p < end) {
-            do {
-                if (name == 0) {
-                    if (counter != index)
-                        goto next2;
-                } else {
-                    if (stricmp(p + 8, name) != 0)
-                        goto next2;
-                }
-                if (offset) *offset = (int)getm(p, 4);
-                if (size)   *size   = (int)getm(p + 4, 4);
-                return p + 8;
-            next2:
-                { int len = (int)strlen(p + 8); p = p + len + 9; }  /* next entry */
-                counter++;                                  /* loop-back delay slot */
-            } while (p < end);
-        }
-        break;
-    }
+        p = ename + (int)strlen(ename) + 1;             /* next entry */
+        counter++;                                      /* loop-back delay slot */
     }
 
     if (offset) *offset = 0;
@@ -142,7 +106,7 @@ extern char *locatebigentryz(void *buf, char *name, int index, int *offset, int 
 /* ===================================================================== *
  *  locatebigentry @0x800E61B8 : forwarder to locatebigentryz.           *
  * ===================================================================== */
-extern char *locatebigentry(void *buf, char *name, int index, int *offset, int *size)
+extern "C" char *locatebigentry(void *buf, char *name, int index, int *offset, int *size)
 {
     return locatebigentryz(buf, name, index, offset, size);
 }
@@ -150,7 +114,7 @@ extern char *locatebigentry(void *buf, char *name, int index, int *offset, int *
 /* ===================================================================== *
  *  locatebigoffset @0x800E61DC : data offset of `name`, or 0.            *
  * ===================================================================== */
-extern int locatebigoffset(void *buf, char *name)
+extern "C" int locatebigoffset(void *buf, char *name)
 {
     int offset = 0;
     if (name != 0)
@@ -161,28 +125,8 @@ extern int locatebigoffset(void *buf, char *name)
 /* ===================================================================== *
  *  locatebig @0x800E6218 : pointer to the entry's data, or NULL.        *
  * ===================================================================== */
-extern char *locatebig(void *buf, char *name)
+extern "C" char *locatebig(void *buf, char *name)
 {
-    int off;
-    /* MATCH: result-funnel var (s0=0 in the jal slot), conditional assign, one return. */
-    char *r = 0;
-    off = locatebigoffset(buf, name);
-    if (off != 0)
-        r = (char *)buf + off;
-    return r;
+    int off = locatebigoffset(buf, name);
+    return off ? (char *)buf + off : 0;
 }
-
-/* ===================================================================== *
- *  bigcount @0x800E6258 : number of entries in the directory.           *
- * ===================================================================== */
-extern int bigcount(void *buf)
-{
-    /* MATCH: same funnel + switch-dispatch shape as sizeofbigfileheader. */
-    int r = 0;
-    switch (typeofbigfile(buf)) {
-    case 1:  r = (int)getm((char *)buf + 4, 2);  break;
-    case 2:  r = (int)getm((char *)buf + 8, 4);  break;
-    }
-    return r;
-}
-

@@ -3,6 +3,7 @@
 #define _EACLIB_H_
 #include "../nfs4_types.h"
 #include "libfns.h"
+#include "snd.h"
 
 /* -- EACPSXZ -- */
    /* fixdmult */
@@ -23,13 +24,13 @@ void getblockname(void * arg0);   /* memstd */
    /* memstd */
 void filesizeatomic(int arg0);   /* nsync */
    /* nsync */
-void loadfileadratomic(int arg0);   /* nsync */
+intptr_t loadfileadratomic(int retry, void *args);   /* nsync */
    /* nsync */
    /* nsync */
-void loadfileatadratomic(int arg0);   /* nsync */
+intptr_t loadfileatadratomic(int retry, void *args);   /* nsync */
    /* nsync */
    /* nsync */
-void loadbigfileheaderatomic(int arg0);   /* nsync */
+intptr_t loadbigfileheaderatomic(int retry, void *args);   /* nsync */
    /* nsync */
    /* xform */
    /* atanfunc */
@@ -54,11 +55,12 @@ void resettick();   /* timer */
    /* timer */
    /* wildcard */
 void synccallback(int arg0);   /* syncfile */
-void syncblockio(void * arg0);   /* syncfile */
+int syncblockio(intptr_t handle, unsigned int offset, intptr_t dest,
+                int length, int priority, void *iofn);   /* syncfile */
    /* syncfile */
    /* syncfile */
    /* syncfile */
-void FILE_sizesync(char * arg0);   /* syncfile */
+int FILE_sizesync(int handle, int priority);   /* syncfile */
    /* syncfile */
    /* syncfile */
    /* crossprd */
@@ -96,7 +98,7 @@ void iFILE_addbigopencallback(int arg0);   /* nfile */
 void FILE_addbig(char * arg0);   /* nfile */
 void iFILE_delbigclosecallback(int arg0);   /* nfile */
 void FILE_delbig(char * arg0);   /* nfile */
-void FILE_atomic(void * arg0);   /* nfile */
+intptr_t FILE_atomic(intptr_t fn, int idle, int retries, void *args);   /* nfile */
 void iFILE_ExecCommand(void * arg0);   /* nfile */
 void iFILE_CommandCompleteCallback(int arg0);   /* nfile */
 void iFILE_perror();   /* nfile */
@@ -171,27 +173,28 @@ void MEM_defaultevent(int arg0);   /* meminit */
 void restoretimer();   /* inittmr */
 void tmrint(int arg0);   /* inittmr */
    /* shpdepth */
-void textbsearch(int arg0);   /* textfor */
+charactertbl *textbsearch(unsigned int key, charactertbl *base,
+                          int count, int stride);   /* textfor */
    /* textfor */
    /* unhuff */
 void memcpyl(void * arg0);   /* unhuff */
 void memcpyb(void * arg0);   /* unhuff */
 void refcpy(void * arg0);   /* unhuff */
    /* unref */
-void chase(int arg0);   /* unref */
+unsigned char *chase(int code);   /* unref */
    /* unbtree */
    /* nullfunc */
    /* crc */
-void checkrect(void * arg0);   /* vramfxya */
-void vramimage(void * arg0);   /* vramfxya */
+unsigned int checkrect(void *rect);   /* vramfxya */
+int vramimage(void *rect, void *data);   /* vramfxya */
    /* vramfxya */
 void getshapeclut(void * arg0);   /* shpclut */
    /* shpclut */
-int CD_systaskfunc();    /* cdfs */
+void CD_systaskfunc();   /* cdfs */
 void CD_timerfunc();   /* cdfs */
 void CdReadyHandler(int arg0);   /* cdfs */
 void readsectorB();   /* cdfs */
-void loaddirinfo(int arg0);   /* cdfs */
+void loaddirinfo(int startSector, int numSectors, int maxEntries);   /* cdfs */
 void dircompare(void * arg0);   /* cdfs */
 void CD_Restore();   /* cdfs */
 void CD_Init(int arg0);   /* cdfs */
@@ -203,16 +206,12 @@ void CD_Stopread();   /* cdfs */
 void CD_Getinfo(int arg0);   /* cdfs */
 void cluttype(int arg0);   /* cluttype */
 void shapetype(int arg0);   /* shptype */
-int validatehandle(int handle, int *outObj, int *outHandle);   /* stream @0x800FC2F8; oracle: 3 args (handle, &obj, &handle) -> int (was a bogus 1-arg void import decl) */
+void validatehandle(void * arg0);   /* stream */
 void inbetween(void * arg0);   /* stream */
 void decbufferusage(void * arg0);   /* stream */
 void getfreerequest(void * arg0);   /* stream */
 void queuerequest(void * arg0);   /* stream */
-// stream.c's slot-lookup helper @0x800FC4E4 is a file-static whose true SYM name is locaterequest
-// (nfs4-f-v3.txt) — the SAME real name as nasync.c's unrelated static locaterequest @0x800F0BF4
-// (line 124 above); two distinct EA statics sharing the name across TUs. Its C identifier is kept as
-// func_800FC4E4 only so verify_asm resolves it to the disambiguated func_800FC4E4.s oracle (the gate
-// keys identifier->.s, so both can't be "locaterequest"). Being static, it has no extern entry here.
+// dup: void locaterequest(void * arg0);   /* stream */
 void freerequest(void * arg0);   /* stream */
 void filterchunk(void * arg0);   /* stream */
 void parsechunks(void * arg0);   /* stream */
@@ -247,10 +246,10 @@ void make64(void * arg0);   /* math64a */
 void divu64(int arg0);   /* math64a */
 void stricmp(char * arg0);   /* stricmp */
 void transmult(void * arg0);   /* trnsmult */
-void fastmovfxya(void * arg0);   /* fastmovf */
-void decodeansi(void * arg0);   /* textcode */
+intptr_t fastmovfxya(unsigned char *shape, int x, int y);   /* fastmovf */
+int decodeansi(unsigned char **cursor);   /* textcode */
 void remapshiftjiscode(int arg0);   /* isqrttbl */
-void decodeshiftjis(int * arg0);   /* isqrttbl */
+int decodeshiftjis(unsigned char **cursor);   /* isqrttbl */
 void psxdevelopmentsystem();   /* devsys */
 /* -- SNDPSXZ -- */
 void iSNDremovepatches(int arg0);   /* sbremove */
@@ -283,21 +282,24 @@ void SNDstopall();   /* sstopall */
    /* sstrstat */
 void strrstr(char * arg0);   /* sstrstat */
 void iSNDstreamdestroyall();   /* sst */
-void iSNDstreamgetstreamptr(int arg0);   /* sst */
-void iSNDstreamremoverequest(int arg0);   /* sst */
-void iSNDstreamreleasecallback(void * arg0);   /* sst */
-void iSNDstreamnotifycallback(int arg0);   /* sst */
-void iSNDstreamparseheader(void * arg0);   /* sst */
-void iSNDstreamparsenumchunks(void * arg0);   /* sst */
-void iSNDstreamparsedata(void * arg0);   /* sst */
-void iSNDstreamparseend(void * arg0);   /* sst */
-void iSNDstreamparsechunk(void * arg0);   /* sst */
-void iSNDstreamisheld(void * arg0);   /* sst */
+SndStreamState *iSNDstreamgetstreamptr(int index);   /* sst */
+int iSNDstreamremoverequest(unsigned int requestId); /* sst */
+void iSNDstreamreleasecallback(intptr_t sample);     /* sst */
+void iSNDstreamnotifycallback(int player, unsigned int bytes); /* sst */
+int iSNDstreamparseheader(SndStreamState *stream, intptr_t data); /* sst */
+int iSNDstreamparsenumchunks(SndStreamState *stream, intptr_t data); /* sst */
+void iSNDstreamparsedata(SndStreamState *stream, intptr_t chunk); /* sst */
+int iSNDstreamparseend(SndStreamState *stream, intptr_t chunk); /* sst */
+int iSNDstreamparsechunk(SndStreamState *stream, intptr_t chunk); /* sst */
+int iSNDstreamisheld(SndStreamState *stream); /* sst */
 void iSNDstreamhotroddatachunks();   /* sst */
 void iSNDstreamservice();   /* sst */
 void iSNDstreamnumcreated();   /* sst */
-void iSNDstreamcreate(void * arg0);   /* sst */
-void iSNDstreamqueue(int arg0);   /* sst */
+int iSNDstreamcreate(int *priority, int numRequests, int packetArg,
+                     intptr_t objectBuffer, int memorySize,
+                     int externalHandle, int externalFlag); /* sst */
+int iSNDstreamqueue(unsigned int stream, int name, char *filename,
+                    int offset, int mode); /* sst */
    /* spvoices */
    /* spvoices */
    /* spvoices */
@@ -323,23 +325,23 @@ void iSNDleaveaudio();   /* sserver */
    /* ssysinit */
 void iSNDsystemtaskreal();   /* ssysreal */
    /* ssysreal */
-int SNDcdvol(int arg0);   /* scdvol */
+void SNDcdvol(int arg0);   /* scdvol */
 void iSNDplatformfree(void * arg0);   /* sdata */
 void iSNDsync_func(int arg0);   /* sbirmpat */
 void iSNDvalidbank(int arg0);   /* sbvalid */
 void iSNDischanreserved(int arg0);   /* salloc */
 void iSNDallocchan(int arg0);   /* salloc */
-void iSNDfreechan(int arg0);   /* salloc */
+intptr_t iSNDfreechan(int chan);   /* salloc: mixed status/address result */
 void iSNDgetchan(int arg0);   /* salloc */
 void iSNDplatform3dpos(int arg0);   /* s3dpos */
-void iSNDpatchkey(int arg0);   /* spatkey */
+int iSNDpatchkey(int chan, int *iter);   /* spatkey */
 void iSNDcalcvol(int arg0);   /* spatkey */
 void iSNDpsxkeyon(int arg0);   /* spatkey */
 void iSNDpsxkeyoff(int arg0);   /* spatkey */
 void iSNDpsxeffecton(int arg0);   /* spatkey */
 void iSNDpsxeffectoff(int arg0);   /* spatkey */
 void iSNDpsxeffectvol(int arg0);   /* spatkey */
-void iSNDsetvol(int chan, int left, int right);   /* spatkey */
+void iSNDsetvol(int arg0);   /* spatkey */
 void iSNDsetslot(int arg0);   /* spatkey */
 void iSNDstartvoice(int arg0);   /* spatkey */
 void iSNDplatformoutputcaps(void * arg0);   /* slib */
@@ -361,33 +363,36 @@ void iSNDplatformfxmasterlevel(int arg0);   /* sfxlevel */
 void SNDfxlevel(int arg0);   /* sfxlevel */
 void iSNDdetunetolinear(int arg0);   /* sclcptch */
 void iSNDcalcpitch(int arg0);   /* sclcptch */
-void iSNDresetpatch(void * arg0);   /* stagpat */
-void iSNDresettimbre(void * arg0);   /* stagpat */
-void iSNDresolveheader(void * arg0);   /* stagpat */
-void iSNDfindfreekey(int arg0);   /* stagpat */
-void iSNDplaytaggedtimbre(int arg0);   /* stagpat */
-void iSNDplaytaggedpatch(void * arg0);   /* stagpat */
-void iSNDresolvetaggedpatch(void * arg0);   /* stagpat */
-void iSNDremovetaggedpatch(void * arg0);   /* stagpat */
-void iSNDdownloadbank(void * arg0);   /* sbdload */
+void iSNDresetpatch(SndTimbre *patch);   /* stagpat */
+unsigned char *iSNDresettimbre(SndTimbre *timbre, SndTimbre *buffer); /* stagpat */
+intptr_t iSNDresolveheader(SndTimbre *timbre, const SndTimbre *header); /* stagpat */
+void iSNDfindfreekey(void);   /* stagpat */
+int iSNDplaytaggedtimbre(intptr_t stream, const unsigned char *tag, SndTimbre *timbre,
+                         SndTimbre *header, int note, int velocity, int pitchOffset); /* stagpat */
+int iSNDplaytaggedpatch(unsigned char *patch, int *info); /* stagpat */
+int iSNDresolvetaggedpatch(unsigned char *bank, intptr_t patchBase, int *scratch); /* stagpat */
+int iSNDremovetaggedpatch(unsigned char *bank, int *patch); /* stagpat */
+int iSNDdownloadbank(intptr_t bankData, intptr_t patchData);   /* sbdload */
 void iSNDbankalloc();   /* sballoc */
 void SNDgetvol(int arg0);   /* sgetvol */
 void iSNDpacketplayoverhead(int arg0);   /* spktplay */
 void SNDPKTPLAY_overhead(int arg0);   /* spktplay */
-void SNDPKTPLAY_create(void * arg0);   /* spktplay */
-void SNDPKTPLAY_start(int arg0);   /* spktplay */
-void SNDPKTPLAY_submit(int arg0);   /* spktplay */
+int SNDPKTPLAY_create(intptr_t memory, int memorySize,
+                      SndPacketReleaseCallback release,
+                      SndPacketNotifyCallback notify); /* spktplay */
+int SNDPKTPLAY_start(int player, intptr_t rate, intptr_t header, int *params); /* spktplay */
+int SNDPKTPLAY_submit(int player, intptr_t *frame); /* spktplay */
 void SNDPKTPLAY_submitspace(int arg0);   /* spktplay */
 void SNDPKTPLAY_unsafeframesoutstanding(int arg0);   /* spktplay */
 void SNDPKTPLAY_framesoutstanding(int arg0);   /* spktplay */
 void SNDPKTPLAY_purge(int arg0);   /* spktplay */
 void SNDPKTPLAY_stop(int arg0);   /* spktplay */
 void SNDPKTPLAY_destroy(int arg0);   /* spktplay */
-void iSNDpacketget(int arg0);   /* spktplay */
-void iSNDpacketfreeframes(int arg0);   /* spktplay */
+intptr_t iSNDpacketget(int player, int channel, int *frameSize);   /* spktplay */
+unsigned int iSNDpacketfreeframes(int player, int channel, int bytes); /* spktplay */
 void iSNDmulu64(void * arg0);   /* smath64 */
 void iSNDdivu64(int arg0);   /* smath64 */
-void iSNDstreamgetrequestptr(int arg0);   /* sstgetrp */
+SndStreamRequest *iSNDstreamgetrequestptr(unsigned int requestId); /* sstgetrp */
 void SNDattributessetdef(void * arg0);   /* spat2hdr */
 void iSNDpatchtohdr(void * arg0);   /* spat2hdr */
 void iSNDpacketgetirq();   /* sdpacket */
@@ -395,11 +400,11 @@ void iSNDpacketsetirq();   /* sdpacket */
 void iSNDpacketirqcallback();   /* sdpacket */
 void iSNDpsxzerospu(void * arg0);   /* sdpacket */
 void iSNDpacketpurgeframes(int arg0);   /* sdpacket */
-void iSNDfillspuwithpackets(int arg0);   /* sdpacket */
+int iSNDfillspuwithpackets(int player, int chunk);   /* sdpacket */
 void iSNDpacketserve();   /* sdpacket */
 void iSNDplatformpacketoverhead();   /* sdpacket */
 void iSNDplatformcalcdatarate(void * arg0);   /* sdpacket */
-void iSNDplatformpacketplaycreate(int arg0);   /* sdpacket */
+int iSNDplatformpacketplaycreate(int player, int *memory);   /* sdpacket */
 void iSNDplatformpacketplaydestroy(int arg0);   /* sdpacket */
 void iSNDplatformpacketplay(char arg0);   /* sdpacket */
 void iSNDpsxpacketstop(void * arg0);   /* sdpacket */
@@ -407,7 +412,7 @@ void iSNDserveraddclient(void * arg0);   /* ssysserv */
 void iSNDserverremoveclient(void * arg0);   /* ssysserv */
 void SNDSYS_service();   /* ssysserv */
 void iSNDtimeremaining(int arg0);   /* sdtimrem */
-void iSNDmemconstrain(int *block, int *size);   /* smemman */
+void iSNDmemconstrain(int * arg0);   /* smemman */
 void iSNDmeminit(void * arg0);   /* smemman */
 void iSNDmemrestore();   /* smemman */
 void iSNDmalloc(int arg0);   /* smemman */
@@ -418,17 +423,20 @@ void iSNDpsxfree(int arg0);   /* sdmemman */
 void iSNDdmtransfer();   /* sdma */
 void iSNDdmcallback();   /* sdma */
 void iSNDdmservice(void * arg0);   /* sdma */
-void iSNDdmqueue(void * arg0);   /* sdma */
-void iSNDdmqueuesplit(void * arg0);   /* sdma */
+int iSNDdmqueue(intptr_t srcRam, int dstSpu, int len, unsigned char priority,
+                unsigned char flag);   /* sdma */
+int iSNDdmqueuesplit(intptr_t srcRam, int dstSpu, int len,
+                     unsigned char priority);   /* sdma */
 void iSNDdmcomplete(int arg0);   /* sdma */
 void iSNDabs(int arg0);   /* saetodv */
 void iSNDatodlrv(int arg0);   /* saetodv */
 void iSNDatolrv(int arg0);   /* saetolrv */
-void iSNDplatformresolve(void * arg0);   /* sdresolv */
-void iSNDplatformremove(void * arg0);   /* sdresolv */
-void iSNDplatformplay(void * arg0);   /* sdplapat */
+int iSNDplatformresolve(intptr_t cursor, intptr_t bank, int *patch); /* sdresolv */
+int iSNDplatformremove(intptr_t cursor, int *patch); /* sdresolv */
+int iSNDplatformplay(intptr_t stream, int voice, int level, int pitch,
+                     int sampleArg, int fx, int volAngle, int volDelta); /* sdplapat */
 void randrange(int arg0);   /* srrange */
-void iSNDgettag(void * arg0);   /* sgettag */
+int iSNDgettag(intptr_t *cursor, unsigned int *id, int *value, intptr_t *data); /* sgettag */
 void iSNDrandom();   /* srandom */
 void iSNDpsxenablespuirq();   /* sdspuirq */
 void iSNDpsxdisablespuirq();   /* sdspuirq */
@@ -437,51 +445,50 @@ void iSNDlibatodlrv(int arg0);   /* saelib */
 void iSNDgetdata(void * arg0);   /* sgetdata */
 void iSNDsin(int arg0);   /* ssine */
 /* -- SPCHPSXZ -- */
-void VoxEvent_GetFilterLengthFlag(void * arg0);   /* spchevnt */
-void VoxEvent_GetKeepTillExpiresFlag(void * arg0);   /* spchevnt */
-void iSPCH_GetOffset16(void * arg0);   /* spchevnt */
-void iSPCH_SearchEventDat(void * arg0);   /* spchevnt */
-void iSPCH_FindEvent(int arg0);   /* spchevnt */
+int VoxEvent_GetFilterLengthFlag(intptr_t event);   /* spchevnt */
+unsigned int VoxEvent_GetKeepTillExpiresFlag(intptr_t event);   /* spchevnt */
+intptr_t iSPCH_SearchEventDat(intptr_t dat, unsigned int eventID);   /* spchevnt */
+intptr_t iSPCH_FindEvent(unsigned int eventID);   /* spchevnt */
 void iSPCH_InitEventDat();   /* spchevnt */
-void GetFilterLength();   /* spchevnt */
-void GetFilterPriority();   /* spchevnt */
+int GetFilterLength();   /* spchevnt */
+int GetFilterPriority();   /* spchevnt */
 void iSPCH_InitEventQueue();   /* spchevnt */
 void iSPCH_FindEventSlot(int arg0);   /* spchevnt */
-void SPCH_AddEvent(void * arg0);   /* spchevnt */
-void iSPCH_ChooseEvent(void * arg0);   /* spchevnt */
+int SPCH_AddEvent(unsigned int *table);   /* spchevnt */
+int iSPCH_ChooseEvent();   /* spchevnt */
 void SPCH_ClearEventQueue();   /* spchevnt */
 void iSPCH_ClearOldEvents(int arg0);   /* spchevnt */
-void SPCH_PlaySpeech(void * arg0);   /* spchevnt */
-void SPCH_ChooseSpeech(void * arg0);   /* spchevnt */
+void SPCH_PlaySpeech();   /* spchevnt */
+void SPCH_ChooseSpeech();   /* spchevnt */
 void iSPCH_InitBanks();   /* spchbank */
 void iSPCH_DisposeBanks();   /* spchbank */
-void iSPCH_BankMemAlloc(int arg0);   /* spchbank */
+intptr_t iSPCH_BankMemAlloc(unsigned int numBanks);   /* spchbank */
 void iSPCH_GetFreeBank();   /* spchbank */
 void iSPCH_FindBank(int arg0);   /* spchbank */
 void iSPCH_TestSubBankBounds(int arg0);   /* spchbank */
-void iSPCH_SetCycleBits(void * arg0);   /* spchbank */
-void SPCH_AddBank(void * arg0);   /* spchbank */
-void iSPCH_MemAlloc(int arg0);   /* spchinit */
+void iSPCH_SetCycleBits(intptr_t bank);       /* spchbank */
+int SPCH_AddBank(intptr_t bank);   /* spchbank */
+intptr_t iSPCH_MemAlloc(int numBytes, char *message);   /* spchinit */
 void iSPCH_MemFree(void * arg0);   /* spchinit */
 void SPCH_Deinit();   /* spchinit */
 void iSPCH_InitInGame();   /* spchinit */
 void SPCH_GetSampleDataRate(int arg0);   /* spchinit */
-void SPCH_InitBankMem(void * arg0);   /* spchinit */
-void SPCH_Init(void * arg0);   /* spchinit */
-void iSPCH_EACrandom();   /* spchrand */
-   /* spchrand */
-void iSPCH_Rand(int arg0);   /* spchrand */
-void iSPCH_BindData(void * arg0);   /* spchrand */
+intptr_t SPCH_InitBankMem(intptr_t memAllocFn, intptr_t memFreeFn, int numBanks); /* spchinit */
+int SPCH_Init(intptr_t sampleRequestCb, unsigned int gameNum, int dataRate); /* spchinit */
+int iSPCH_EACrandom();   /* spchrand */
+int *iSPCH_EACseedrandom(unsigned int seed);   /* spchrand */
+int iSPCH_Rand(int n);   /* spchrand */
+int iSPCH_BindData(unsigned short *dat);   /* spchrand */
 void SPCH_ResolveData(void * arg0);   /* spchrslv */
-void iSPCH_GetMatchValue(void * arg0);   /* spchdata */
-void VoxSentence_GetShortRule(void * arg0);   /* spchdata */
-void VoxSentence_GetNumPhrases(byte * arg0);   /* spchdata */
+int iSPCH_GetMatchValue(intptr_t base, int index);   /* spchdata */
+int VoxSentence_GetShortRule(intptr_t sentence);   /* spchdata */
+int VoxSentence_GetNumPhrases(intptr_t sentence);   /* spchdata */
 // dup: void VoxEvent_GetFilterLengthFlag(void * arg0);   /* spchdata */
-void iSPCH_GetOffset8(void * arg0);   /* spchdata */
+intptr_t iSPCH_GetOffset8(intptr_t base, intptr_t tableBase, int index); /* spchdata */
 // dup: void iSPCH_GetOffset16(void * arg0);   /* spchdata */
 void iSPCH_MatchSample(int arg0);   /* spchpick */
 void iSPCH_GetPhraseBank(void * arg0);   /* spchpick */
-void iSPCH_GetBankBits(void * arg0);   /* spchpick */
+intptr_t iSPCH_GetBankBits(intptr_t bank);   /* spchpick */
 void iSPCH_ClearCycleBit(void * arg0);   /* spchpick */
 void iSPCH_CheckBankBit(void * arg0);   /* spchpick */
 void iSPCH_CheckTemplateSample(void * arg0);   /* spchpick */
@@ -489,19 +496,22 @@ void iSPCH_SampleExists(void * arg0);   /* spchpick */
 void iSPCH_ChooseSamples(void * arg0);   /* spchpick */
 void iSPCH_SampleLength(void * arg0);   /* spchpick */
 void iSPCH_ConvertTime(int arg0);   /* spchpick */
-void iSPCH_SentenceLength(void * arg0);   /* spchpick */
-void iSPCH_OrderSentences(void * arg0);   /* spchpick */
+int iSPCH_SentenceLength(intptr_t sentence);   /* spchpick */
+unsigned char *iSPCH_OrderSentences(intptr_t event, unsigned char *outOrder); /* spchpick */
 void iSPCH_RepeatEvent(void * arg0);   /* spchpick */
-void iSPCH_ShortRuleStatus(void * arg0);   /* spchpick */
-void iSPCH_SentenceGetChoices(void * arg0);   /* spchpick */
-void iSPCH_RandomizeSentencePicks(void * arg0);   /* spchpick */
-void iSPCH_IterateChoice(void * arg0);   /* spchpick */
-void iSPCH_ChooseShortSentence(int arg0);   /* spchpick */
-void iSPCH_SentenceMakeChoice(void * arg0);   /* spchpick */
-void iSPCH_ConstantRuleSet(void * arg0);   /* spchpick */
-void iSPCH_MakeSampleRequests(void * arg0);   /* spchpick */
+int iSPCH_ShortRuleStatus(intptr_t sentence, int mode);   /* spchpick */
+int iSPCH_SentenceGetChoices(intptr_t sentence, intptr_t paramTable,
+                             unsigned int ruleByte1, unsigned int ruleByte2,
+                             int filterMode);   /* spchpick */
+void iSPCH_RandomizeSentencePicks(intptr_t sentence);   /* spchpick */
+void iSPCH_IterateChoice(intptr_t sentence);   /* spchpick */
+int iSPCH_ChooseShortSentence(intptr_t sentence);   /* spchpick */
+int iSPCH_SentenceMakeChoice(intptr_t sentence, int mode);   /* spchpick */
+void iSPCH_ConstantRuleSet(short *sentence, intptr_t rule); /* spchpick */
+int iSPCH_MakeSampleRequests(intptr_t sentence, int paramTable); /* spchpick */
 void iSPCH_ClearChosen();   /* spchpick */
-void iSPCH_SaveChosenSentence(void * arg0);   /* spchpick */
+int iSPCH_SaveChosenSentence(intptr_t event, intptr_t sentence,
+                             int ruleCtx, int *eventArgs);   /* spchpick */
 void iSPCH_OneChosen();   /* spchpick */
 void iSPCH_PlayChosen(void * arg0);   /* spchpick */
 void iSPCH_ChooseSentence(void * arg0);   /* spchpick */
@@ -509,13 +519,14 @@ void SPCH_SetPreLoadTicks(int arg0);   /* spchpick */
 // dup: void VoxSentence_GetNumPhrases(void * arg0);   /* spchrule */
 // dup: void iSPCH_GetOffset8(void * arg0);   /* spchrule */
 // dup: void iSPCH_GetOffset16(void * arg0);   /* spchrule */
-void iSPCH_GetRuleDataAddr(void * arg0);   /* spchrule */
-void iSPCH_SentenceUsesParm(int arg0);   /* spchrule */
-void iSPCH_GetRuleID(int arg0);   /* spchrule */
-void iSPCH_RuleSet(void * arg0);   /* spchrule */
-void iSPCH_GetRuleSettings(void * arg0);   /* spchrule */
-void iSPCH_CheckSentenceRules(int arg0);   /* spchrule */
+intptr_t iSPCH_GetRuleDataAddr(intptr_t sentence);   /* spchrule */
+int iSPCH_SentenceUsesParm(intptr_t sentence, unsigned int paramIdx); /* spchrule */
+unsigned int iSPCH_GetRuleID(intptr_t sentence, int index); /* spchrule */
+void iSPCH_RuleSet(short *sentence, int rule, int *values); /* spchrule */
+unsigned int iSPCH_GetRuleSettings(short *sentence, int *values, char *out); /* spchrule */
+unsigned int iSPCH_CheckSentenceRules(int testVal, int clearMask,
+                                      intptr_t rulePtr); /* spchrule */
 void iSPCH_InitSample(void * arg0);   /* spchsamp */
-void iSPCH_UnPackSample(void * arg0);   /* spchsamp */
+int iSPCH_UnPackSample(intptr_t bank, unsigned int sampleIdx, int *out); /* spchsamp */
 
 #endif

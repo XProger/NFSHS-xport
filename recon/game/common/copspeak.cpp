@@ -5,21 +5,14 @@
 #include "../../nfs4_types.h"
 #include "copspeak_externs.h"
 
-/* ---- copspeak.obj OWNED globals (EXT; SYM Globals.jsonl; $gp state @0x8013d07c..0x8013d0f8) ----
- * SYM v3 VAs (2026-07-12): gBank @0x80111ea4, gRequest @0x80111ee4, gCurrent @0x80111f04,
- * gQueue @0x80111f24 (64*32B, ends exactly at gMusicStat @0x80112724). ALL image-verified
- * genuinely zero at load -> the zero-init defs below are byte-correct, NOT a data-mat gap. */
+/* ---- copspeak.obj OWNED globals (EXT; SYM Globals.jsonl; $gp state @0x8013d07c..0x8013d0f8) ---- */
 CopSpeak_tBank     Copspeak_gBank[4];
 CopSpeak_tRequest  CopSpeak_gRequest;
 CopSpeak_tRequest  CopSpeak_gCurrent;
 CopSpeak_tRequest  CopSpeak_gQueue[64];
 SNDSTREAMSTATUS    CopSpeak_gMusicStat;
-/* W67-A4: explicit =0 on the next two cells -- retail emits them BEFORE the TU's
-   -G8 string-literal pool (0x8013d084..0x8013d0c8), so they cannot have been
-   tentative (16E =0 discriminator).  The cells from CopSpeak_gQueueHead down stay
-   tentative: retail emits them AFTER the pool.  DO NOT strip the =0. */
-int                cdsectorreseek = 0;
-char               CopSpeak_gHandleCount = 0;
+int                cdsectorreseek;
+char               CopSpeak_gHandleCount;
 int                CopSpeak_gQueueHead;
 int                CopSpeak_gQueuePlay;
 int                CopSpeak_gSpchHandle;
@@ -33,7 +26,7 @@ short              CopSpeak_gBufferStart;
 short              CopSpeak_gBufferEnd;
 short              CopSpeak_gBufferHigh;
 int                CopSpeak_gStaticHandle[2];
-signed char        CopSpeak_gStaticPatch[2];
+char               CopSpeak_gStaticPatch[2];
 
 /* ---- intra-TU forward declarations (auto-emitted, signature-exact) ---- */
 void CopSpeak_RadioStaticInit(void);
@@ -41,24 +34,24 @@ void CopSpeak_RadioStaticActive(int noise);
 void CopSpeak_RadioStaticSquelch(void);
 void CopSpeak_InitRequest(CopSpeak_tRequest *r);
 void CopSpeak_SilenceCop(Car_tObj *car,int playerIndex);
-void CopSpeak_Alloc(CopSpeak_tRequest *r);
-void CopSpeak_Free(CopSpeak_tRequest *r);
+void CopSpeak_Alloc(intptr_t r);
+void CopSpeak_Free(intptr_t r);
 void CopSpeak_ReadyNextRequest(void);
 void CopSpeak_Cancel(void);
 void CopSpeak_Stop(void);
 void CopSpeak_CleanUp(void);
 void CopSpeak_InitVars(void);
-void CopSpeak_DirectRequest(int filehandle,long offset,long size,Car_tObj *car,char *name);
-void CopSpeak_GenericBankRequest(int patch,Car_tObj *car);
+extern "C" { void CopSpeak_DirectRequest(int filehandle,long offset,long size,Car_tObj *car,char *name); }
+extern "C" { void CopSpeak_GenericBankRequest(int patch,Car_tObj *car); }
 void CopSpeak_StartUp(void);
 int CopSpeak_GetEnginePatch(int type,int timbre);
 int CopSpeak_Play(CopSpeak_tRequest *r,int handle);
 void CopSpeak_Skip(void);
 int CopSpeak_Request(CopSpeak_tRequest *r);
-int CopSpeak_BankVolume(CopSpeak_tRequest *r);
+int CopSpeak_BankVolume(intptr_t r);
 void CopSpeak_LoadNextRequest(void);
 void CopSpeak_PlayNextRequest(void);
-void CopSpeak_Flush(void);
+extern "C" { void CopSpeak_Flush(void); }
 void CopSpeak_Server(void);
 int CopSpeak_SfxQueued(void);
 void CopSpeak_ShowQueue(void);
@@ -70,11 +63,19 @@ void CopSpeak_RadioStaticInit(void)
 
 {
   int i;
-
-  for (i = 0; i < 2; i = i + 1) {
-    CopSpeak_gStaticHandle[i] = -1;
-    *(signed char *)(CopSpeak_gStaticPatch + i) = -1;
-  }
+  char *pcVar1;
+  int iVar2;
+  int *piVar3;
+  
+  iVar2 = 0;
+  piVar3 = CopSpeak_gStaticHandle;
+  do {
+    *piVar3 = -1;
+    pcVar1 = CopSpeak_gStaticPatch + iVar2;
+    iVar2 = iVar2 + 1;
+    *pcVar1 = -1;
+    piVar3 = piVar3 + 1;
+  } while (iVar2 < 2);
   return;
 }
 
@@ -82,48 +83,68 @@ void CopSpeak_RadioStaticInit(void)
 void CopSpeak_RadioStaticActive(int noise)
 
 {
-  int numpatches = 3;
-
-  if (noise > 0x60) {
-    numpatches = 4;
+  int numpatches;
+  int i;
+  int bhandle;
+  SNDPLAYOPTS playopts;
+  bool bVar1;
+  u_int uVar2;
+  int iVar3;
+  int *piVar4;
+  char *pcVar5;
+  int iVar6;
+  u_int uVar7;
+  u_int local_38;
+  u_char local_34;
+  u_char local_30;
+  
+  uVar7 = 3;
+  if (0x60 < noise) {
+    uVar7 = 4;
   }
-  {
-    int i;
-
-    for (i = 0; i < 2; i++) {
-      if (CopSpeak_gStaticPatch[i] == -1) {
-        CopSpeak_gStaticPatch[i] =
-            (u_int)random() % (u_int)numpatches;
+  iVar6 = 0;
+  bVar1 = true;
+CopSpkRadioStatic_returnLoop:
+  do {
+    if (!bVar1) {
+      return;
+    }
+    pcVar5 = CopSpeak_gStaticPatch + iVar6;
+    if (*pcVar5 == -1) {
+      uVar2 = random();
+      if (uVar7 == 0) {
+        trap(0x1c00);
       }
-      {
-        int *handle = &CopSpeak_gStaticHandle[i];
-
-        if (*handle == -1) {
-          int bhandle = AudioCmn_GetAsyncSfx
-              (2,CopSpeak_gStaticPatch[i] + 0x2f,false);
-
-          if (bhandle >= 0) {
-            SNDPLAYOPTS playopts;
-
-            SNDplaysetdef(&playopts);
-            playopts.bhandle = (u_char)bhandle;
-            playopts.patnum = 0;
-            playopts.vol =
-                (u_char)(gMasterFENarrationLevel *
-                         ((noise << 7) + noise) >> 0xe);
-            *handle = SNDplay(&playopts);
-            CopSpeak_gStaticPatch[i] = -1;
-            if (*handle < 0) {
-              AudioClc_SndError(*handle);
-            }
-          }
-        }
-        else if (SNDover(*handle) != 0) {
-          *handle = -1;
+      *pcVar5 = (char)(uVar2 % uVar7);
+    }
+    piVar4 = CopSpeak_gStaticHandle + iVar6;
+    if (*piVar4 == -1) {
+      iVar3 = AudioCmn_GetAsyncSfx(2,*pcVar5 + 0x2f,false);
+      if (-1 < iVar3) {
+        SNDplaysetdef(&local_38);
+        local_34 = (u_char)iVar3;
+        local_38 = 0;
+        local_30 = (u_char)(gMasterFENarrationLevel * noise * 0x81 >> 0xe);
+        iVar3 = SNDplay(&local_38);
+        *piVar4 = iVar3;
+        *pcVar5 = -1;
+        if (*piVar4 < 0) {
+          iVar6 = iVar6 + 1;
+          AudioClc_SndError();
+          bVar1 = iVar6 < 2;
+          goto CopSpkRadioStatic_returnLoop;
         }
       }
     }
-  }
+    else {
+      iVar3 = SNDover(*piVar4);
+      if (iVar3 != 0) {
+        *piVar4 = -1;
+      }
+    }
+    iVar6 = iVar6 + 1;
+    bVar1 = iVar6 < 2;
+  } while( true );
 }
 
 /* ---- CopSpeak_RadioStaticSquelch__Fv  [COPSPEAK.CPP:259-267] SLD-VERIFIED ---- */
@@ -131,20 +152,19 @@ void CopSpeak_RadioStaticSquelch(void)
 
 {
   int i;
-  int iVar1;
-  int *ph;
-
-  i = 0;
-  iVar1 = -1;
-  ph = CopSpeak_gStaticHandle;
+  int *piVar1;
+  int iVar2;
+  
+  iVar2 = 0;
+  piVar1 = CopSpeak_gStaticHandle;
   do {
-    if (*ph != iVar1) {
-      SNDstop(*ph);
-      *ph = iVar1;
+    if (*piVar1 != -1) {
+      SNDstop(*piVar1);
+      *piVar1 = -1;
     }
-    i = i + 1;
-    ph = ph + 1;
-  } while (i < 2);
+    iVar2 = iVar2 + 1;
+    piVar1 = piVar1 + 1;
+  } while (iVar2 < 2);
   return;
 }
 
@@ -179,7 +199,7 @@ void CopSpeak_SilenceCop(Car_tObj *car,int playerIndex)
 }
 
 /* ---- CopSpeak_Alloc__FP17CopSpeak_tRequest  [COPSPEAK.CPP:312-337] SLD-VERIFIED ---- */
-void CopSpeak_Alloc(CopSpeak_tRequest *r)
+void CopSpeak_Alloc(intptr_t r)
 
 {
   if (CopSpeak_gQueueReady == CopSpeak_gQueueLoad) {
@@ -188,47 +208,45 @@ void CopSpeak_Alloc(CopSpeak_tRequest *r)
     CopSpeak_gBufferStart = 0;
     CopSpeak_gBufferEnd = 0x7ffc;
   }
-  if (r->size <= (int)CopSpeak_gBufferEnd - (int)CopSpeak_gBufferStart) {
-    r->buffer = (int)CopSpeak_gBufferStart;
-    CopSpeak_gBufferStart = CopSpeak_gBufferStart + (short)r->size;
+  if (*(int *)(r + 0xc) <= (int)CopSpeak_gBufferEnd - (int)CopSpeak_gBufferStart) {
+    *(int *)(r + 4) = (int)CopSpeak_gBufferStart;
+    CopSpeak_gBufferStart = CopSpeak_gBufferStart + *(short *)(r + 0xc);
     return;
   }
-  if (r->size <= (int)CopSpeak_gBufferLow) {
+  if (*(int *)(r + 0xc) <= (int)CopSpeak_gBufferLow) {
     CopSpeak_gBufferHigh = CopSpeak_gBufferStart;
     CopSpeak_gBufferEnd = CopSpeak_gBufferLow;
     CopSpeak_gBufferLow = 0;
-    r->buffer = 0;
-    CopSpeak_gBufferStart = (u_short)r->size;
+    *(u_int *)(r + 4) = 0;
+    CopSpeak_gBufferStart = *(u_short *)(r + 0xc);
     return;
   }
-  r->buffer = 0xffffffff;
+  *(u_int *)(r + 4) = 0xffffffff;
   return;
 }
 
 /* ---- CopSpeak_Free__FP17CopSpeak_tRequest  [COPSPEAK.CPP:344-361] SLD-VERIFIED ---- */
-void CopSpeak_Free(CopSpeak_tRequest *r)
+void CopSpeak_Free(intptr_t r)
 
 {
   int iVar1;
   int iVar2;
-
-  iVar1 = r->buffer;
-  if ((-1 < iVar1) && (iVar2 = r->size, 0 < iVar2)) {
-    if (CopSpeak_gBufferHigh != 0) {
-      if (iVar1 + iVar2 == (int)CopSpeak_gBufferHigh) {
-        CopSpeak_gBufferHigh = 0;
-        CopSpeak_gBufferEnd = 0x7ffc;
+  
+  iVar1 = *(int *)(r + 4);
+  if ((-1 < iVar1) && (iVar2 = *(int *)(r + 0xc), 0 < iVar2)) {
+    if (CopSpeak_gBufferHigh == 0) {
+      if (iVar1 + iVar2 == (int)CopSpeak_gBufferStart) {
+        CopSpeak_gBufferStart = 0;
+        *(u_int *)(r + 4) = 0xffffffff;
+        return;
       }
+      CopSpeak_gBufferLow = *(short *)(r + 4) + *(short *)(r + 0xc);
     }
-    else if (iVar1 + iVar2 == (int)CopSpeak_gBufferStart) {
-      CopSpeak_gBufferStart = 0;
-      r->buffer = 0xffffffff;
-      return;
+    else if (iVar1 + iVar2 == (int)CopSpeak_gBufferHigh) {
+      CopSpeak_gBufferHigh = 0;
+      CopSpeak_gBufferEnd = 0x7ffc;
     }
-    else {
-      CopSpeak_gBufferLow = (short)r->buffer + (short)r->size;
-    }
-    r->buffer = 0xffffffff;
+    *(u_int *)(r + 4) = 0xffffffff;
   }
   return;
 }
@@ -237,70 +255,85 @@ void CopSpeak_Free(CopSpeak_tRequest *r)
 void CopSpeak_ReadyNextRequest(void)
 
 {
-  CopSpeak_tRequest *r;
+  CopSpeak_tRequest * r;
   int ok;
-
-  r = &CopSpeak_gQueue[CopSpeak_gQueueReady];
-  ok = true;
-  if (r->buffer >= 0) {
-    int status;
-    CopSpeak_tBankHeader *bnk;
-
-    status = FILE_opstatus(r->ophandle);
-    if (status == 0) {
-      return;
+  int status;
+  CopSpeak_tBankHeader * bnk;
+  char cVar1;
+  bool bVar2;
+  int iVar3;
+  int iVar4;
+  int iVar5;
+  int iVar6;
+  CopSpeak_tRequest *pCVar7;
+  int *piVar8;
+  
+  iVar3 = CopSpeak_gQueueReady;
+  pCVar7 = CopSpeak_gQueue + CopSpeak_gQueueReady;
+  bVar2 = true;
+  if (CopSpeak_gQueue[CopSpeak_gQueueReady].buffer < 0) {
+    if ((CopSpeak_gQueue[CopSpeak_gQueueReady].sfx != '\0') ||
+       ((-1 < CopSpeak_gQueue[CopSpeak_gQueueReady].phrase && (-1 < CopSpeak_gQueue[CopSpeak_gQueueReady].bank)))) {
+      AudioCmn_LoadAsyncSfx((int)CopSpeak_gQueue[CopSpeak_gQueueReady].bank,CopSpeak_gQueue[CopSpeak_gQueueReady].phrase,0,0);
     }
-    ok = status == 1;
-    status = FILE_completeop(r->ophandle);
-    CopSpeak_gHandleCount--;
-    if (status != r->size) {
-      ok = false;
+    goto CopSpeakReady_advanceQueue;
+  }
+  iVar4 = FILE_opstatus(CopSpeak_gQueue[CopSpeak_gQueueReady].ophandle);
+  if (iVar4 == 0) {
+    return;
+  }
+  iVar5 = FILE_completeop(CopSpeak_gQueue[iVar3].ophandle);
+  CopSpeak_gHandleCount = CopSpeak_gHandleCount + -1;
+  piVar8 = (int *)(((int)CopSpeak_gBuffer) + CopSpeak_gQueue[iVar3].buffer);
+  bVar2 = *piVar8 == 0x6c4b4e42 && (iVar5 == CopSpeak_gQueue[iVar3].size && iVar4 == 1);
+  if (((char)piVar8[1] != '\x04') && ((char)piVar8[1] != '\x02')) {
+    bVar2 = false;
+  }
+  if (!bVar2) {
+    if ((CopSpeak_gQueue[iVar3].sfx != '\0') && (-1 < CopSpeak_gQueue[iVar3].bank)) {
+      AudioCmn_LoadAsyncSfx((int)CopSpeak_gQueue[iVar3].bank,CopSpeak_gQueue[iVar3].phrase,0,0);
     }
-    bnk = (CopSpeak_tBankHeader *)(CopSpeak_gBuffer + r->buffer);
-    if (bnk->id != 0x6c4b4e42) {
-      ok = false;
-    }
-    if ((bnk->ver != 4) && (bnk->ver != 2)) {
-      ok = false;
-    }
-    if (!ok) {
-      if ((r->sfx != 0) && (*(signed char *)&r->bank >= 0)) {
-        AudioCmn_LoadAsyncSfx(*(signed char *)&r->bank,r->phrase,0,0);
+    *piVar8 = 0x4c494146;
+    iVar4 = FILE_read(CopSpeak_gQueue[iVar3].filehandle,CopSpeak_gQueue[iVar3].offset,
+                       (intptr_t)CopSpeak_gBuffer + CopSpeak_gQueue[iVar3].buffer,
+                       CopSpeak_gQueue[iVar3].size,0,0);
+    CopSpeak_gQueue[iVar3].ophandle = iVar4;
+    CopSpeak_gHandleCount = CopSpeak_gHandleCount + '\x01';
+    FILE_operror(CopSpeak_gQueue[iVar3].ophandle);
+    goto CopSpeakReady_advanceQueue;
+  }
+  iVar4 = (int)CopSpeak_gQueue[iVar3].bank;
+  if (-1 < iVar4) {
+    if ((CopSpeak_gQueue[iVar3].sfx == '\0') && (CopSpeak_gQueue[iVar3].phrase < 0)) {
+      iVar4 = AudioCmn_GetAsyncSfx(iVar4,CopSpeak_gQueue[iVar3].offset + 0x4000,true);
+      if (iVar4 == -1) {
+        cVar1 = CopSpeak_gQueue[iVar3].bank;
+        iVar6 = CopSpeak_gQueue[iVar3].size;
+        iVar5 = CopSpeak_gQueue[iVar3].buffer;
+        iVar4 = CopSpeak_gQueue[iVar3].offset + 0x4000;
+CopSpeakReady_loadAsync:
+        AudioCmn_LoadAsyncSfx((int)cVar1,iVar4,(void *)((intptr_t)CopSpeak_gBuffer + iVar5),iVar6);
       }
-      bnk->id = 0x4c494146;
-      r->ophandle = FILE_read(r->filehandle,(void *)r->offset,
-                              CopSpeak_gBuffer + r->buffer,r->size,0,(void *)0x0);
-      CopSpeak_gHandleCount++;
-      FILE_operror(r->ophandle);
     }
     else {
-      if (*(signed char *)&r->bank >= 0) {
-        if ((r->sfx != 0) || (r->phrase >= 0)) {
-          if (AudioCmn_GetAsyncSfx(*(signed char *)&r->bank,r->phrase,true) == -1) {
-            AudioCmn_LoadAsyncSfx(*(signed char *)&r->bank,r->phrase,
-                                  CopSpeak_gBuffer + r->buffer,r->size);
-          }
-        }
-        else {
-          if (AudioCmn_GetAsyncSfx(*(signed char *)&r->bank,r->offset + 0x4000,true) == -1) {
-            AudioCmn_LoadAsyncSfx(*(signed char *)&r->bank,r->offset + 0x4000,
-                                  CopSpeak_gBuffer + r->buffer,r->size);
-          }
-        }
+      iVar4 = AudioCmn_GetAsyncSfx(iVar4,CopSpeak_gQueue[iVar3].phrase,true);
+      if (iVar4 == -1) {
+        cVar1 = CopSpeak_gQueue[iVar3].bank;
+        iVar4 = CopSpeak_gQueue[iVar3].phrase;
+        iVar5 = CopSpeak_gQueue[iVar3].buffer;
+        iVar6 = CopSpeak_gQueue[iVar3].size;
+        goto CopSpeakReady_loadAsync;
       }
-      bnk->id = 0x4c494146;
-      CopSpeak_Free(r);
     }
   }
-  else {
-    if ((r->sfx != 0) || ((r->phrase >= 0) && (*(signed char *)&r->bank >= 0))) {
-      AudioCmn_LoadAsyncSfx(*(signed char *)&r->bank,r->phrase,0,0);
-    }
+  *piVar8 = 0x4c494146;
+  CopSpeak_Free((intptr_t)pCVar7);
+CopSpeakReady_advanceQueue:
+  iVar3 = CopSpeak_gQueueReady;
+  if ((bVar2) && (iVar3 = 0, CopSpeak_gQueueReady < 0x3f)) {
+    iVar3 = CopSpeak_gQueueReady + 1;
   }
-  if (ok) {
-    CopSpeak_gQueueReady =
-        CopSpeak_gQueueReady < 0x3f ? CopSpeak_gQueueReady + 1 : 0;
-  }
+  CopSpeak_gQueueReady = iVar3;
   return;
 }
 
@@ -349,8 +382,8 @@ void CopSpeak_CleanUp(void)
   
   CopSpeak_Stop();
   iVar2 = 0;
+  pCVar1 = Copspeak_gBank;
   do {
-    pCVar1 = Copspeak_gBank + iVar2;
     if (pCVar1->FileOpen != 0) {
       FILE_closesync(pCVar1->FileHandle,100);   /* oracle 0x89b10/b14: a1=0x64 (was dropped) */
       pCVar1->FileOpen = 0;
@@ -360,6 +393,7 @@ void CopSpeak_CleanUp(void)
       pCVar1->Index = (CopSpeak_tFileIndex *)0x0;
     }
     iVar2 = iVar2 + 1;
+    pCVar1 = pCVar1 + 1;
   } while (iVar2 < 4);
   if (((int)CopSpeak_gBuffer) != 0) {
     CopSpeak_gBuffer = (char *)0;
@@ -373,11 +407,16 @@ void CopSpeak_InitVars(void)
 {
   int i;
   CopSpeak_tBank *pCVar1;
-
-  for (i = 0; i < 4; i++) {
-    Copspeak_gBank[i].FileOpen = 0;
-    Copspeak_gBank[i].Index = (CopSpeak_tFileIndex *)0x0;
-  }
+  int iVar2;
+  
+  iVar2 = 0;
+  pCVar1 = Copspeak_gBank;
+  do {
+    pCVar1->FileOpen = 0;
+    pCVar1->Index = (CopSpeak_tFileIndex *)0x0;
+    iVar2 = iVar2 + 1;
+    pCVar1 = pCVar1 + 1;
+  } while (iVar2 < 4);
   CopSpeak_gSpchHandle = 0xffffffff;
   CopSpeak_gBuffer = (char *)0;
   CopSpeak_gQueueHead = 0;
@@ -394,7 +433,7 @@ void CopSpeak_InitVars(void)
 }
 
 /* ---- CopSpeak_DirectRequest__FillP8Car_tObjPc  [COPSPEAK.CPP:656-675] SLD-VERIFIED ---- */
-void CopSpeak_DirectRequest(int filehandle,long offset,long size,Car_tObj *car,char *name)
+extern "C" void CopSpeak_DirectRequest(int filehandle,long offset,long size,Car_tObj *car,char *name)
 
 {
   int next;
@@ -421,7 +460,7 @@ void CopSpeak_DirectRequest(int filehandle,long offset,long size,Car_tObj *car,c
 }
 
 /* ---- CopSpeak_GenericBankRequest__FiP8Car_tObj  [COPSPEAK.CPP:682-695] SLD-VERIFIED ---- */
-void CopSpeak_GenericBankRequest(int patch,Car_tObj *car)
+extern "C" void CopSpeak_GenericBankRequest(int patch,Car_tObj *car)
 
 {
   int next;
@@ -450,148 +489,161 @@ void CopSpeak_GenericBankRequest(int patch,Car_tObj *car)
 void CopSpeak_StartUp(void)
 
 {
-  char filename[100];
-  char *header;
-  char *SpeechLanguage;
+  long offset;
+  long size;
+  int filename;
+  char * header;
+  char * SpeechLanguage;
+  CopSpeak_tBank * bank;
+  int Generic;
+  int i;
+  int bankname;
+  int timbre;
+  char * list;
+  char * p;
+  int quoted;
+  char * name;
+  bool bVar1;
+  void *pvVar2;
+  int iVar3;
+  void *pvVar4;
+  char *addr;
+  int *out_size_ptr;
+  char *pcVar5;
+  char **ppcVar6;
+  int iVar7;
+  char *tag;
+  char acStack_b8 [104];
+  char acStack_50 [16];
+  char *local_40 [3];
+  void *local_34;
+  int local_30 [2];
   
   CopSpeak_InitVars();
   CopSpeak_RadioStaticInit();
-  sprintf(filename,"%szzzwzzz.viv",Paths_Paths[0x1c]);
-  header = (char *)loadbigfileheader(filename,(void *)0x10);
-  if (header != (char *)0x0) {
-    CopSpeak_tBank *bank = &Copspeak_gBank[1];
-    char *Generic[1];
-
-    bank->Count = 0;
-    while (strcmp(GameSetup_gCarNames[bank->Count],"BAD!") != 0) {
-      bank->Count++;
+  sprintf(acStack_b8,"%szzzwzzz.viv",Paths_Paths[0x1c]);
+  pvVar2 = (void *)loadbigfileheader(acStack_b8,0x10);
+  if (pvVar2 != (void *)0x0) {
+    Copspeak_gBank[1].Count = 0;
+    while (iVar3 = strcmp(GameSetup_gCarNames[Copspeak_gBank[1].Count],"BAD!"),
+          iVar3 != 0) {
+      Copspeak_gBank[1].Count = Copspeak_gBank[1].Count + 1;
     }
-    bank->Count = bank->Count * 2 + 1;
-    bank->Index = (CopSpeak_tFileIndex *)reservememadr("ocar index",bank->Count * 8,0);
-    Generic[0] = "rain.bnk";
-
-    {
-      int i;
-
-      for (i = 0; i < 1; i++) {
-        if (locatebigentryz(header,Generic[i],0,&bank->Index[i].offset,
-                            &bank->Index[i].size) == (void *)0x0) {
-          bank->Index[i].offset = 0;
-          bank->Index[i].size = 0;
-        }
+    iVar3 = 0;
+    ppcVar6 = local_40 + 2;
+    Copspeak_gBank[1].Count = Copspeak_gBank[1].Count * 2 + 1;
+    Copspeak_gBank[1].Index =
+         (CopSpeak_tFileIndex *)reservememadr("ocar index",Copspeak_gBank[1].Count * 8,0);
+    local_40[2] = "rain.bnk";
+    do {
+      pvVar4 = locatebigentryz(pvVar2,*ppcVar6,0,&Copspeak_gBank[1].Index[iVar3].offset,
+                          (int)&Copspeak_gBank[1].Index[iVar3].size);
+      if (pvVar4 == (void *)0x0) {
+        Copspeak_gBank[1].Index[iVar3].offset = 0;
+        Copspeak_gBank[1].Index[iVar3].size = 0;
       }
-    }
-
-    {
-      int i;
-
-      for (i = 0; i < bank->Count - 1; i++) {
-        char bankname[16];
-        char *timbre[2] = {"lden","ldex"};
-
-        sprintf(bankname,"%.4s%.4s.bnk",GameSetup_gCarNames + i / 2,timbre[i % 2]);
-        if (locatebigentryz(header,bankname,0,&bank->Index[i + 1].offset,
-                            &bank->Index[i + 1].size) == (void *)0x0) {
-          bank->Index[i + 1].offset = 0;
-          bank->Index[i + 1].size = 0;
-        }
+      iVar3 = iVar3 + 1;
+      ppcVar6 = ppcVar6 + 1;
+    } while (iVar3 < 1);
+    iVar7 = 8;
+    for (iVar3 = 0; iVar3 < Copspeak_gBank[1].Count + -1; iVar3 = iVar3 + 1) {
+      local_40[0] = "lden";
+      local_40[1] = "ldex";
+      sprintf(acStack_50,"%.4s%.4s.bnk",GameSetup_gCarNames + iVar3 / 2,local_40[iVar3 % 2]);
+      out_size_ptr = (int *)((int)&(Copspeak_gBank[1].Index)->offset + iVar7);
+      pvVar4 = locatebigentryz(pvVar2,acStack_50,0,out_size_ptr,(int)(out_size_ptr + 1));
+      if (pvVar4 == (void *)0x0) {
+        Copspeak_gBank[1].Index[iVar3 + 1].offset = 0;
+        Copspeak_gBank[1].Index[iVar3 + 1].size = 0;
       }
+      iVar7 = iVar7 + 8;
     }
-
-    purgememadr(header);
-    bank->FileOpen = FILE_opensync(filename,1,100,bank);
+    purgememadr(pvVar2);
+    Copspeak_gBank[1].FileOpen =
+         FILE_opensync(acStack_b8,1,100,&Copspeak_gBank[1].FileHandle);
   }
-
   CopSpeak_gNumTrackSfx = 0;
-  sprintf(filename,"%szzzw%s.viv",Paths_Paths[0x1c],
+  sprintf(acStack_b8,"%szzzw%s.viv",Paths_Paths[0x1c],
              GameSetup_gTrackNames + GameSetup_gData.track);
-  header = (char *)loadbigfileheader(filename,(void *)0x10);
-  if (header == (char *)0x0) {
-    sprintf(filename,"%szzzwcst.viv",Paths_Paths[0x1c]);
-    header = (char *)loadbigfileheader(filename,(void *)0x10);
+  pvVar2 = (void *)loadbigfileheader(acStack_b8,0x10);
+  if (pvVar2 == (void *)0x0) {
+    sprintf(acStack_b8,"%szzzwcst.viv",Paths_Paths[0x1c]);
+    pvVar2 = (void *)loadbigfileheader(acStack_b8,0x10);
+    if (pvVar2 == (void *)0x0) goto CopSpeakStart_langSwitch;
   }
-  if (header != (char *)0x0) {
-    CopSpeak_tBank *bank = &Copspeak_gBank[0];
-
-    bank->Count = bigcount(header);
-    bank->Index = (CopSpeak_tFileIndex *)reservememadr("trck index",bank->Count << 3,0);
-    CopSpeak_gNumTrackSfx = bank->Count;
-    {
-      int i;
-
-      for (i = 0; i < bank->Count; i++) {
-        locatebigentry(header,(char *)0x0,i,&bank->Index[i].offset,
-                       &bank->Index[i].size);
-      }
-    }
-    purgememadr(header);
-    bank->FileOpen = FILE_opensync(filename,1,100,bank);
+  Copspeak_gBank[0].Count = bigcount(pvVar2);
+  Copspeak_gBank[0].Index =
+       (CopSpeak_tFileIndex *)reservememadr("trck index",Copspeak_gBank[0].Count << 3,0);
+  CopSpeak_gNumTrackSfx = Copspeak_gBank[0].Count;
+  iVar3 = 0;
+  if (0 < Copspeak_gBank[0].Count) {
+    do {
+      locatebigentry(pvVar2,(char *)0x0,iVar3,&Copspeak_gBank[0].Index[iVar3].offset,
+                 (int)&Copspeak_gBank[0].Index[iVar3].size);
+      iVar3 = iVar3 + 1;
+    } while (iVar3 < Copspeak_gBank[0].Count);
   }
-
-  switch (GameSetup_gData.userSetting.language) {
-  case 2:
-    SpeechLanguage = "fre";
-    break;
-  case 1:
-    SpeechLanguage = "ger";
-    break;
-  default:
-    SpeechLanguage = "eng";
-    break;
+  purgememadr(pvVar2);
+  Copspeak_gBank[0].FileOpen =
+       FILE_opensync(acStack_b8,1,100,&Copspeak_gBank[0].FileHandle);
+CopSpeakStart_langSwitch:
+  if (GameSetup_gData.userSetting.language == 1) {
+    pcVar5 = "ger";
   }
-  sprintf(filename,"%szzzx%s.viv",Paths_Paths[0x1d],SpeechLanguage);
-  header = (char *)loadbigfileheader(filename,(void *)0x10);
-  if (header != (char *)0x0) {
-    CopSpeak_tBank *bank = &Copspeak_gBank[2];
-    long offset;
-    long size;
-
-    if ((locatebigentryz(header,"oneshots.txt",0,&offset,&size) != (void *)0x0) &&
-        (size != 0)) {
-      char *list = (char *)reservememadr("copspeak temp",size,0x10);
-      char *p;
-      int quoted;
-      int i;
-      char *name;
-
-      bank->FileOpen = FILE_opensync(filename,1,100,bank);
-      FILE_readsync(bank->FileHandle,offset,(int)list,size,100);
-      p = list;
-      quoted = 0;
-      bank->Count = 0;
-      for (; p < list + size; p++) {
-        if (*p == '\"') {
-          if (quoted) {
-            bank->Count++;
+  else if (GameSetup_gData.userSetting.language == 2) {
+    pcVar5 = "fre";
+  }
+  else {
+    pcVar5 = "eng";
+  }
+  sprintf(acStack_b8,"%szzzx%s.viv",Paths_Paths[0x1d],pcVar5);
+  pvVar2 = (void *)loadbigfileheader(acStack_b8,0x10);
+  if (pvVar2 != (void *)0x0) {
+    pvVar4 = locatebigentryz(pvVar2,"oneshots.txt",0,(int *)&local_34,(int)local_30);
+    if ((pvVar4 != (void *)0x0) && (local_30[0] != 0)) {
+      addr = (char *)reservememadr("copspeak temp",local_30[0],0x10);
+      Copspeak_gBank[2].FileOpen =
+            FILE_opensync(acStack_b8,1,100,&Copspeak_gBank[2].FileHandle);
+      FILE_readsync(Copspeak_gBank[2].FileHandle,(unsigned int)(uintptr_t)local_34,(intptr_t)addr,local_30[0],100);   /* oracle 0x8a160: +size(local_30[0]) +prio(0x64) */
+      bVar1 = false;
+      Copspeak_gBank[2].Count = 0;
+      for (pcVar5 = addr; pcVar5 < addr + local_30[0]; pcVar5 = pcVar5 + 1) {
+        if (*pcVar5 == '\"') {
+          if (bVar1) {
+            Copspeak_gBank[2].Count = Copspeak_gBank[2].Count + 1;
           }
-          quoted = !quoted;
+          bVar1 = !bVar1;
         }
       }
-
-      bank->Index = (CopSpeak_tFileIndex *)reservememadr("1sht index",bank->Count << 3,0);
-      i = 0;
-      name = list;
-      p = list;
-      quoted = 0;
-      for (; p < list + size; p++) {
-        if (*p == '\"') {
-          if (!quoted) {
-            name = p + 1;
-          }
-          else {
-            *p = '\0';
-            if (locatebigentryz(header,name,0,&bank->Index[i].offset,
-                                &bank->Index[i].size) == (void *)0x0) {
-              bank->Index[i].size = 0;
+      iVar3 = 0;
+      Copspeak_gBank[2].Index =
+           (CopSpeak_tFileIndex *)reservememadr("1sht index",Copspeak_gBank[2].Count << 3,0);
+      bVar1 = false;
+      pcVar5 = addr;
+      tag = addr;
+      if (addr < addr + local_30[0]) {
+        do {
+          if (*pcVar5 == '\"') {
+            if (bVar1) {
+              *pcVar5 = '\0';
+              pvVar4 = locatebigentryz(pvVar2,tag,0,&Copspeak_gBank[2].Index[iVar3].offset,
+                                  (int)&Copspeak_gBank[2].Index[iVar3].size);
+              if (pvVar4 == (void *)0x0) {
+                Copspeak_gBank[2].Index[iVar3].size = 0;
+              }
+              iVar3 = iVar3 + 1;
             }
-            i++;
+            else {
+              tag = pcVar5 + 1;
+            }
+            bVar1 = (bool)(bVar1 ^ 1);
           }
-          quoted = !quoted;
-        }
+          pcVar5 = pcVar5 + 1;
+        } while (pcVar5 < addr + local_30[0]);
       }
-      purgememadr(list);
+      purgememadr(addr);
     }
-    purgememadr(header);
+    purgememadr(pvVar2);
   }
   CopSpeak_gBuffer = Platform_GetDCTBuffer(0x8000,"CopSpeakBuf");
   return;
@@ -603,11 +655,8 @@ int CopSpeak_GetEnginePatch(int type,int timbre)
 {
   int patch;
   int iVar1;
-  int t1;
-
-  type = type + type;
-  t1 = timbre + 1;
-  iVar1 = type + t1;
+  
+  iVar1 = type * 2 + timbre + 1;
   if (Copspeak_gBank[1].Index[iVar1].size == 0) {
     iVar1 = timbre + 0x45;
   }
@@ -622,72 +671,74 @@ int CopSpeak_Play(CopSpeak_tRequest *r,int handle)
   int vol;
   int azimuth;
   int noise;
-
-  azimuth = 0;
-  SNDplaysetdef(&playopts);
-  if (*(signed char *)&r->bank == '\x03') {
-    playopts.bhandle = *(u_char *)&gSndBnk[3].bnkID;
-    playopts.patnum = r->phrase;
+  int iVar1;
+  int iVar2;
+  int local_28;
+  u_char local_24;
+  u_char local_21;
+  u_char local_20;
+  u_char local_1f;
+  u_char local_1d;
+  u_short local_18;
+  
+  SNDplaysetdef(&local_28);
+  if (r->bank == '\x03') {
+    local_24 = (u_char)gSndBnk[3].bnkID;
+    local_28 = ((int *)r)[6];
   }
   else {
-    playopts.bhandle = (u_char)handle;
-    playopts.patnum = 0;
+    local_28 = 0;
+    local_24 = handle;
   }
-  vol = 0x30;
-  if (r->car != (Car_tObj *)0x0) {
-    noise = *(short *)((char *)r->car + 0x8e) + 0x20;
-    vol = 0x7f;
-    if (noise < 0x80) {
-      vol = noise;
+  iVar2 = 0x30;
+  if (*(int *)r != 0) {
+    iVar1 = *(short *)(*(int *)r + 0x8e) + 0x20;
+    iVar2 = 0x7f;
+    if (iVar1 < 0x80) {
+      iVar2 = iVar1;
     }
   }
-  if (r->filehandle == Copspeak_gBank[2].FileHandle) {
-    noise = (gMasterFENarrationLevel * 0x81 >> 7) << 1;
-    vol = 0x7f;
-    if (noise < 0x80) {
-      vol = noise;
+  if (((int *)r)[4] == Copspeak_gBank[2].FileHandle) {
+    iVar1 = (gMasterFENarrationLevel * 0x81 >> 7) << 1;
+    iVar2 = 0x7f;
+    if (iVar1 < 0x80) {
+      iVar2 = iVar1;
     }
   }
   else {
-    int scaled = 0x80 - (vol >> 2);
-    vol = gMasterFENarrationLevel * ((scaled << 7) + scaled) >> 0xe;
+    iVar2 = gMasterFENarrationLevel * (0x80 - (iVar2 >> 2)) * 0x81 >> 0xe;
   }
-  playopts.bend = 0x40;
-  playopts.vol = (u_char)vol;
-  playopts.use3dpos = Audio_direct3davail != 0;
-  if (Audio_direct3davail != 0) {
-    playopts.azimuth = (u_short)azimuth;
-  }
-  else {
-    if (gStereoMode != 0) {
-      if (azimuth - 0x4000U < 0x8000) {
-        playopts.pan = (u_char)((0xbfff - azimuth) >> 8);
-      }
-      else {
-        playopts.pan = (u_char)((u_int)(azimuth + 0x4000) >> 8);
-      }
+  local_1f = 0x40;
+  local_20 = (u_char)iVar2;
+  local_1d = Audio_direct3davail != 0;
+  if (Audio_direct3davail == 0) {
+    if (gStereoMode == 0) {
+      local_21 = 0x40;
     }
     else {
-      playopts.pan = 0x40;
+      local_21 = 0x40;
     }
   }
-  return SNDplay(&playopts);
+  else {
+    local_18 = 0;
+  }
+  SNDplay(&local_28);
+  return 0;
 }
 
 /* ---- CopSpeak_Skip__Fv  [COPSPEAK.CPP:1028-1042] SLD-VERIFIED ---- */
 void CopSpeak_Skip(void)
 
 {
-  CopSpeak_tRequest *r;
-  u_int uVar1;
+  CopSpeak_tRequest * r;
+  char cVar1;
   int iVar2;
-
-  r = &CopSpeak_gQueue[CopSpeak_gQueueLoad];
-  uVar1 = r->sfx;
-  r->buffer = -1;
-  r->phrase = -1;
-  if (uVar1 != 0) {
-    AudioCmn_LoadAsyncSfx(*(signed char *)&r->bank,0xffffffff,0,0);
+  
+  cVar1 = CopSpeak_gQueue[CopSpeak_gQueueLoad].sfx;
+  CopSpeak_gQueue[CopSpeak_gQueueLoad].buffer = -1;
+  CopSpeak_gQueue[CopSpeak_gQueueLoad].phrase = -1;
+  if (cVar1 != '\0') {
+    AudioCmn_LoadAsyncSfx((int)CopSpeak_gQueue[CopSpeak_gQueueLoad].bank,0xffffffff,0,0);
   }
   iVar2 = 0;
   if (CopSpeak_gQueueLoad < 0x3f) {
@@ -701,178 +752,239 @@ void CopSpeak_Skip(void)
 int CopSpeak_Request(CopSpeak_tRequest *r)
 
 {
-  int head;
+  char cVar1;
+  CopSpeak_tRequest *pCVar2;
+  char cVar3;
+  char cVar4;
+  char cVar5;
   int iVar6;
   int next;
-  CopSpeak_tBank *bank;  /* SYM: Def class REG $5 (a1) PTR CopSpeak_tBank name bank */
-
-  head = CopSpeak_gQueueHead;  /* MATCH: single top capture (a3) reused for guard 1 + copy index + return; guard 2 re-reads the global (a1) */
-  iVar6 = 0;
-  if (head < 0x3f) {
-    iVar6 = head + 1;
-  }
-  if (iVar6 == CopSpeak_gQueuePlay) {
-    return -1;
-  }
-  bank = &Copspeak_gBank[*(signed char *)&r->bank];
-  if (((bank->FileOpen == 0) ||
-      (bank->Index == (CopSpeak_tFileIndex *)0x0)) || (r->phrase < 0)) {
-    return -1;
-  }
-  if (bank->Count < r->phrase) {
-    return -1;
-  }
-  r->filehandle = bank->FileHandle;
-  r->offset = bank->Index[r->phrase].offset;
-  r->size = bank->Index[r->phrase].size;
-  if (r->size == 0) {
-    return -1;
-  }
-  CopSpeak_gQueue[head] = *r;
-  next = 0;
+  int iVar7;
+  CopSpeak_tBank *bank;
+  int iVar8;
+  int iVar9;
+  
+  iVar6 = CopSpeak_gQueueHead;
+  iVar7 = 0;
   if (CopSpeak_gQueueHead < 0x3f) {
-    next = CopSpeak_gQueueHead + 1;
+    iVar7 = CopSpeak_gQueueHead + 1;
   }
-  CopSpeak_gQueueHead = next;
-  return head;
+  if (iVar7 != CopSpeak_gQueuePlay) {
+    cVar1 = r->bank;
+    if ((((Copspeak_gBank[cVar1].FileOpen != 0) &&
+         (Copspeak_gBank[cVar1].Index != (CopSpeak_tFileIndex *)0x0)) && (-1 < r->phrase)) &&
+       (r->phrase <= Copspeak_gBank[cVar1].Count)) {
+      r->filehandle = Copspeak_gBank[cVar1].FileHandle;
+      r->offset = Copspeak_gBank[cVar1].Index[r->phrase].offset;
+      iVar7 = Copspeak_gBank[cVar1].Index[r->phrase].size;
+      r->size = iVar7;
+      if (iVar7 != 0) {
+        iVar7 = r->buffer;
+        iVar8 = r->offset;
+        iVar9 = r->size;
+        CopSpeak_gQueue[iVar6].car = r->car;
+        CopSpeak_gQueue[iVar6].buffer = iVar7;
+        CopSpeak_gQueue[iVar6].offset = iVar8;
+        CopSpeak_gQueue[iVar6].size = iVar9;
+        iVar7 = r->ophandle;
+        iVar8 = r->phrase;
+        cVar1 = r->player;
+        cVar3 = r->sfx;
+        cVar4 = r->bank;
+        cVar5 = r->noise;
+        CopSpeak_gQueue[iVar6].filehandle = r->filehandle;
+        CopSpeak_gQueue[iVar6].ophandle = iVar7;
+        CopSpeak_gQueue[iVar6].phrase = iVar8;
+        pCVar2 = CopSpeak_gQueue + iVar6;
+        pCVar2->player = cVar1;
+        pCVar2->sfx = cVar3;
+        pCVar2->bank = cVar4;
+        pCVar2->noise = cVar5;
+        iVar7 = 0;
+        if (CopSpeak_gQueueHead < 0x3f) {
+          iVar7 = CopSpeak_gQueueHead + 1;
+        }
+        CopSpeak_gQueueHead = iVar7;
+        return iVar6;
+      }
+    }
+  }
+  return -1;
 }
 
 /* ---- CopSpeak_BankVolume__FP17CopSpeak_tRequest  [COPSPEAK.CPP:1095-1099] SLD-VERIFIED ---- */
-int CopSpeak_BankVolume(CopSpeak_tRequest *r)
+int CopSpeak_BankVolume(intptr_t r)
 
 {
-  if (*(signed char *)&r->bank == '\x02') {
-    return gMasterFENarrationLevel;
+  if (*(char *)(r + 0x1e) != '\x02') {
+    return gMasterAmbientLevel;
   }
-  return gMasterAmbientLevel;
+  return gMasterFENarrationLevel;
 }
 
 /* ---- CopSpeak_LoadNextRequest__Fv  [COPSPEAK.CPP:1115-1185] SLD-VERIFIED ---- */
 void CopSpeak_LoadNextRequest(void)
 
 {
-  CopSpeak_tRequest *r;
-  CopSpeak_tBankHeader *bnk;
-
-  if (AudioMus_Buffered() < AudioMus_Threshold()) {
+  CopSpeak_tRequest * r;
+  CopSpeak_tBankHeader * bnk;
+  int iVar1;
+  char cVar2;
+  int iVar3;
+  int iVar4;
+  CopSpeak_tRequest *pCVar5;
+  
+  iVar3 = AudioMus_Buffered();
+  iVar4 = AudioMus_Threshold();
+  iVar1 = CopSpeak_gQueueLoad;
+  if (iVar3 < iVar4) {
     return;
   }
-  while (true) {
-    if (CopSpeak_gQueueLoad == CopSpeak_gQueueHead) {
-      return;
-    }
-    if (7 < ((CopSpeak_gQueueLoad -
-              (*(volatile int *)&CopSpeak_gQueueReady - 0x40)) & 0x3f)) {
-      return;
-    }
-    r = &CopSpeak_gQueue[CopSpeak_gQueueLoad];
-    if (*(signed char *)&r->bank < 0) {
+CopSpeak_loadLoopTop:
+  do {
+    while( true ) {
+      CopSpeak_gQueueLoad = iVar1;
+      iVar1 = CopSpeak_gQueueLoad;
+      if (CopSpeak_gQueueLoad == CopSpeak_gQueueHead) {
+        return;
+      }
+      if (7 < (CopSpeak_gQueueLoad - (CopSpeak_gQueueReady + -0x40) & 0x3fU)) {
+        return;
+      }
+      pCVar5 = CopSpeak_gQueue + CopSpeak_gQueueLoad;
+      iVar3 = (int)CopSpeak_gQueue[CopSpeak_gQueueLoad].bank;
+      if (-1 < iVar3) break;
+CopSpeak_skipPath:
       CopSpeak_Skip();
-      continue;
+      iVar1 = CopSpeak_gQueueLoad;
     }
-    if (*(signed char *)&r->bank == 3) {
-      r->buffer = -1;
-      CopSpeak_gQueueLoad =
-          CopSpeak_gQueueLoad < 0x3f ? CopSpeak_gQueueLoad + 1 : 0;
-      continue;
+    if (iVar3 == 3) {
+      CopSpeak_gQueue[CopSpeak_gQueueLoad].buffer = -1;
+      iVar1 = 0;
+      if (CopSpeak_gQueueLoad < 0x3f) {
+        iVar1 = CopSpeak_gQueueLoad + 1;
+      }
+      goto CopSpeak_loadLoopTop;
     }
-
-    if ((r->sfx == 0) && (r->phrase >= 0)) {
-      if (AudioCmn_GetAsyncSfx(*(signed char *)&r->bank,r->phrase,true) >= 0) {
-        r->buffer = -1;
-        CopSpeak_gQueueLoad =
-            CopSpeak_gQueueLoad < 0x3f ? CopSpeak_gQueueLoad + 1 : 0;
-        continue;
+    if (CopSpeak_gQueue[CopSpeak_gQueueLoad].sfx == '\0') {
+      cVar2 = '\0';
+      if (CopSpeak_gQueue[CopSpeak_gQueueLoad].phrase < 0) {
+CopSpeak_checkBankSfx: /* @0x8009a70c */
+        if ((cVar2 != '\0') ||
+           (iVar3 = AudioCmn_GetAsyncSfx((int)CopSpeak_gQueue[iVar1].bank,
+                               CopSpeak_gQueue[iVar1].offset + 0x4000,true), iVar3 < 0))
+        goto CopSpeak_allocGate;
+        CopSpeak_gQueue[iVar1].buffer = -1;
+      }
+      else {
+        iVar3 = AudioCmn_GetAsyncSfx(iVar3,CopSpeak_gQueue[CopSpeak_gQueueLoad].phrase,true)
+        ;
+        if (iVar3 < 0) {
+          cVar2 = CopSpeak_gQueue[iVar1].sfx;
+          goto CopSpeak_checkBankSfx;
+        }
+        CopSpeak_gQueue[iVar1].buffer = -1;
+      }
+      goto CopSpeak_advanceLoad;
+    }
+CopSpeak_allocGate:
+    if ((((((int)CopSpeak_gBuffer) == 0) ||
+         (iVar3 = CopSpeak_BankVolume((intptr_t)pCVar5), iVar3 == 0)) ||
+        (CopSpeak_gQueue[iVar1].size == 0)) || (0x7ffc < CopSpeak_gQueue[iVar1].size))
+    goto CopSpeak_skipPath;
+    CopSpeak_Alloc((intptr_t)pCVar5);
+    if (CopSpeak_gQueue[iVar1].buffer < 0) {
+      return;
+    }
+    *(u_int *)(((int)CopSpeak_gBuffer) + CopSpeak_gQueue[iVar1].buffer) = 0x4c494146;
+    iVar3 = FILE_read(CopSpeak_gQueue[iVar1].filehandle,CopSpeak_gQueue[iVar1].offset,
+                       (intptr_t)CopSpeak_gBuffer + CopSpeak_gQueue[iVar1].buffer,
+                       CopSpeak_gQueue[iVar1].size,100,0);
+    CopSpeak_gQueue[iVar1].ophandle = iVar3;
+    CopSpeak_gHandleCount = CopSpeak_gHandleCount + '\x01';
+    iVar3 = FILE_operror(CopSpeak_gQueue[iVar1].ophandle);
+    iVar1 = CopSpeak_gQueueLoad;
+    if (iVar3 < 1) {
+CopSpeak_advanceLoad: /* @0x8009a7f8 */
+      iVar1 = 0;
+      if (CopSpeak_gQueueLoad < 0x3f) {
+        iVar1 = CopSpeak_gQueueLoad + 1;
       }
     }
-    if ((r->sfx == 0) &&
-        (AudioCmn_GetAsyncSfx(*(signed char *)&r->bank,
-                              r->offset + 0x4000,true) >= 0)) {
-      r->buffer = -1;
-      CopSpeak_gQueueLoad =
-          CopSpeak_gQueueLoad < 0x3f ? CopSpeak_gQueueLoad + 1 : 0;
-      continue;
-    }
-
-    if ((CopSpeak_gBuffer == (char *)0x0) || (CopSpeak_BankVolume(r) == 0) ||
-        (r->size == 0) || (r->size > 0x7ffc)) {
-      CopSpeak_Skip();
-      continue;
-    }
-    CopSpeak_Alloc(r);
-    if (r->buffer < 0) {
-      return;
-    }
-    bnk = (CopSpeak_tBankHeader *)(CopSpeak_gBuffer + r->buffer);
-    bnk->id = 0x4c494146;
-    r->ophandle = FILE_read(r->filehandle,(void *)r->offset,
-                            CopSpeak_gBuffer + r->buffer,r->size,
-                            100,(void *)0x0);
-    CopSpeak_gHandleCount++;
-    if (FILE_operror(r->ophandle) > 0) {
-      continue;
-    }
-    CopSpeak_gQueueLoad =
-        CopSpeak_gQueueLoad < 0x3f ? CopSpeak_gQueueLoad + 1 : 0;
-  }
+  } while( true );
 }
 
 /* ---- CopSpeak_PlayNextRequest__Fv  [COPSPEAK.CPP:1191-1238] SLD-VERIFIED ---- */
 void CopSpeak_PlayNextRequest(void)
 
 {
-  int iVar3;
   int handle;
-  int next;
+  char cVar1;
+  CopSpeak_tRequest *pCVar2;
+  int iVar3;
+  int iVar4;
   CopSpeak_tRequest *r;
-
+  
   iVar3 = CopSpeak_gQueuePlay;
-  r = &CopSpeak_gQueue[iVar3];
-  if (*(signed char *)&r->bank >= 0) {
-    if (r->sfx == '\0') {
+  r = CopSpeak_gQueue + CopSpeak_gQueuePlay;
+  if (-1 < CopSpeak_gQueue[CopSpeak_gQueuePlay].bank) {
+    if (CopSpeak_gQueue[CopSpeak_gQueuePlay].sfx == '\0') {
       if (CopSpeak_gSpchHandle != -1) {
         return;
       }
-      CopSpeak_gCurrent = *r;
-      handle = r->phrase;
-      if (handle == -1) {
-        handle = r->offset;
-        handle = AudioCmn_GetAsyncSfx(*(signed char *)&r->bank,handle + 0x4000,true);
+      CopSpeak_gCurrent.car = r->car;
+      CopSpeak_gCurrent.buffer = CopSpeak_gQueue[CopSpeak_gQueuePlay].buffer;
+      CopSpeak_gCurrent.offset = CopSpeak_gQueue[CopSpeak_gQueuePlay].offset;
+      CopSpeak_gCurrent.size = CopSpeak_gQueue[CopSpeak_gQueuePlay].size;
+      CopSpeak_gCurrent.filehandle = CopSpeak_gQueue[CopSpeak_gQueuePlay].filehandle;
+      CopSpeak_gCurrent.ophandle = CopSpeak_gQueue[CopSpeak_gQueuePlay].ophandle;
+      CopSpeak_gCurrent.phrase = CopSpeak_gQueue[CopSpeak_gQueuePlay].phrase;
+      pCVar2 = CopSpeak_gQueue + CopSpeak_gQueuePlay;
+      CopSpeak_gCurrent.player = pCVar2->player;
+      CopSpeak_gCurrent.sfx = pCVar2->sfx;
+      CopSpeak_gCurrent.bank = pCVar2->bank;
+      CopSpeak_gCurrent.noise = pCVar2->noise;
+      iVar4 = CopSpeak_gQueue[CopSpeak_gQueuePlay].phrase;
+      if (iVar4 == -1) {
+        cVar1 = CopSpeak_gQueue[CopSpeak_gQueuePlay].bank;
+        iVar4 = CopSpeak_gQueue[CopSpeak_gQueuePlay].offset + 0x4000;
       }
       else {
-        handle = AudioCmn_GetAsyncSfx(*(signed char *)&r->bank,handle,true);
+        cVar1 = CopSpeak_gQueue[CopSpeak_gQueuePlay].bank;
       }
-      if ((-1 < handle) || (*(signed char *)&r->bank == '\x03')) {
-        CopSpeak_gSpchHandle = CopSpeak_Play(r,handle);
+      iVar4 = AudioCmn_GetAsyncSfx((int)cVar1,iVar4,true);
+      if ((-1 < iVar4) || (CopSpeak_gQueue[iVar3].bank == '\x03')) {
+        CopSpeak_gSpchHandle = CopSpeak_Play(r,iVar4);
       }
     }
     CopSpeak_InitRequest(r);
-    iVar3 = CopSpeak_gQueuePlay;
   }
-  next = 0;
-  if (iVar3 < 0x3f) {
-    next = iVar3 + 1;
+  iVar3 = 0;
+  if (CopSpeak_gQueuePlay < 0x3f) {
+    iVar3 = CopSpeak_gQueuePlay + 1;
   }
-  CopSpeak_gQueuePlay = next;
+  CopSpeak_gQueuePlay = iVar3;
   return;
 }
 
 /* ---- CopSpeak_Flush__Fv  [COPSPEAK.CPP:1257-1259] SLD-VERIFIED ---- */
-void CopSpeak_Flush(void)
+extern "C" void CopSpeak_Flush(void)
 
 {
   int i;
   int iVar1;
   int iVar2;
-  CopSpeak_tRequest *pCVar1;
-
-  for (iVar1 = CopSpeak_gQueuePlay; iVar1 != CopSpeak_gQueueHead; iVar1 = iVar2) {
-    pCVar1 = &CopSpeak_gQueue[iVar1];
-    *(signed char *)&pCVar1->bank = -1;
-    iVar2 = 0;
-    if (iVar1 < 0x3f) {
-      iVar2 = iVar1 + 1;
-    }
+  
+  iVar1 = CopSpeak_gQueuePlay;
+  if (CopSpeak_gQueuePlay != CopSpeak_gQueueHead) {
+    do {
+      CopSpeak_gQueue[iVar1].bank = -1;
+      iVar2 = 0;
+      if (iVar1 < 0x3f) {
+        iVar2 = iVar1 + 1;
+      }
+      iVar1 = iVar2;
+    } while (iVar2 != CopSpeak_gQueueHead);
   }
   return;
 }
@@ -881,84 +993,80 @@ void CopSpeak_Flush(void)
 void CopSpeak_Server(void)
 
 {
-  CopSpeak_tRequest *next;
+  int noise;
+  CopSpeak_tRequest * next;
+  CopSpeak_tRequest * r;
+  int i;
+  int iVar1;
+  int iVar2;
+  CopSpeak_tRequest *pCVar3;
+  int patch;
   
   if (CopSpeak_gSpchHandle != -1) {
+    iVar1 = CopSpeak_gCurrent.phrase;
     if (CopSpeak_gCurrent.phrase == -1) {
-      AudioCmn_GetAsyncSfx((signed char)CopSpeak_gCurrent.bank,
-                           CopSpeak_gCurrent.offset + 0x4000,true);
+      iVar1 = CopSpeak_gCurrent.offset + 0x4000;
     }
-    else {
-      AudioCmn_GetAsyncSfx((signed char)CopSpeak_gCurrent.bank,
-                           CopSpeak_gCurrent.phrase,true);
-    }
-    if (SNDtimeremaining(CopSpeak_gSpchHandle) < 5) {
-      if (CopSpeak_gQueuePlay != CopSpeak_gQueueHead) {
-        CopSpeak_tRequest *r = &CopSpeak_gQueue[CopSpeak_gQueuePlay];
-
-        if (((signed char)r->bank == 3) && (r->phrase == 0x13) &&
-            (CopSpeak_gCurrent.car == (Car_tObj *)0x0)) {
-          r->phrase = 0x14;
-        }
+    AudioCmn_GetAsyncSfx((int)CopSpeak_gCurrent.bank,iVar1,true);
+    iVar1 = SNDtimeremaining(CopSpeak_gSpchHandle);
+    if (iVar1 < 5) {
+      if ((((CopSpeak_gQueuePlay != CopSpeak_gQueueHead) && (CopSpeak_gQueue[CopSpeak_gQueuePlay].bank == '\x03')) &&
+          (CopSpeak_gQueue[CopSpeak_gQueuePlay].phrase == 0x13)) &&
+         (CopSpeak_gCurrent.car == (Car_tObj *)0x0)) {
+        CopSpeak_gQueue[CopSpeak_gQueuePlay].phrase = 0x14;
       }
       CopSpeak_gSpchHandle = -1;
       CopSpeak_InitRequest(&CopSpeak_gCurrent);
     }
   }
-
-  {
-    int i;
-
-    for (i = CopSpeak_gQueuePlay; i != CopSpeak_gQueueHead;
-         i = i < 0x3f ? i + 1 : 0) {
-      if ((CopSpeak_gQueue[i].sfx == 0) &&
-          ((signed char)CopSpeak_gQueue[i].bank != 3) &&
-          ((signed char)CopSpeak_gQueue[i].bank >= 0)) {
-        if (CopSpeak_gQueue[i].phrase == -1) {
-          AudioCmn_GetAsyncSfx((signed char)CopSpeak_gQueue[i].bank,
-                               CopSpeak_gQueue[i].offset + 0x4000,true);
+  iVar1 = CopSpeak_gQueuePlay;
+  if (CopSpeak_gQueuePlay != CopSpeak_gQueueHead) {
+    do {
+      if (((CopSpeak_gQueue[iVar1].sfx == '\0') &&
+          (iVar2 = (int)CopSpeak_gQueue[iVar1].bank, iVar2 != 3)) && (-1 < iVar2)) {
+        patch = CopSpeak_gQueue[iVar1].phrase;
+        if (patch == -1) {
+          patch = CopSpeak_gQueue[iVar1].offset + 0x4000;
         }
-        else {
-          AudioCmn_GetAsyncSfx((signed char)CopSpeak_gQueue[i].bank,
-                               CopSpeak_gQueue[i].phrase,true);
-        }
+        AudioCmn_GetAsyncSfx(iVar2,patch,true);
       }
-    }
+      iVar2 = 0;
+      if (iVar1 < 0x3f) {
+        iVar2 = iVar1 + 1;
+      }
+      iVar1 = iVar2;
+    } while (iVar2 != CopSpeak_gQueueHead);
   }
-
   if (CopSpeak_gQueueReady != CopSpeak_gQueueLoad) {
     CopSpeak_ReadyNextRequest();
   }
-
-  next = (CopSpeak_tRequest *)0x0;
-  if (CopSpeak_gSpchHandle != -1) {
-    next = &CopSpeak_gCurrent;
-  }
-  else {
+  pCVar3 = (CopSpeak_tRequest *)0x0;
+  if (CopSpeak_gSpchHandle == -1) {
     if ((CopSpeak_gQueuePlay != CopSpeak_gQueueReady) && (CopSpeak_gQueuePlay != CopSpeak_gQueueHead)) {
-      next = &CopSpeak_gQueue[CopSpeak_gQueuePlay < 0x3f ?
-                              CopSpeak_gQueuePlay + 1 : 0];
-    }
-  }
-
-  if ((next != (CopSpeak_tRequest *)0x0) && (next->noise != 0)) {
-    int noise = 0x30;
-
-    if (next->car != (Car_tObj *)0x0) {
-      int carNoise = *(short *)((char *)next->car + 0x8e) + 0x20;
-
-      noise = 0x7f;
-      if (carNoise < 0x80) {
-        noise = carNoise;
+      pCVar3 = CopSpeak_gQueue;
+      if (CopSpeak_gQueuePlay < 0x3f) {
+        pCVar3 = CopSpeak_gQueue + CopSpeak_gQueuePlay + 1;
       }
     }
-    CopSpeak_RadioStaticActive(noise);
   }
   else {
+    pCVar3 = &CopSpeak_gCurrent;
+  }
+  if ((pCVar3 == (CopSpeak_tRequest *)0x0) || (pCVar3->noise == '\0')) {
     CopSpeak_RadioStaticSquelch();
   }
-
-  if ((((CopSpeak_gQueueReady == CopSpeak_gQueueHead) || (CopSpeak_gQueue[CopSpeak_gQueueReady].sfx != 0)) ||
+  else {
+    iVar1 = 0x30;
+    if (pCVar3->car != (Car_tObj *)0x0) {
+      iVar2 = *(short *)((int)&(pCVar3->car->N).distToPlayer + 2) + 0x20;
+      iVar1 = 0x7f;
+      if (iVar2 < 0x80) {
+        iVar1 = iVar2;
+      }
+    }
+    CopSpeak_RadioStaticActive(iVar1);
+  }
+  if ((((CopSpeak_gQueueReady == CopSpeak_gQueueHead) || (CopSpeak_gQueue[CopSpeak_gQueueReady].sfx != '\0')) ||
       (CopSpeak_gQueue[CopSpeak_gQueueReady].car != CopSpeak_gQueue[CopSpeak_gQueuePlay].car)) &&
      ((CopSpeak_gQueuePlay != CopSpeak_gQueueReady && (CopSpeak_gQueuePlay != CopSpeak_gQueueHead)))) {
     CopSpeak_PlayNextRequest();
@@ -972,61 +1080,81 @@ int CopSpeak_SfxQueued(void)
 
 {
   int iVar1;
+  int iVar2;
   int chkQ;
+  int iVar3;
   int count;
-  CopSpeak_tRequest *pEntry;
-
-  count = 0;
-  chkQ = CopSpeak_gQueuePlay;
-  while (iVar1 = chkQ, iVar1 != CopSpeak_gQueueHead) {
-    pEntry = CopSpeak_gQueue + iVar1;
-    if ((0 <= *(signed char *)&pEntry->bank) && (pEntry->sfx != '\0')) {
-      count = count + 1;
+  
+  iVar3 = 0;
+  iVar2 = CopSpeak_gQueuePlay;
+  while (iVar1 = iVar2, iVar1 != CopSpeak_gQueueHead) {
+    if ((-1 < CopSpeak_gQueue[iVar1].bank) && (CopSpeak_gQueue[iVar1].sfx != '\0')) {
+      iVar3 = iVar3 + 1;
     }
-    chkQ = 0;
+    iVar2 = 0;
     if (iVar1 < 0x3f) {
-      chkQ = iVar1 + 1;
+      iVar2 = iVar1 + 1;
     }
   }
-  return count;
+  return iVar3;
 }
 
 /* ---- CopSpeak_ShowQueue__Fv  [COPSPEAK.CPP:1377-1404] SLD-VERIFIED ---- */
 void CopSpeak_ShowQueue(void)
 
 {
-  int chkQ = CopSpeak_gQueuePlay;
-  char bufferstat[66] = "\0";
-
-  if (chkQ != CopSpeak_gQueueHead) {
+  int chkQ;
+  int bufferstat;
+  long lVar1;
+  int iVar2;
+  int iVar3;
+  char local_58;
+  u_char local_57;
+  u_char auStack_56 [70];
+  
+  iVar2 = CopSpeak_gQueuePlay;
+  local_58 = 0;
+  local_57 = 0;
+  memset(auStack_56,'\0',0x40);
+  if (iVar2 != CopSpeak_gQueueHead) {
     do {
-      if ((signed char)CopSpeak_gQueue[chkQ].bank == -1) {
-        strcat(bufferstat,"x");
+      if (CopSpeak_gQueue[iVar2].bank == -1) {
+        strcat(&local_58,"x");
       }
-      else if (CopSpeak_gQueue[chkQ].sfx != 0) {
-        strcat(bufferstat,"s");
-      }
-      else if ((signed char)CopSpeak_gQueue[chkQ].bank == 3) {
-        strcat(bufferstat,".");
-      }
-      else if (CopSpeak_gQueue[chkQ].phrase >= 0) {
-        strcat(bufferstat,"n");
-      }
-      else if (CopSpeak_gQueue[chkQ].car == (Car_tObj *)0x0) {
-        strcat(bufferstat,"D");
+      else if (CopSpeak_gQueue[iVar2].sfx == '\0') {
+        if (CopSpeak_gQueue[iVar2].bank == '\x03') {
+          strcat(&local_58,".");
+        }
+        else if (CopSpeak_gQueue[iVar2].phrase < 0) {
+          if (CopSpeak_gQueue[iVar2].car == (Car_tObj *)0x0) {
+            strcat(&local_58,"D");
+          }
+          else {
+            sprintf(&local_58,"%s%d",&local_58,(CopSpeak_gQueue[iVar2].car)->carIndex);
+          }
+        }
+        else {
+          strcat(&local_58,"n");
+        }
       }
       else {
-        sprintf(bufferstat,"%s%d",bufferstat,CopSpeak_gQueue[chkQ].car->carIndex);
+        strcat(&local_58,"s");
       }
-      if ((chkQ == CopSpeak_gQueueReady) || (chkQ == CopSpeak_gQueueLoad)) {
-        strcat(bufferstat,"|");
+      if ((iVar2 == CopSpeak_gQueueReady) || (iVar2 == CopSpeak_gQueueLoad)) {
+        strcat(&local_58,"|");
       }
-      chkQ = chkQ < 0x3f ? chkQ + 1 : 0;
-    } while (chkQ != CopSpeak_gQueueHead);
+      iVar3 = 0;
+      if (iVar2 < 0x3f) {
+        iVar3 = iVar2 + 1;
+      }
+      iVar2 = iVar3;
+    } while (iVar3 != CopSpeak_gQueueHead);
   }
-  if (strlen((u_long)bufferstat) != 0) {
-    Font_TextXY(bufferstat,10,6);
-    Hud_FBuildF4(1,8,9,textpixels(bufferstat) + 5,9,0x190505,0,0);
+  lVar1 = strlen((const char *)&local_58);
+  if (lVar1 != 0) {
+    Font_TextXY(&local_58,10,6);
+    iVar2 = textpixels(&local_58);
+    Hud_FBuildF4(1,8,9,iVar2 + 5,9,0x190505,'\0','\0');
   }
   return;
 }

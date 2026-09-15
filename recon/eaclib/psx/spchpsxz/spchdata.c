@@ -11,47 +11,51 @@
  *   duplicate copies in spchevnt/spchrule are reconstructed as `static` to avoid multiple-definition.
  */
 
-extern int iSPCH_GetMatchValue(int base, int index);                  /* @0x80100710 */
-extern int VoxSentence_GetShortRule(int sentence);                    /* @0x80100724 */
-extern int VoxSentence_GetNumPhrases(int sentence);                   /* @0x80100730 */
-extern int VoxEvent_GetFilterLengthFlag(int event);                   /* @0x8010073C */
-extern int iSPCH_GetOffset8(int base, int tableBase, int index);      /* @0x80100748 */
-extern int iSPCH_GetOffset16(int base, int tableBase, int index);     /* @0x80100760 */
+#include "../../../nfs4_types.h"
 
-/* iSPCH_GetMatchValue @0x80100710 : read the int at entry `index` of the table that starts at base+8.
- * MATCH: in-place dead-ptr mutate: base += index*4 forces oracle's addu a0,a0,a1; lw v0,8(a0) */
-extern int iSPCH_GetMatchValue(int base, int index)
+extern "C" int iSPCH_GetMatchValue(intptr_t base, int index);             /* @0x80100710 */
+extern "C" int VoxSentence_GetShortRule(intptr_t sentence);               /* @0x80100724 */
+extern "C" int VoxSentence_GetNumPhrases(intptr_t sentence);              /* @0x80100730 */
+extern "C" int VoxEvent_GetFilterLengthFlag(intptr_t event);              /* @0x8010073C */
+extern "C" intptr_t iSPCH_GetOffset8(intptr_t base, intptr_t tableBase,
+                                      int index);                           /* @0x80100748 */
+extern "C" intptr_t iSPCH_GetOffset16(intptr_t base, intptr_t tableBase,
+                                       int index);                          /* @0x80100760 */
+
+/* iSPCH_GetMatchValue @0x80100710 : read the int at entry `index` of the table that starts at base+8. */
+extern "C" int iSPCH_GetMatchValue(intptr_t base, int index)
 {
-    base += index * 4;
-    return *(int *)(base + 8);
+    return *(int *)(base + index * 4 + 8);
 }
 
 /* VoxSentence_GetShortRule @0x80100724 : low 2 bits of the sentence's flags byte (+3). */
-extern int VoxSentence_GetShortRule(int sentence)
+extern "C" int VoxSentence_GetShortRule(intptr_t sentence)
 {
     return (int)*(unsigned char *)(sentence + 3) & 3;
 }
 
 /* VoxSentence_GetNumPhrases @0x80100730 : upper 6 bits of the sentence's flags byte (+3). */
-extern int VoxSentence_GetNumPhrases(int sentence)
+extern "C" int VoxSentence_GetNumPhrases(intptr_t sentence)
 {
     return (int)((unsigned int)*(unsigned char *)(sentence + 3) >> 2);
 }
 
 /* VoxEvent_GetFilterLengthFlag @0x8010073C : bit 0 of the event's flags byte (+0xa). */
-extern int VoxEvent_GetFilterLengthFlag(int event)
+extern "C" int VoxEvent_GetFilterLengthFlag(intptr_t event)
 {
     return (int)*(unsigned char *)(event + 0xa) & 1;
 }
 
 /* iSPCH_GetOffset8 @0x80100748 : follow an 8-bit offset table -- base + (table[index] << 2). */
-extern int iSPCH_GetOffset8(int base, int tableBase, int index)
+extern "C" intptr_t iSPCH_GetOffset8(intptr_t base, intptr_t tableBase,
+                                      int index)
 {
     return base + ((int)*(unsigned char *)(tableBase + index) << 2);
 }
 
 /* iSPCH_GetOffset16 @0x80100760 : follow a 16-bit offset table -- base + (table[index] << 2). */
-extern int iSPCH_GetOffset16(int base, int tableBase, int index)
+extern "C" intptr_t iSPCH_GetOffset16(intptr_t base, intptr_t tableBase,
+                                       int index)
 {
     return base + ((int)*(unsigned short *)(tableBase + index * 2) << 2);
 }

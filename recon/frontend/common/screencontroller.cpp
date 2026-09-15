@@ -1,12 +1,13 @@
 /* frontend/common/screencontroller.cpp  --  RECONSTRUCTED  (controller-config screen; C++ TU)
  *   8 MEMBER fns of tScreenController : tScreen. Member-fn decls in nfs4_types.h. Bodies: Ghidra.
  */
-#include "../../lib/nfs4_new.h"
 #include "screencontroller.h"
 
 /* ScreenController.obj-OWNED globals -- DEFINED here (self-contained; .data=real EXE bytes via
-   gen_owned_defs: screenControllerConfig + the 4 Arrow/Text/NumTexts/Controller
+   gen_owned_defs: screenControllerConfig + max_fi/max_fidir + the 4 Arrow/Text/NumTexts/Controller
    tables). The manual zero-init versions were a faithfulness gap -- now real binary data. */
+int          max_fi = 3750;   /* @0x800528C8 */
+int          max_fidir = 250;   /* @0x800528CC */
 short        ArrowLocations[55][6] = { 0, 0, 290, 37, 290, 47, 0, 0, 290, 85, 290, 58, 0, 0, 413, 37, 413, 47, 0, 0, 413, 85, 413, 58, 153, 143, 193, 143, 193, 160, 153, 163, 181, 163, 181, 167, 153, 183, 193, 183, 193, 175, 153, 203, 205, 203, 205, 168, 237, 213, 242, 213, 242, 175, 272, 213, 265, 213, 265, 175, 351, 143, 314, 143, 314, 158, 351, 163, 329, 163, 329, 167, 351, 183, 314, 183, 314, 175, 351, 203, 298, 203, 298, 168, 0, 0, 290, 37, 290, 47, 0, 0, 290, 85, 290, 58, 0, 0, 415, 37, 415, 47, 0, 0, 415, 85, 415, 58, 153, 143, 193, 143, 193, 161, 153, 163, 182, 163, 182, 167, 153, 183, 193, 183, 193, 174, 153, 203, 205, 203, 205, 167, 231, 215, 238, 215, 238, 165, 280, 215, 271, 215, 271, 165, 351, 143, 317, 143, 317, 158, 351, 163, 332, 163, 332, 167, 351, 183, 318, 183, 318, 178, 351, 203, 302, 203, 302, 168, 351, 193, 302, 193, 302, 168, 233, 130, 239, 130, 239, 165, 280, 130, 271, 130, 271, 165, 215, 215, 225, 215, 225, 180, 215, 209, 225, 209, 225, 180, 296, 215, 285, 215, 285, 180, 0, 0, 288, 40, 288, 60, 0, 0, 428, 40, 428, 60, 150, 146, 189, 146, 189, 168, 150, 166, 179, 166, 179, 173, 150, 186, 189, 186, 189, 180, 150, 206, 200, 206, 200, 173, 352, 146, 310, 146, 310, 166, 352, 166, 327, 166, 327, 175, 352, 186, 310, 186, 310, 183, 352, 206, 290, 206, 290, 175, 195, 220, 214, 220, 214, 183, 292, 160, 292, 170, 172, 170, 167, 150, 172, 145, 172, 170, 167, 200, 172, 200, 172, 171, 0, 0, 292, 100, 292, 136, 0, 0, 300, 65, 300, 138, 0, 0, 308, 30, 308, 143, 0, 0, 378, 30, 378, 143, 0, 0, 386, 65, 386, 138, 0, 0, 394, 100, 394, 136, 167, 210, 341, 210, 341, 170 };   /* @0x80052104 */
 short        TextLocations[80][5] = { 335, 29, 570, 1, 0, 335, 85, 543, 1, 0, 365, 29, 569, 0, 0, 365, 85, 568, 0, 0, 335, 29, 569, 1, 0, 365, 29, 568, 0, 0, 365, 85, 570, 0, 0, 150, 140, 558, 1, 0, 150, 148, 559, 1, 0, 150, 160, 555, 1, 0, 150, 200, 556, 1, 0, 232, 210, 554, 1, 0, 277, 210, 552, 0, 0, 354, 140, 547, 0, 0, 354, 148, 548, 0, 0, 354, 160, 550, 0, 0, 354, 200, 564, 0, 0, 354, 180, 557, 0, 0, 354, 140, 557, 0, 0, 354, 208, 548, 0, 0, 354, 160, 564, 0, 0, 354, 200, 547, 0, 0, 354, 180, 550, 0, 0, 354, 180, 564, 0, 0, 354, 200, 557, 0, 0, 335, 85, 567, 1, 0, 375, 29, 543, 0, 0, 226, 212, 554, 1, 0, 283, 212, 552, 0, 0, 228, 127, 554, 1, 0, 281, 127, 552, 0, 0, 210, 212, 572, 1, 0, 210, 204, 574, 1, 0, 210, 212, 573, 1, 0, 210, 220, 564, 1, 0, 210, 206, 576, 1, 0, 301, 212, 572, 0, 0, 301, 212, 575, 0, 0, 301, 220, 567, 0, 0, 147, 140, 557, 1, 0, 147, 180, 565, 1, 0, 147, 188, 545, 1, 0, 357, 190, 558, 0, 0, 357, 198, 559, 0, 0, 330, 33, 543, 1, 0, 370, 33, 571, 0, 0, 370, 33, 553, 0, 0, 148, 143, 566, 1, 0, 148, 183, 567, 1, 0, 148, 163, 558, 1, 0, 148, 171, 559, 1, 0, 148, 203, 554, 1, 0, 148, 203, 570, 1, 0, 353, 183, 557, 0, 0, 353, 203, 564, 0, 0, 353, 203, 557, 0, 0, 353, 183, 564, 0, 0, 353, 143, 547, 0, 0, 353, 151, 548, 0, 0, 353, 163, 550, 0, 0, 195, 217, 552, 1, 0, 352, 20, 570, 0, 0, 352, 20, 554, 0, 0, 326, 20, 543, 1, 0, 326, 54, 565, 1, 0, 326, 54, 557, 1, 0, 326, 68, 545, 1, 0, 352, 54, 547, 0, 0, 352, 68, 548, 0, 0, 326, 90, 557, 1, 0, 326, 90, 544, 1, 0, 326, 104, 545, 1, 0, 352, 90, 550, 0, 0, 156, 146, 566, 1, 0, 156, 159, 567, 1, 0, 156, 170, 558, 1, 0, 156, 178, 559, 1, 0, 156, 189, 554, 1, 0, 156, 189, 570, 1, 0, 162, 207, 552, 1, 0 };   /* @0x80052398 */
 short        NumTexts[7][3] = { 13, 13, 13, 14, 14, 14, 15, 15, 15, 15, 15, 15, 14, 14, 14, 0, 0, 0, 0, 0, 0 };   /* @0x800526b8 */
@@ -16,6 +17,7 @@ tScreenControllerConfig *screenControllerConfig;   /* @0x800528d0  (bss(zero)) *
    fileNames @0x800520e8 -> .rodata strings; flare_intensity = persistent accumulator). */
 static unsigned char Offset[7][2] = {{0,0},{133,117},{228,117},{130,117},{130,117},{130,117},{130,117}};
 static char *fileNames[7] = {"None","Neg","Whl","Ctrl","aCtrl","aCtrl","aCtrl"};
+static int flare_intensity;            /* DrawForeground flare accumulator (persists) */
 
 /* ---- tScreenControllerConfig::ClearActuators  (screencontroller.cpp:41) ---- */
 void tScreenControllerConfig::ClearActuators()
@@ -30,33 +32,75 @@ void tScreenControllerConfig::ClearActuators()
 void tScreenControllerConfig::SetActuators(int max)
 
 {
-  /* MATCH: direct member updates (rather than decompiler byte temporaries)
-     expose the common timer store and retail branch layout.  The full-width
-     pulse removes a redundant mask; tickValue orders the two independent
-     global-address pseudos exactly as retail. */
-  /* SYM-CODEGEN-CARRIER: tickValue -- the oracle receipt above proves this
-     split orders the independent ticks/random-table address pseudos. */
-  int tickValue;
-  /* SYM-CODEGEN-CARRIER: pulse -- the full-width carrier removes a mask. */
-  uint pulse;
-
-  if (this->fResetShakeTimeOut != 0) {
-    this->fResetShakeTimeOut = 0;
-    (this->fShaker).time = 0x40;
+  uchar curtime;
+  byte pulse;
+  uchar newtime;
+  
+  newtime = '@';
+  if (this->fResetShakeTimeOut == 0) {
+    curtime = (this->fShaker).time;
+    newtime = curtime + 0xff;
+    if (curtime == '\0') goto SetActuators_clearAndRet;
   }
   else {
-    if ((this->fShaker).time == '\0') goto SetActuators_clearAndRet;
-    (this->fShaker).time = (this->fShaker).time - 1;
+    this->fResetShakeTimeOut = 0;
   }
-  if (*(volatile uchar *)&(this->fShaker).time != '\0') {
-    tickValue = ticks;
-    pulse = Force_rand_256[tickValue >> 2 & 0xff];   /* @0x80043180 lbu Force_rand_256((ticks>>2)&0xff) */
+  (this->fShaker).time = newtime;
+  if ((this->fShaker).time != '\0') {
+    pulse = ""[ticks >> 2 & 0xff];
     (this->fShaker).actuator[1] = (uchar)max;
     (this->fShaker).actuator[0] = (int)(uint)pulse < max;
     return;
   }
 SetActuators_clearAndRet:
   this->ClearActuators();
+  return;
+}
+
+/* ---- Controller_SetRamp  (screencontroller.cpp:791) ---- */
+extern "C" void Controller_SetRamp(void)
+
+{
+  int device;
+  int devType;
+  int config;
+  int type_idx;
+  short i;
+  short p;
+  short ctrl_type;
+  byte config_idx;
+  
+  for (p = 0; p < 2; p = p + 1) {
+    ctrl_type = frontEnd.controlType[p];
+    if (ctrl_type == 0x23) {
+      type_idx = 0;
+    }
+    else if ((ctrl_type == 0x53) || (ctrl_type == 0x73)) {
+      type_idx = 1;
+    }
+    else {
+      type_idx = 2;
+    }
+    config_idx = frontEnd.controlConfig[p];
+    frontEnd.rampGas[p] = '\x01';
+    frontEnd.rampBrake[p] = '\x01';
+    frontEnd.rampSteer[p] = '\x01';
+    device = GetPSXPadValue(mappings[config_idx][0][type_idx],0);
+    devType = InGame_GetDevice(device);
+    if (devType == 1) {
+      frontEnd.rampSteer[p] = '\0';
+    }
+    devType = GetPSXPadValue(mappings[config_idx][2][type_idx],0);
+    devType = InGame_GetDevice(devType);
+    if (devType == 1) {
+      frontEnd.rampGas[p] = '\0';
+    }
+    devType = GetPSXPadValue(mappings[config_idx][3][type_idx],0);
+    devType = InGame_GetDevice(devType);
+    if (devType == 1) {
+      frontEnd.rampBrake[p] = '\0';
+    }
+  }
   return;
 }
 
@@ -77,76 +121,18 @@ void tScreenControllerConfig::ShakeIt()
   
   padnum = this->player << 4;
   padState = PadGetState(padnum);
-  if (padState != 6) {
+  if (padState == 6) {
+    if ((this->fShaker).active == '\0') {
+      (this->fShaker).active = '\x01';
+      PadSetAct(padnum,(this->fShaker).actuator,2);
+      PadSetActAlign(padnum,"");
+    }
+  }
+  else {
     if (padState < 4) {
       (this->fShaker).active = '\0';
     }
     this->ClearActuators();
-  }
-  else if ((this->fShaker).active == '\0') {
-    (this->fShaker).active = '\x01';
-    PadSetAct(padnum,(this->fShaker).actuator,2);
-    PadSetActAlign(padnum,Force_gActAlign);
-  }
-  return;
-}
-
-/* ---- Controller_SetRamp  (screencontroller.cpp:791) ---- */
-void Controller_SetRamp(void)
-
-{
-  /* MATCH (06A, SYM 8c @0x80043250): the recovered semantic locals are `i`
-     (SHORT, loop counter, REG s2), `type` (INT), and `config` (INT).
-     device/devType/ctrl_type were Ghidra-fabricated and remain inlined. */
-  short i;
-  int type;
-  int config;
-
-  /* MATCH (SLD 794): the oracle re-tests at the TOP of every iteration
-     (sll/sra/slti/beqz before the body) -- a plain `for` gets loop-rotated and
-     fuses the sign-extend into the address (sra ..,15). */
-  i = 0;
-  while (1) {
-    /* SYM-CODEGEN-CARRIER: one -- the receipt below proves this zero-insn
-       identity-fence carrier is required for retail's per-iteration `li 1`. */
-    int one;
-
-    if (i >= 2) break;
-    /* MATCH (SLD 797 = ONE source line): a nested ternary -- the if/else-if
-       chain lays the `0` arm out inline, the oracle has it LAST. */
-    type = frontEnd.controlType[i] == 0x23 ? 0 :
-           ((frontEnd.controlType[i] == 0x53 || frontEnd.controlType[i] == 0x73) ? 1 : 2);
-    config = frontEnd.controlConfig[i];
-    /* MATCH (2026-08-10, 26 -> PASS 83/83): plain literals let LICM hoist the
-       store-only 1 into $s4, which adds an $s6 save and two instructions.  `one`
-       is only an identity-fence carrier: the empty template retains retail's
-       per-iteration `li $v0,1` without emitting code.  The read-only `config`
-       fence immediately before it preserves retail's `lbu $v1,866($s0)` then
-       `li $v0,1` schedule.  Retail still hoists the comparison constant 1 into
-       $s3 across the three calls.  A plain void scheduling barrier and literal
-       type changes were neutral and reverted. */
-    /* ASPSX-DIALECT (w64-a20): the asm below uses NUMERIC registers and no
-     * `.set push/pop` -- ASPSX 2.77, the PRODUCTION assembler, rejects ABI
-     * register NAMES and push/pop.  $0 zero $1 at $2-3 v0-v1 $4-7 a0-a3
-     * $8-15 t0-t7 $16-23 s0-s7 $24-25 t8-t9 $28 gp $29 sp $30 fp $31 ra.
-     * Gate-lane object is byte-identical (proven by hash); see
-     * scratchpad/w64a20/RECEIPTS.md. */
-    __asm__("" : : "r"(config));
-    one = 1;
-    __asm__("" : "=r"(one) : "0"(one));
-    frontEnd.rampGas[i] = (char)one;
-    frontEnd.rampBrake[i] = (char)one;
-    frontEnd.rampSteer[i] = (char)one;
-    if (InGame_GetDevice(GetPSXPadValue(mappings[config][0][type],0)) == 1) {
-      frontEnd.rampSteer[i] = '\0';
-    }
-    if (InGame_GetDevice(GetPSXPadValue(mappings[config][2][type],0)) == 1) {
-      frontEnd.rampGas[i] = '\0';
-    }
-    if (InGame_GetDevice(GetPSXPadValue(mappings[config][3][type],0)) == 1) {
-      frontEnd.rampBrake[i] = '\0';
-    }
-    i = i + 1;
   }
   return;
 }
@@ -156,29 +142,30 @@ short tScreenControllerConfig::AnimKeyPoints(bool forward,bool pt)
 
 {
   short result;
-
-  /* SYM-CODEGEN-CARRIER: result -- SYM has no named local, but this explicit
-     shared return funnel is required for the retail 25-instruction layout;
-     direct returns compile three instructions short and produce 23 diffs. */
+  uint fwdU;
+  uint ptU;
+  
+  ptU = pt;
+  fwdU = forward;
   if (this->fCurrentController == '\x02') {
-    if (forward != 0) {
+    if (fwdU == 0) {
       result = 0x14;
-      if (pt != 0) {
-        return 0;
+      if (ptU != 0) {
+        return 0x28;
       }
     }
     else {
       result = 0x14;
-      if (pt != 0) {
-        return 0x28;
+      if (ptU != 0) {
+        return 0;
       }
     }
   }
   else {
-    if ((pt & forward) != 0) {
+    if ((ptU & fwdU) != 0) {
       return 0;
     }
-    if ((pt != 0) || (result = 0, forward != 0)) {
+    if ((ptU != 0) || (result = 0, fwdU != 0)) {
       return 0x18;
     }
   }
@@ -189,136 +176,97 @@ short tScreenControllerConfig::AnimKeyPoints(bool forward,bool pt)
 void tScreenControllerConfig::CheckConfigs()
 
 {
-  /* Reliable SYM names no locals in this function.  IDA/SLD and the measured
-     alternatives below prove these optimized-away source identities:
-     SYM-CODEGEN-CARRIER: currentControllerSnapshot
-     SYM-CODEGEN-CARRIER: previousControllerSnapshot
-     SYM-CODEGEN-CARRIER: currentControllerForSwap
-     SYM-CODEGEN-CARRIER: arrowFadeBelowHalf */
-  int currentControllerSnapshot;
-  int previousControllerSnapshot;
-  int currentControllerForSwap;
-
-  /* MATCH (2026-08-10, 18 -> PASS 187/187; SLD-driven block order,
-     oracle 0x80043400..0x800436EC): allocsim exactly reproduced all 10 global
-     handouts and proved that the old function-wide `arrowDim` pseudo (p81=$v0)
-     could not reach retail's $v1 by any refs/live dial.  IDA's gold annotations
-     instead show arm-local controller snapshots in $a0/$a1 and the comparison in
-     $v1.  Giving each arm its own `armArrowDim`, then targeting the common text
-     tail, lets GCC local-allocate those values and cross-jump-merge the identical
-     branch.  In that basin the SLD/IDA [0]-then-[1] controller-store order is exact.
-     `short` snapshot types, `bool`/`register` comparison types, and declaration
-     permutations were neutral and reverted.  Direct use of the first current
-     controller is FAIL17 at 188/187; direct previous-controller use is
-     count-exact FAIL2; direct current-controller use in the two-snapshot arm
-     is FAIL12 at 185/187.  A direct strcmp comparison remains exact and removes
-     the decompiler-only `cmp` identity.
-     - top-level guard is `!=` with the CHANGED-controller arm INLINE
-       (oracle `beq v1,v0,.L800435B8` jumps AWAY to the unchanged arm);
-     - the strcmp-hit "swap in" body is OUT OF LINE at the end (oracle
-       `beqz $v0,.L80043570` branches FORWARD past the fTextController block),
-       so it must be a `goto` target, not an inline if-body;
-     - the two fade arms each compute `slti fArrowFade,0x80` locally and share
-       ONE `bnez` at .L80043544 (cross-jump-merged `ChkConfigs_textDone` tail).
-     SLD: 835 guard / 837 TurnOffShakers / 840 fAnim / 843 curr==0 /
-          853 prev==0 / 869 strcmp / 871-879 fades / 880-883 fTextController /
-          888-892 swap-in / 899-926 unchanged arm. */
-  if (this->fCurrentController != this->fPrevController) {
-    this->TurnOffShakers();
+  byte config;
+  byte prevConfig;
+  short animVal;
+  int cmp;
+  
+  if (this->fCurrentController == this->fPrevController) {
+    if ((uint)(byte)frontEnd.controlConfig[this->player] == (uint)(byte)this->fPrevConfig) {
+      return;
+    }
     Front_ResetPSXController(this->player,(uint)(byte)frontEnd.controlConfig[this->player]);
-    if (this->fAnim != 0) {
-      return;
-    }
-    if (this->fCurrentController == '\0') {
-      if (this->fAnimFade != 0) {
-        return;
+    if ((*(int *)this->fFade == 0) && (this->fAnim == 0)) {
+      this->fAnim = 1;
+      this->fAnimController = (ushort)(byte)this->fCurrentController;
+      config = frontEnd.controlConfig[this->player];
+      prevConfig = this->fPrevConfig;
+      if (((prevConfig < config) && ((config != 2 || (prevConfig != 0)))) || ((config == 0 && (prevConfig == 2)))) {
+        animVal = this->AnimKeyPoints(true,1);
+        this->fAnimStart = animVal;
+        animVal = this->AnimKeyPoints(true,0);
+        this->fAnimStop = animVal;
+        animVal = 1;
       }
-      this->fFade[0] = 1;
-      this->fFadeController[0] = (ushort)(byte)this->fPrevController;
-      this->fPrevController = this->fCurrentController;
-      return;
-    }
-    if (this->fPrevController == '\0') {
-      int arrowFadeBelowHalf;
-
-      if (this->fAnimFade != 0) {
-        return;
+      else {
+        animVal = this->AnimKeyPoints(false,1);
+        this->fAnimStart = animVal;
+        animVal = this->AnimKeyPoints(false,0);
+        this->fAnimStop = animVal;
+        animVal = -1;
       }
-      currentControllerSnapshot = (byte)this->fCurrentController;
-      arrowFadeBelowHalf = this->fArrowFade < 0x80;
-      this->fSwap = 1;
-      this->fFade[1] = 1;
-      this->fFadeController[1] = (ushort)currentControllerSnapshot;
-      if (arrowFadeBelowHalf) {
-        goto ChkConfigs_textDone;
-      }
+      this->fAnimStep = animVal;
+      this->fAnimFrame = this->fAnimStart;
     }
-    else {
-      int arrowFadeBelowHalf;
-
-      if ((this->CurrentlyLoadedArt != -1) &&
-         (strcmp(fileNames[(byte)this->fCurrentController],
-                 fileNames[this->CurrentlyLoadedArt]) == 0)) {
-        goto ChkConfigs_swapIn;
-      }
-      if (this->fAnimFade != 0) {
-        return;
-      }
-      previousControllerSnapshot = (byte)this->fPrevController;
-      currentControllerForSwap = (byte)this->fCurrentController;
-      arrowFadeBelowHalf = this->fArrowFade < 0x80;
-      this->fFade[0] = 1;
-      this->fSwap = 1;
-      this->fFade[1] = 1;
-      this->fFadeController[0] = (ushort)previousControllerSnapshot;
-      this->fFadeController[1] = (ushort)currentControllerForSwap;
-      if (arrowFadeBelowHalf) {
-        goto ChkConfigs_textDone;
-      }
-    }
-    this->fTextController = this->fCurrentController;
-ChkConfigs_textDone:
-    if (this->fTextController == 6) {
-      this->fTextController = 5;
-    }
-    this->fPrevController = this->fCurrentController;
-    return;
-ChkConfigs_swapIn:
-    this->fFadeTextOut = 1;
-    if (((this->fPrevController == 5) || (this->fPrevController == 3)) &&
-       ((this->fCurrentController == 4 || (this->fCurrentController == 6)))) {
-      this->SwapInController();
-    }
-    this->fPrevController = this->fCurrentController;
+    this->fPrevConfig = frontEnd.controlConfig[this->player];
     return;
   }
-  if ((uint)(byte)frontEnd.controlConfig[this->player] == (uint)(byte)this->fPrevConfig) {
-    return;
-  }
+  this->TurnOffShakers();
   Front_ResetPSXController(this->player,(uint)(byte)frontEnd.controlConfig[this->player]);
-  if ((*(int *)this->fFade == 0) && (this->fAnim == 0)) {
-    this->fAnim = 1;
-    this->fAnimController = (ushort)(byte)this->fCurrentController;
-    /* MATCH: SLD 911 owns BOTH byte loads AND the whole compare chain -> retail
-       read the two config bytes INSIDE the if-expression (no line-267/268 locals);
-       that alone fixes the config-vs-prevConfig load order. */
-    if (((frontEnd.controlConfig[this->player] > this->fPrevConfig) &&
-         ((frontEnd.controlConfig[this->player] != 2 || (this->fPrevConfig != 0)))) ||
-        ((frontEnd.controlConfig[this->player] == 0 && (this->fPrevConfig == 2)))) {
-      this->fAnimStart = this->AnimKeyPoints(true,1);
-      this->fAnimStop = this->AnimKeyPoints(true,0);
-      this->fAnimStep = 1;   /* MATCH: store the step DIRECTLY per arm (no shared
-                                animVal local) -- gcc colors each to $v0 and
-                                cross-jump-merges only the `sh $v0,0x86` tail. */
-    }
-    else {
-      this->fAnimStart = this->AnimKeyPoints(false,1);
-      this->fAnimStop = this->AnimKeyPoints(false,0);
-      this->fAnimStep = -1;
-    }
-    this->fAnimFrame = this->fAnimStart;
+  if (this->fAnim != 0) {
+    return;
   }
-  this->fPrevConfig = frontEnd.controlConfig[this->player];
+  if (this->fCurrentController == '\0') {
+    if (this->fAnimFade != 0) {
+      return;
+    }
+    this->fFade[0] = 1;
+    this->fFadeController[0] = (ushort)(byte)this->fPrevController;
+    this->fPrevController = this->fCurrentController;
+    return;
+  }
+  if (this->fPrevController == '\0') {
+    if (this->fAnimFade != 0) {
+      return;
+    }
+    config = this->fCurrentController;
+    animVal = this->fArrowFade;
+    this->fSwap = 1;
+    this->fFade[1] = 1;
+    this->fFadeController[1] = (ushort)config;
+  }
+  else {
+    if ((this->CurrentlyLoadedArt != -1) &&
+       (cmp = strcmp
+                          (fileNames[(byte)this->fCurrentController],
+                           fileNames[this->CurrentlyLoadedArt]), cmp == 0)) {
+      this->fFadeTextOut = 1;
+      if (((this->fPrevController == '\x05') || (this->fPrevController == '\x03')) &&
+         ((this->fCurrentController == '\x04' || (this->fCurrentController == '\x06')))) {
+        this->SwapInController();
+      }
+      goto ChkConfigs_savePrevCtrl;
+    }
+    if (this->fAnimFade != 0) {
+      return;
+    }
+    config = this->fPrevController;
+    prevConfig = this->fCurrentController;
+    animVal = this->fArrowFade;
+    this->fFade[0] = 1;
+    this->fSwap = 1;
+    this->fFade[1] = 1;
+    this->fFadeController[0] = (ushort)config;
+    this->fFadeController[1] = (ushort)prevConfig;
+  }
+  if (0x7f < animVal) {
+    this->fTextController = this->fCurrentController;
+  }
+  if (this->fTextController == '\x06') {
+    this->fTextController = '\x05';
+  }
+ChkConfigs_savePrevCtrl:
+  this->fPrevController = this->fCurrentController;
   return;
 }
 
@@ -326,14 +274,12 @@ ChkConfigs_swapIn:
 void tScreenControllerConfig::SwapInController()
 
 {
-  /* MATCH: SLD reports a 24-byte frame with only ra/s0 saved and no locals.
-     Passing the table entry directly removes the decompiler's uninitialized
-     fileName pseudo and lets GCC rematerialize fileNames after strcmp. */
+  int cmp;
+  
   if ((this->CurrentlyLoadedArt == -1) ||
-     (strcmp(fileNames[(byte)this->fCurrentController],
-             fileNames[this->CurrentlyLoadedArt]) != 0)) {
-    ::AsyncLoadSwapShapeFile((tScreen *)this,
-                             fileNames[(byte)this->fCurrentController]);
+     (cmp = strcmp(fileNames[(byte)this->fCurrentController],
+                         fileNames[this->CurrentlyLoadedArt]), cmp != 0)) {
+    AsyncLoadSwapShapeFile(&this->_base_tScreen,fileNames[(byte)this->fCurrentController]);
     this->CurrentlyLoadedArt = (ushort)(byte)this->fCurrentController;
   }
   return;
@@ -343,29 +289,30 @@ void tScreenControllerConfig::SwapInController()
 void tScreenControllerConfig::SetCurrentController(bool firsttime)
 
 {
-  /* Reliable SYM names only fSetMenu and setmenutonull.  The optimized-away
-     identities retained by the measured source shape are:
-     SYM-CODEGEN-CARRIER: dialog
-     SYM-CODEGEN-CARRIER: dialogIsIdle
-     SYM-CODEGEN-CARRIER: previousNegconChoice
-     SYM-CODEGEN-CARRIER: menuDefinitions
-     Direct menuDefs member addressing is FAIL40 at 220/222 instructions;
-     folding dialogIsIdle into a conjunction is FAIL5 at 221/222; direct
-     negconPopUp member addressing is FAIL214 at 220/222 and collapses the
-     retail 48-byte frame to 40 bytes. */
+  byte padID;
+  bool dialogIdle;
+  uint playerMask;
   bool setmenutonull;
+  tGlobalMenuDefs *menus;
+  short choice;
+  char *word;
+  uint padOffset;
+  int padState;
+  char ctrlType;
   tInsideBoxMenu *fSetMenu;
-  tDialogYesNo *dialog;
-
+  int firsttimeU;
+  
+  firsttimeU = firsttime;
   fSetMenu = (tInsideBoxMenu *)0x0;
-  dialog = &this->negconPopUp;
-  /* SYM-INLINE-THIS: SetString */
-  dialog->SetString(TextSys_Word(0x20b));
-  dialog->yesnowords[0] = 0x20c;
-  dialog->yesnowords[1] = 0x20d;
-  dialog->fDefault = 1;
+  word = TextSys_Word(0x20b);
+  (this->negconPopUp)._base_tDialogInteractive._base_tDialogMessageString.string = word;
+  (this->negconPopUp).yesnowords[0] = 0x20c;
+  (this->negconPopUp).yesnowords[1] = 0x20d;
+  (this->negconPopUp)._base_tDialogInteractive._base_tDialogMessageString._base_tDialogBase.fDefault = 1;
+  playerMask = -(uint)(this->player != 0);
+  padOffset = playerMask & 0x20;
   setmenutonull = false;
-  if (gPadinfo.buf[(this->player != 0) * 4].nopad != '\0') {
+  if ((&gPadinfo.buf[0].nopad)[padOffset] != '\0') {
     this->fCurrentController = '\0';
     if (0x7f < this->fArrowFade) {
       this->CurrentlyLoadedArt = 0;
@@ -373,106 +320,99 @@ void tScreenControllerConfig::SetCurrentController(bool firsttime)
     setmenutonull = true;
     goto SetCurCtrl_menuSetVertHelp;
   }
-  switch (gPadinfo.buf[(this->player != 0) * 4].ID) {
-  case 0x23:
-    {
-      bool dialogIsIdle;
-      int previousNegconChoice;
-
-      this->fTimeOutStartTick = 0;
-      if (((firsttime == 0) && (this->fCurrentController != '\x02')) &&
-         (this->fCurrentController != '\x01')) {
-        dialogIsIdle = false;
-        if (dialog->currentlyOn == 0) {
-          dialogIsIdle = dialog->fCurrentlyRunning == 0;
-        }
-        if (dialogIsIdle) {
-          previousNegconChoice = this->negconChoice;
-          if (previousNegconChoice != -1) {
-            goto SetCurCtrl_noNegconDialog;
+  padID = (&gPadinfo.buf[0].ID)[padOffset];
+  if (padID == 0x53) {
+SetCurCtrl_dualShockDetected:
+    this->fTimeOutStartTick = 0;
+    padState = PadGetState((uint)(this->player != 0) << 4);
+    if (padState == 6) {
+      this->fCurrentController = '\x06';
+      fSetMenu = &menuDefs->menuControllerDualShockAnalog;
+    }
+    else {
+      padState = PadGetState((uint)(this->player != 0) << 4);
+      if (padState == 2) {
+        this->fCurrentController = '\x05';
+        fSetMenu = &menuDefs->menuControllerAnalog;
+      }
+    }
+  }
+  else {
+    if (padID < 0x54) {
+      if (padID == 0x23) {
+        this->fTimeOutStartTick = 0;
+        if (((firsttimeU == 0) && (this->fCurrentController != '\x02')) &&
+           (this->fCurrentController != '\x01')) {
+          dialogIdle = false;
+          if ((this->negconPopUp)._base_tDialogInteractive._base_tDialogMessageString._base_tDialogBase.currentlyOn ==
+              0) {
+            dialogIdle = (this->negconPopUp)._base_tDialogInteractive.fCurrentlyRunning == 0;
           }
-          this->fCurrentController = '\0';
-          this->fArrowFade = 0x80;
-          this->negconChoice = Run((tDialogInteractive *)dialog);
-          this->fCurrentController =
-              this->negconChoice != 0 ? '\x02' : '\x01';
-          {
-            tGlobalMenuDefs *menuDefinitions = menuDefs[0];
-
-            this->negconChoice = previousNegconChoice;
-            fSetMenu = &menuDefinitions->menuControllerNegcon;
+          if ((dialogIdle) && (this->negconChoice == -1)) {
+            this->fCurrentController = '\0';
+            this->fArrowFade = 0x80;
+            choice = Run(&(this->negconPopUp)._base_tDialogInteractive);
+            this->negconChoice = choice;
+            ctrlType = '\x01';
+            if (choice != 0) {
+              ctrlType = '\x02';
+            }
+            this->fCurrentController = ctrlType;
+            menus = menuDefs;
+            this->negconChoice = -1;
+            fSetMenu = &menus->menuControllerNegcon;
+          }
+          else {
+            setmenutonull = true;
+            firsttimeU = 1;
+            this->fArrowFade = 0x80;
+            this->fCurrentController = '\0';
+          }
+        }
+        else {
+          fSetMenu = &menuDefs->menuControllerNegcon;
+        }
+        goto SetCurCtrl_menuSetVertHelp;
+      }
+      if (padID == 0x41) {
+        padState = PadGetState(playerMask & 0x10);
+        dialogIdle = false;
+        if (padState == 6) {
+          this->fCurrentController = '\x04';
+          menus = menuDefs;
+          this->fTimeOutStartTick = 0;
+          fSetMenu = &menus->menuControllerDualShock;
+          goto SetCurCtrl_menuSetVertHelp;
+        }
+        padState = PadGetState((uint)(this->player != 0) << 4);
+        if ((padState == 2) ||
+           (((this->fTimeOutStartTick != 0 &&
+             (padState = PadGetState((uint)(this->player != 0) << 4),
+             padState == 1)) && (0x60 < ticks - this->fTimeOutStartTick)))) {
+          dialogIdle = true;
+        }
+        if ((!dialogIdle) && (this->fCurrentController != '\x03')) {
+          if (this->fTimeOutStartTick == 0) {
+            this->fTimeOutStartTick = ticks;
           }
           goto SetCurCtrl_menuSetVertHelp;
         }
-SetCurCtrl_noNegconDialog:
-        {
-          setmenutonull = true;
-          firsttime = true;
-          this->fArrowFade = 0x80;
-          this->fCurrentController = '\0';
-        }
-      }
-      else {
-        fSetMenu = &menuDefs[0]->menuControllerNegcon;
-      }
-      goto SetCurCtrl_menuSetVertHelp;
-    }
-  case 0x41:
-    {
-      if (PadGetState(-(uint)(this->player != 0) & 0x10) == 6) {
-        tGlobalMenuDefs *menuDefinitions;
-
-        this->fCurrentController = '\x04';
-        menuDefinitions = menuDefs[0];
-        this->fTimeOutStartTick = 0;
-        fSetMenu = &menuDefinitions->menuControllerDualShock;
-        goto SetCurCtrl_menuSetVertHelp;
-      }
-      if ((PadGetState((this->player != 0) * 0x10) == 2) ||
-          (((this->fTimeOutStartTick != 0) &&
-            (PadGetState((this->player != 0) * 0x10) == 1)) &&
-           (0x60 < ticks - this->fTimeOutStartTick)) ||
-          (this->fCurrentController == '\x03')) {
-        setmenutonull = true;
-        goto SetCurCtrl_unknown;
-      }
-      if (this->fTimeOutStartTick == 0) {
-        this->fTimeOutStartTick = ticks;
-      }
-      goto SetCurCtrl_menuSetVertHelp;
-    }
-  case 0x53:
-  case 0x73:
-SetCurCtrl_dualShockDetected:
-    this->fTimeOutStartTick = 0;
-    if (PadGetState((this->player != 0) * 0x10) == 6) {
-      this->fCurrentController = '\x06';
-      fSetMenu = &menuDefs[0]->menuControllerDualShockAnalog;
-    }
-    else {
-      if (PadGetState((this->player != 0) * 0x10) == 2) {
-        this->fCurrentController = '\x05';
-        fSetMenu = &menuDefs[0]->menuControllerAnalog;
       }
     }
-    break;
-  default:
+    else if (padID == 0x73) goto SetCurCtrl_dualShockDetected;
     setmenutonull = true;
-SetCurCtrl_unknown:
     this->fTimeOutStartTick = 0;
     this->fCurrentController = '\x03';
-    break;
   }
 SetCurCtrl_menuSetVertHelp:
   if ((fSetMenu != (tInsideBoxMenu *)0x0) || (setmenutonull)) {
-    SetMenu(&menuDefs[0]->itemControllerSettings,firsttime,fSetMenu);
+    SetMenu(&menuDefs->itemControllerSettings,firsttimeU,fSetMenu);
   }
-  if (((uint)((byte)this->fCurrentController - 5) < 2U) &&
-      ((byte)this->fTextConfig < 2)) {
-    (menuDefs[0]->menuControllerConfig).VertHelp = 1;
+  if (((byte)this->fCurrentController - 5 < 2) && ((byte)this->fTextConfig < 2)) {
+    (menuDefs->menuControllerConfig)._base_tMenu.VertHelp = 1;
   }
   else {
-    (menuDefs[0]->menuControllerConfig).VertHelp = 0;
+    (menuDefs->menuControllerConfig)._base_tMenu.VertHelp = 0;
   }
   return;
 }
@@ -481,9 +421,8 @@ SetCurCtrl_menuSetVertHelp:
 int tScreenControllerConfig::CalcAnimFrame(int frame)
 
 {
-  /* MATCH: SLD has no `bound` local.  Keeping the low/high reflections as
-     separate tails lets GCC cross-jump their subtraction and select $v0 for
-     the 0x16/0x38 constants, matching retail's 35-instruction CFG. */
+  int bound;
+  
   if (this->fCurrentController == '\x02') {
     if (((frame == 0) || (frame == 0x14)) || (frame == 0x28)) {
       frame = 1;
@@ -495,22 +434,19 @@ int tScreenControllerConfig::CalcAnimFrame(int frame)
       frame = frame + 2;
     }
     else {
-      if (frame < 0x14) goto CalcAnimFrame_low;
-      if (0x1e < frame) goto CalcAnimFrame_high;
-      frame = frame + -0x14;
-      if (9 < frame) {
-        frame = 9;
+      bound = 0x16;
+      if ((frame < 0x14) || (bound = 0x38, 0x1e < frame)) {
+        frame = bound - frame;
       }
-      frame = frame + 0x10;
-      goto CalcAnimFrame_done;
-CalcAnimFrame_low:
-      frame = 0x16 - frame;
-      goto CalcAnimFrame_done;
-CalcAnimFrame_high:
-      frame = 0x38 - frame;
+      else {
+        bound = frame + -0x14;
+        if (9 < bound) {
+          bound = 9;
+        }
+        frame = bound + 0x10;
+      }
     }
   }
-CalcAnimFrame_done:
   return frame;
 }
 
@@ -519,135 +455,92 @@ void tScreenControllerConfig::ActualDrawController(int frame,int fadelevelmain,i
                int shakex,int shakey)
 
 {
-  /* MATCH W64 PASS (40->0): keep frame+1 in the call argument, spell the
-     flag selects with the retail branch polarity, and lay out the non-art-2
-     final draw before the art-2 arrow block. */
-  /* SYM (nfs4-f-v3.txt @0x80043b7c) shows NO locals besides the args and one
-   * fn-scope `drawFlags` (tDrawShapeExtended); a SECOND `drawFlags` + `i` are
-   * declared in a nested block starting at the CurrentlyLoadedArt==2 arm --
-   * everything else (scaleIdx/shapeFlags/shapeX/shapeY/ofs/shakeOff/pX/pY)
-   * was Ghidra-fabricated. Rewritten as a literal transcription of the raw
-   * oracle: two mutually-exclusive first-draw arms (frame!=0||art==1 vs
-   * art!=1&&frame==0) that both feed the SAME cross-jump-merged
-   * DrawShapeExtended call, then a shared art==2 check that either emits the
-   * arrow/fade block or falls through to the final generic-shape draw. */
-  /* MATCH (80->40): `offTbl` was invented -- hoisting `Offset` into a local
-     materializes `lui/addiu` in the ENTRY block; retail builds the %hi/%lo
-     base inside the arm that uses it. */
+  short (*arrowLocation)[6];
+  int i;
+  int loadedArt;
+  int mainFlags;
+  int topFlags;
   tDrawShapeExtended drawFlags;
-
-  if (this->CurrentlyLoadedArt == 0) {
+  tDrawShapeExtended drawFlags2;
+  
+  loadedArt = this->CurrentlyLoadedArt;
+  if (loadedArt == 0) {
     return;
   }
-  drawFlags.custom_shapes = this->fSwapShapes.fShapes;
-  /* MATCH (W57, 138 @180 insns -> 80 @154 EXACT): all four "0x600 vs 0x601"
-     if/else pairs are ONE call with a SELECT on the flags argument -- the
-     oracle emits `addiu $a1,$zero,0x600; beqz $s3,L; <ds>; addiu $a1,$zero,
-     0x601; L:` and then ONE shared arg setup (w48-a4 value-select-in-a-call-
-     arg).  Also `frame + 1` is UNCONDITIONAL: retail's `addiu $a0,$a0,0x1`
-     sits in that select branch's DELAY SLOT, so it runs on both paths (the
-     Ghidra body had it only in the fadelevelmain!=0 arm -- a real bug). */
-  if ((frame != 0) || (this->CurrentlyLoadedArt == 1)) {
-    ScaleShapeExtended(frame + 1,fadelevelmain != 0 ? 0x601 : 0x600,
-               Offset[this->CurrentlyLoadedArt][0],
-               Offset[this->CurrentlyLoadedArt][1],fadelevelmain,0,&drawFlags);
-    if (this->CurrentlyLoadedArt == 2) {
-      DrawShapeExtended(0,fadelevelmain != 0 ? 0x601 : 0x600,
-                 Offset[2][0] + shakex,Offset[2][1] + shakey,fadelevelmain,0,&drawFlags);
-    }
+  drawFlags.custom_shapes = (this->_base_tScreen).fSwapShapes.fShapes;
+  mainFlags = (fadelevelmain == 0) ? 0x600 : 0x601;
+  if ((frame == 0) && (loadedArt != 1)) {
+    DrawShapeExtended(1,mainFlags,
+                      (int)Offset[loadedArt][0] + shakex,
+                      (int)Offset[loadedArt][1] + shakey,
+                      fadelevelmain,0,&drawFlags);
   }
   else {
-    DrawShapeExtended(1,fadelevelmain != 0 ? 0x601 : 0x600,
-               Offset[this->CurrentlyLoadedArt][0] + shakex,
-               Offset[this->CurrentlyLoadedArt][1] + shakey,fadelevelmain,0,&drawFlags);
+    ScaleShapeExtended(frame + 1,mainFlags,
+                       (int)Offset[loadedArt][0],(int)Offset[loadedArt][1],
+                       fadelevelmain,0,&drawFlags);
+    if (loadedArt == 2) {
+      DrawShapeExtended(0,mainFlags,
+                        (int)Offset[2][0] + shakex,(int)Offset[2][1] + shakey,
+                        fadelevelmain,0,&drawFlags);
+    }
   }
-  if (this->CurrentlyLoadedArt != 2) {
-    DrawShapeExtended(0,fadeleveltop != 0 ? 0x201 : 0x200,0,0,fadeleveltop,0,&drawFlags);
-    return;
-  }
-  {
-    tDrawShapeExtended drawFlags;
-    int i;
-
-    drawFlags.tint[0] = CalcFadeVal(0xc8c8c8,this->fArrowFade);
+  if (loadedArt == 2) {
     i = 0x30;
-    DrawShapeExtended(0x1a,0x18,0x9e,0x92,0,1,&drawFlags);
-    DrawShapeExtended(0x1b,0x18,0x9e,0xa1,0,1,&drawFlags);
-    DrawShapeExtended(0x1c,0x18,0x9e,0xac,0,1,&drawFlags);
-    DrawShapeExtended(0x1d,0x18,0x9e,0xbb,0,1,&drawFlags);
+    drawFlags2.tint[0] = CalcFadeVal(0xc8c8c8,(int)this->fArrowFade);
+    DrawShapeExtended(0x1a,0x18,0x9e,0x92,0,1,&drawFlags2);
+    DrawShapeExtended(0x1b,0x18,0x9e,0xa1,0,1,&drawFlags2);
+    DrawShapeExtended(0x1c,0x18,0x9e,0xac,0,1,&drawFlags2);
+    DrawShapeExtended(0x1d,0x18,0x9e,0xbb,0,1,&drawFlags2);
+    arrowLocation = &ArrowLocations[48];
     do {
-      PSXDrawSquare(drawFlags.tint[0],ArrowLocations[i][2] + -2,ArrowLocations[i][3] + -2,5,3);
+      int x = (*arrowLocation)[2];
+      int y = (*arrowLocation)[3];
+      arrowLocation = arrowLocation + 1;
       i = i + 1;
+      PSXDrawSquare(drawFlags2.tint[0],x - 2,y - 2,5,3);
     } while (i < 0x36);
     return;
   }
-}
-
-static inline short ControllerTwistRange(int player)
-{
-  /* The SLD inline block at 0x80044994 owns exactly `player` (INT) and
-     `range` (SHORT).  Keeping the short inside this helper preserves that
-     original source scope without forcing its promoted caller value back
-     through a 16-bit spill/reload. */
-  short range = (short)(gPadinfo.buf[player * 4].data.negcon.twist - 0x80);
-  return range;
+  topFlags = (fadeleveltop == 0) ? 0x200 : 0x201;
+  DrawShapeExtended(0,topFlags,0,0,fadeleveltop,0,&drawFlags);
+  return;
 }
 
 /* ---- tScreenControllerConfig::DrawController  (screencontroller.cpp:1156) ---- */
-/* MATCH: 77 -> 5. `flare_intensity / 4` restores gcc's signed-division bias,
-   `__builtin_abs` restores the retail absolute-value branch/copy shape, and
-   explicit flare x/Offset temporaries reduce the halo loop to allocation/order
-   differences.  2026-08-10: splitting the reused shock boolean into the two
-   source-arm values shown by IDA (v7=$a0 for shockMode, v10=$a1 for shockImpact)
-   removes 6 diffs with no code-size change. 2026-08-11: spelling the NegCon
-   zero-axis case as an out-of-line forward arm and comparing the already-wide
-   controller local removes one instruction and lowers the authoritative gate
-   from 30 to 21. 2026-08-12: Tenchu's matched split-index/working-copy idioms
-   recover the retail halo allocation exactly: build the byte row from a staged
-   doubled controller offset, and stage `iy = ii; iy += 0x3f`. Writing the first
-   mode tests as fresh field reads also places the 2/16 constants in the retail
-   delay slots, reducing 21 -> 5 at 837/836 instructions. 2026-08-14 PASS:
-   stage the captured controller as a `byte` separately inside each sign arm.
-   Its short lifetime lets GCC keep the normalized value in v0, while the byte
-   local and fresh field test remain logically distinct, preserving retail's
-   two identical comparisons without a copy or a second mask (836/836).
-   Falsified in this basin: one shared
-   controller-offset pointer (neutral), pointer/read fences (extra scheduling instruction), explicit
-   animStep/animRange locals (whole-function s1/s2 swap), and a direct SYM-local
-   NegCon rewrite (853/836 instructions), identity fences (extra masks), and
-   identical-arm fences (wrong v0/v1 basin), an arm-local `int` copy
-   (21 diffs/839), and an outer initialized copy (6/838); all were reverted. */
 void tScreenControllerConfig::DrawController()
 
 {
-  static int flare_intensity;
-  static int max_fi = 3750;
-  static int max_fidir = 250;
-  tDrawShapeExtended drawFlags;
-  short shakex;
-  short shakey;
+  bool bShockActive;
   short maxshakex;
   short maxshakey;
   int fadelevel;
-  /* SYM-CODEGEN-CARRIER: shockModeActive -- no debug name survives for IDA's
-     first arm value (`v7`, $a0).  Folding it into the predicate is measured
-     FAIL 18 at 832/836, deleting four retail instructions. */
-  bool shockModeActive;
+  uint frame;
+  int absA;
+  int player;
+  int axisB;
+  int t;
+  short shakey;
+  short shakex;
+  float f12;
+  double fd;
+  float f14;
+  tDrawShapeExtended drawFlags;
   
   shakex = 0;
   shakey = 0;
   maxshakex = 0;
   maxshakey = 0;
-  drawFlags.custom_shapes = this->fSwapShapes.fShapes;
-  shockModeActive = false;
+  drawFlags.custom_shapes = (this->_base_tScreen).fSwapShapes.fShapes;
+  bShockActive = false;
   if ((((this->fCurrentController == '\x04') &&
-       ((short)(menuDefs[0]->menuControllerDualShock).fCurrentItem == 0)) ||
+       ((short)(menuDefs->menuControllerDualShock)._base_tMenu.fCurrentItem == 0)) ||
       ((this->fCurrentController == '\x06' &&
-       ((short)(menuDefs[0]->menuControllerDualShockAnalog).fCurrentItem == 0)))) &&
-     ((short)(menuDefs[0]->menuControllerConfig).fCurrentItem == 1)) {
-    shockModeActive = true;
+       ((short)(menuDefs->menuControllerDualShockAnalog)._base_tMenu.fCurrentItem == 0)))) &&
+     ((short)(menuDefs->menuControllerConfig)._base_tMenu.fCurrentItem == 1)) {
+    bShockActive = true;
   }
-  if ((shockModeActive) && (frontEnd.shockMode[this->player] != '\0')) {
+  if ((bShockActive) && (frontEnd.shockMode[this->player] != '\0')) {
     if (this->fShakingItem != 0) {
       this->fShakingItem = 0;
       this->fResetShakeTimeOut = 1;
@@ -657,20 +550,15 @@ void tScreenControllerConfig::DrawController()
     maxshakey = ((byte)frontEnd.shockMode[this->player] >> 6) + 2;
   }
   else {
-    /* SYM-CODEGEN-CARRIER: shockImpactActive -- the distinct second-arm value
-       is IDA `v10` in $a1.  Folding it into the predicate is measured FAIL 52
-       at 834/836 and rotates the long-lived shake registers. */
-    bool shockImpactActive;
-
-    shockImpactActive = false;
+    bShockActive = false;
     if ((((this->fCurrentController == '\x04') &&
-         ((short)(menuDefs[0]->menuControllerDualShock).fCurrentItem == 1)) ||
+         ((short)(menuDefs->menuControllerDualShock)._base_tMenu.fCurrentItem == 1)) ||
         ((this->fCurrentController == '\x06' &&
-         ((short)(menuDefs[0]->menuControllerDualShockAnalog).fCurrentItem == 1)))) &&
-       ((short)(menuDefs[0]->menuControllerConfig).fCurrentItem == 1)) {
-      shockImpactActive = true;
+         ((short)(menuDefs->menuControllerDualShockAnalog)._base_tMenu.fCurrentItem == 1)))) &&
+       ((short)(menuDefs->menuControllerConfig)._base_tMenu.fCurrentItem == 1)) {
+      bShockActive = true;
     }
-    if ((shockImpactActive) && ((byte)frontEnd.shockImpact[this->player] != 0)) {
+    if ((bShockActive) && ((byte)frontEnd.shockImpact[this->player] != 0)) {
       this->SetActuators((uint)(byte)frontEnd.shockImpact[this->player] << 1);
       maxshakex = ((byte)frontEnd.shockImpact[this->player] >> 5) + 2;
       maxshakey = ((byte)frontEnd.shockImpact[this->player] >> 6) + 2;
@@ -685,22 +573,36 @@ void tScreenControllerConfig::DrawController()
     }
   }
   this->ShakeIt();
-  if ((maxshakex != 0) || (maxshakey != 0)) {
+  t = (int)maxshakex;
+  if ((t != 0) || (maxshakey != 0)) {
     fadelevel = rand();
-    shakex = (short)(fadelevel % maxshakex) - (maxshakex >> 1);
-    fadelevel = rand();
-    shakey = (short)(fadelevel % maxshakey) - (maxshakey >> 1);
+    if (t == 0) {
+      trap(0x1c00);
+    }
+    if ((t == -1) && (fadelevel == -0x80000000)) {
+      trap(0x1800);
+    }
+    shakex = (short)(fadelevel % t) - (maxshakex >> 1);
+    t = rand();
+    fadelevel = (int)maxshakey;
+    if (fadelevel == 0) {
+      trap(0x1c00);
+    }
+    if ((fadelevel == -1) && (t == -0x80000000)) {
+      trap(0x1800);
+    }
+    shakey = (short)(t % fadelevel) - (maxshakey >> 1);
   }
-  ::IsShapeFileLoaded((tScreen *)this,&this->fSwapShapes);
-  if (this->fSwapShapes.fFile != (char *)0x0) {
-    ::UploadSwapShapes((tScreen *)this,0x42);
+  IsShapeFileLoaded(&this->_base_tScreen,&(this->_base_tScreen).fSwapShapes);
+  if ((this->_base_tScreen).fSwapShapes.fFile != (char *)0x0) {
+    UploadSwapShapes(&this->_base_tScreen,0x42);
     return;
   }
-  if ((this->fSwapShapes.fFlags & 1) == 0) {
+  if (((this->_base_tScreen).fSwapShapes.fFlags & 1) == 0) {
     this->fGotTick = 0;
     return;
   }
-  if (((((u_int)((byte)this->fCurrentController - 5) < 2) && (this->fAnim == 0)) &&
+  if (((((byte)this->fCurrentController - 5 < 2) && (this->fAnim == 0)) &&
       (*(int *)this->fFade == 0)) && (this->fAnimFade == 0)) {
     flare_intensity = flare_intensity + 0xfa;
     if (max_fi <= flare_intensity) {
@@ -724,98 +626,95 @@ void tScreenControllerConfig::DrawController()
     }
   }
   if (0 < flare_intensity) {
-    int ii = 0;
-    /* SYM-CODEGEN-CARRIER: offsets
-       SYM-CODEGEN-CARRIER: x
-       SYM-CODEGEN-CARRIER: controllerOffset
-       SYM-CODEGEN-CARRIER: row
-       SYM-CODEGEN-CARRIER: xOffset
-       SYM-CODEGEN-CARRIER: haloX
-       SYM-CODEGEN-CARRIER: iy
-       These optimized-away split-index/working-copy values reproduce the
-       retail halo argument web.  Direct Offset indexing and arithmetic is
-       count-exact but measured FAIL 30 at 836/836. */
-    unsigned char (*offsets)[2] = Offset;
-    int x = (int)shakex + 0x7e;
+    t = 0;
     do {
-      int controllerOffset = (byte)this->fCurrentController;
-      controllerOffset <<= 1;
-      unsigned char *row = (unsigned char *)(controllerOffset + (int)offsets);
-      int xOffset = (uint)row[0];
-      int haloX = xOffset + x;
-      int iy = ii;
-      iy += 0x3f;
-      Flare_2DHalo(haloX,
-                 (uint)row[1] +
-                   iy + (int)shakey,
-                 flare_intensity,flare_intensity / 4,0x15);
-      ii++;
-    } while (ii < 2);
+      fadelevel = flare_intensity;
+      if (flare_intensity < 0) {
+        fadelevel = flare_intensity + 3;
+      }
+      Flare_2DHalo((uint)Offset[(byte)this->fCurrentController][0] + shakex + 0x7e,
+                 (uint)Offset[(byte)this->fCurrentController][1] + t + 0x3f + (int)shakey,
+                 flare_intensity,fadelevel >> 2,0x15);
+      t = t + 1;
+    } while (t < 2);
   }
-  if ((this->fFade[0] != 0) && (this->fAnimFade == 0)) {
-    this->fFade[0] = 0;
-    this->fAnimFade = -1;
-    this->fAnimFadeController = this->fFadeController[0];
-    this->fAnimFadeStart = this->AnimKeyPoints(false,1);
-    this->fAnimFadeStop = this->AnimKeyPoints(false,0);
-    this->fAnimFadeFrame = this->fAnimFadeStart;
-    goto DrawCtrl_ticksUpdate;
-  }
-  if (this->fFade[1] != 0) {
-    if (this->fAnimFade == 0) {
-      this->fFade[1] = 0;
-      this->fAnimFade = 1;
-      this->fAnimFadeController = this->fFadeController[1];
-      this->fAnimFadeStart = this->AnimKeyPoints(true,1);
-      this->fAnimFadeStop = this->AnimKeyPoints(true,0);
-      this->fAnimFadeFrame = this->fAnimFadeStart;
-      if (this->fSwap == 0) goto DrawCtrl_ticksUpdate;
-      goto DrawCtrl_swapController;
+  if ((this->fFade[0] == 0) || (this->fAnimFade != 0)) {
+    if (this->fFade[1] == 0) {
+DrawCtrl_fadeOpacity:
+      if (this->fFade[0] == 0) {
+        if ((this->fFade[1] == 0) || (this->fAnimFade != 1)) goto DrawCtrl_ticksUpdate;
+        maxshakex = this->fSwap;
+        this->fFade[1] = 0;
+      }
+      else {
+DrawCtrl_swapDoneA:
+        maxshakex = this->fSwap;
+        this->fFade[0] = 0;
+      }
+DrawCtrl_swapCheck:
+      if (maxshakex == 0) goto DrawCtrl_ticksUpdate;
+      this->SwapInController();
     }
-    if (this->fAnimFade == 1) {
-      if (this->fFade[0] != 0) goto DrawCtrl_clearFade0;
+    else {
+      if (this->fAnimFade == 0) {
+        maxshakex = this->fFadeController[1];
+        this->fFade[1] = 0;
+        this->fAnimFade = 1;
+        this->fAnimFadeController = maxshakex;
+        maxshakex = this->AnimKeyPoints(true,1);
+        this->fAnimFadeStart = maxshakex;
+        maxshakey = this->AnimKeyPoints(true,0);
+        maxshakex = this->fSwap;
+        this->fAnimFadeStop = maxshakey;
+        this->fAnimFadeFrame = this->fAnimFadeStart;
+        goto DrawCtrl_swapCheck;
+      }
+      if (this->fAnimFade != 1) goto DrawCtrl_fadeOpacity;
+      if (this->fFade[0] != 0) goto DrawCtrl_swapDoneA;
+      maxshakex = this->fFadeController[1];
       this->fFade[1] = 0;
       this->fAnimFade = 1;
-      this->fAnimFadeController = this->fFadeController[1];
-      this->fAnimFadeStart = this->AnimKeyPoints(true,1);
-      this->fAnimFadeStop = this->AnimKeyPoints(true,0);
+      this->fAnimFadeController = maxshakex;
+      maxshakex = this->AnimKeyPoints(true,1);
+      this->fAnimFadeStart = maxshakex;
+      maxshakex = this->AnimKeyPoints(true,0);
+      this->fAnimFadeStop = maxshakex;
       this->fAnimFadeFrame = this->fAnimFadeStart;
       if (this->fSwap == 0) goto DrawCtrl_ticksUpdate;
       this->SwapInController();
       this->fGotTick = 0;
-      goto DrawCtrl_clearSwap;
     }
-  }
-  if (this->fFade[0] != 0) {
-DrawCtrl_clearFade0:
-    this->fFade[0] = 0;
-    if (this->fSwap == 0) goto DrawCtrl_ticksUpdate;
-    goto DrawCtrl_swapController;
-  }
-  if ((this->fFade[1] != 0) && (this->fAnimFade == 1)) {
-    this->fFade[1] = 0;
-    if (this->fSwap == 0) goto DrawCtrl_ticksUpdate;
-DrawCtrl_swapController:
-    this->SwapInController();
-DrawCtrl_clearSwap:
     this->fSwap = 0;
   }
+  else {
+    this->fFade[0] = 0;
+    this->fAnimFade = -1;
+    this->fAnimFadeController = this->fFadeController[0];
+    maxshakex = this->AnimKeyPoints(false,1);
+    this->fAnimFadeStart = maxshakex;
+    maxshakex = this->AnimKeyPoints(false,0);
+    this->fAnimFadeStop = maxshakex;
+    this->fAnimFadeFrame = this->fAnimFadeStart;
+  }
 DrawCtrl_ticksUpdate:
+  t = ticks;
   if (this->fAnimFade != 0) {
     if (this->fGotTick == 0) {
       this->fGotTick = 1;
       this->fPlayedInSound = 0;
-      this->fStartTick = ticks;
+      this->fStartTick = t;
     }
     if (((10 < ticks - this->fStartTick) && (this->fPlayedInSound == 0)) && (this->fAnimFade == 1))
     {
       AudioCmn_PlayFESFX(0xf);
       this->fPlayedInSound = 1;
     }
-    this->fAnimFadeFrame = (u_short)this->fAnimFadeStart +
+    t = (uint)(ushort)this->fAnimFadeStart +
             ((ticks - this->fStartTick) / 6) * (int)this->fAnimFade;
-    if (((this->fAnimFadeStop < this->fAnimFadeFrame) && (this->fAnimFade == 1)) ||
-       ((this->fAnimFadeFrame < this->fAnimFadeStop && (this->fAnimFade == -1)))) {
+    this->fAnimFadeFrame = (short)t;
+    t = t * 0x10000 >> 0x10;
+    if (((this->fAnimFadeStop < t) && (this->fAnimFade == 1)) ||
+       ((t < this->fAnimFadeStop && (this->fAnimFade == -1)))) {
       this->fGotTick = 0;
       this->fAnimFadeFrame = this->fAnimFadeStop;
       if (this->fAnimFade == 1) {
@@ -823,12 +722,21 @@ DrawCtrl_ticksUpdate:
         this->fArrowFade = 0x80;
       }
     }
-    fadelevel = __builtin_abs(
-        (((int)this->fAnimFadeFrame - (int)this->fAnimFadeStart) * 0x80) /
-        ((int)this->fAnimFadeStop - (int)this->fAnimFadeStart));
-    fadelevel = fadelevel << 1;
+    fadelevel = ((int)this->fAnimFadeFrame - (int)this->fAnimFadeStart) * 0x80;
+    axisB = (int)this->fAnimFadeStop - (int)this->fAnimFadeStart;
+    t = fadelevel / axisB;
+    if (axisB == 0) {
+      trap(0x1c00);
+    }
+    if ((axisB == -1) && (fadelevel == -0x80000000)) {
+      trap(0x1800);
+    }
+    if (t < 0) {
+      t = -t;
+    }
+    fadelevel = t << 1;
     if (this->SuperFastFadeOut != 0) {
-      fadelevel = fadelevel << 1;
+      fadelevel = t << 2;
     }
     if (0x80 < fadelevel) {
       fadelevel = 0x80;
@@ -839,145 +747,148 @@ DrawCtrl_ticksUpdate:
     if (this->fGotTick == 0) {
       this->fAnimFade = 0;
     }
-    this->ActualDrawController(this->CalcAnimFrame((int)this->fAnimFadeFrame),
-                               fadelevel,fadelevel,0,0);
-    return;
+    frame = this->CalcAnimFrame((int)this->fAnimFadeFrame);
+    t = fadelevel;
+    goto DrawCtrl_callActual;
   }
   if (this->fAnim != 0) {
     if (this->fGotTick == 0) {
       AudioCmn_PlayFESFX(0xf);
+      t = ticks;
       this->fGotTick = 1;
-      this->fStartTick = ticks;
+      this->fStartTick = t;
     }
-    this->fAnimFrame = (u_short)this->fAnimStart +
-                       ((ticks - this->fStartTick) / 6) * (int)this->fAnimStep;
-    if (((this->fAnimStop < this->fAnimFrame) && (this->fAnimStep == 1)) ||
-       ((this->fAnimFrame < this->fAnimStop && (this->fAnimStep == -1)))) {
+    t = (uint)(ushort)this->fAnimStart + ((ticks - this->fStartTick) / 6) * (int)this->fAnimStep
+    ;
+    this->fAnimFrame = (short)t;
+    t = t * 0x10000 >> 0x10;
+    if (((this->fAnimStop < t) && (this->fAnimStep == 1)) ||
+       ((t < this->fAnimStop && (this->fAnimStep == -1)))) {
       this->fAnim = 0;
       this->fGotTick = 0;
       this->fAnimFrame = this->fAnimStop;
     }
-    fadelevel = (int)(((float)(ticks - this->fStartTick) /
-                       (float)((((int)this->fAnimStop - (int)this->fAnimStart) * 6) *
-                               (int)this->fAnimStep)) * 256.0);
-    if (0x100 < fadelevel) {
+    t = this->fStartTick;
+    f12 = __floatsisf(ticks - t);
+    fadelevel = this->fAnimStep * 6;
+    f14 = __floatsisf(((int)this->fAnimStop - (int)this->fAnimStart) * fadelevel);
+    f12 = __divsf3(f12,f14);
+    fd = __extendsfdf2(f12);
+    fd = __muldf3(fd,256.0);   /* 2nd operand (scale const) lost to decompiler -> inferred 0x100 */
+    t = __fixdfsi(fd);
+    fadelevel = t;
+    if (0x100 < t) {
       fadelevel = 0x100;
     }
-    if (0x80 < fadelevel) {
+    if (0x80 < t) {
       fadelevel = 0x100 - fadelevel;
     }
     fadelevel = fadelevel + 10;
+    t = fadelevel;
     if (fadelevel < 0) {
-      fadelevel = 0;
+      t = 0;
     }
     if (0x80 < fadelevel) {
-      fadelevel = 0x80;
+      t = 0x80;
     }
-    this->ActualDrawController(this->CalcAnimFrame((int)this->fAnimFrame),0,fadelevel,0,0);
-    return;
+    frame = this->CalcAnimFrame((int)this->fAnimFrame);
+    fadelevel = 0;
+    goto DrawCtrl_callActual;
   }
-  if ((u_int)((byte)this->fCurrentController - 5) < 2) {
-    char frame = 0;
-    if (((menuDefs[0]->itemControllerSteeringRange2).fActive != 0) ||
-       ((menuDefs[0]->itemControllerDeadSpot2).fActive != 0)) {
-      int player = this->player;
-      int range2 = 0x80 - (uint)gPadinfo.buf[player * 4].data.negcon.leftshift;
-      int range1 = 0x80 - (uint)gPadinfo.buf[player * 4].data.negcon.buttonII;
-      short ret = (short)range2;
-      if (((range1 < 0) ? -range1 : range1) >
-          ((range2 < 0) ? -range2 : range2)) {
-        ret = (short)range1;
+  if ((byte)this->fCurrentController - 5 < 2) {
+    frame = 0;
+    if (((menuDefs->itemControllerSteeringRange2).fActive != 0) ||
+       ((menuDefs->itemControllerDeadSpot2).fActive != 0)) {
+      fadelevel = 0x80 - (uint)gPadinfo.buf[this->player * 4].data.negcon.leftshift;
+      axisB = 0x80 - (uint)gPadinfo.buf[this->player * 4].data.negcon.buttonII;
+      t = axisB;
+      if (axisB < 0) {
+        t = -axisB;
       }
-      if (ret >= 0) {
-        frame = ret / 0xd + 0x1a;
+      absA = fadelevel;
+      if (fadelevel < 0) {
+        absA = -fadelevel;
+      }
+      if (absA < t) {
+        fadelevel = axisB;
+      }
+      t = (int)(short)fadelevel;
+      if (t < 0) {
+        frame = -t / 0xd + 0x24;
       }
       else {
-        frame = -ret / 0xd + 0x24;
+        frame = t / 0xd + 0x1a;
       }
     }
-    if (((menuDefs[0]->itemControllerSteeringRange1).fActive != 0) ||
-       ((menuDefs[0]->itemControllerDeadSpot1).fActive != 0)) {
-      int player = this->player;
-      int range2 = 0x80 - (uint)gPadinfo.buf[player * 4].data.negcon.buttonI;
-      int range1 = 0x80 - (uint)gPadinfo.buf[player * 4].data.negcon.twist;
-      short ret = (short)range2;
-      if (((range1 < 0) ? -range1 : range1) >
-          ((range2 < 0) ? -range2 : range2)) {
-        ret = (short)range1;
+    if (((menuDefs->itemControllerSteeringRange1).fActive != 0) ||
+       ((menuDefs->itemControllerDeadSpot1).fActive != 0)) {
+      fadelevel = 0x80 - (uint)gPadinfo.buf[this->player * 4].data.negcon.buttonI;
+      axisB = 0x80 - (uint)gPadinfo.buf[this->player * 4].data.negcon.twist;
+      t = axisB;
+      if (axisB < 0) {
+        t = -axisB;
       }
-      if (ret >= 0) {
-        frame = ret / 0xd + 0x2e;
+      absA = fadelevel;
+      if (fadelevel < 0) {
+        absA = -fadelevel;
+      }
+      if (absA < t) {
+        fadelevel = axisB;
+      }
+      t = (int)(short)fadelevel;
+      if (t < 0) {
+        frame = -t / 0xd + 0x38;
       }
       else {
-        frame = -ret / 0xd + 0x38;
+        frame = t / 0xd + 0x2e;
       }
     }
     if ((frame & 0xff) != 0) {
-      /* CORRECTNESS FIX: oracle @0x8004494C reuses the SAME masked a0 (frame&0xff,
-       * already materialized for the guard test above) as the shape index, with
-       * a1=0x600 literal and a2/a3=Offset[CurrentlyLoadedArt][0/1] -- the prior
-       * prior reconstruction passed unrelated decompiler temporaries. */
-      DrawShapeExtended(frame & 0xff,0x600,Offset[this->CurrentlyLoadedArt][0],
-                 Offset[this->CurrentlyLoadedArt][1],0,0,&drawFlags);
+      DrawShapeExtended((int)(frame & 0xff),0x600,
+                        (int)Offset[this->CurrentlyLoadedArt][0],
+                        (int)Offset[this->CurrentlyLoadedArt][1],0,0,&drawFlags);
     }
   }
-  int frame = (uint)(byte)this->fCurrentController;
-  /* SYM-INLINE-LOCAL: range = ControllerTwistRange */
-  /* SYM-CODEGEN-CARRIER: rangeValue -- promoted caller storage for the
-     helper's recorded SHORT `range`; making this carrier SHORT is measured
-     FAIL 55 at 837/836. */
-  int rangeValue;
-  /* SYM-CODEGEN-CARRIER: modeBase -- IDA's mutually exclusive v72/v73 base
-     constant web; the optimized SYM has no surviving source identifier. */
-  int modeBase;
-  /* SYM-CODEGEN-CARRIER: controller -- the arm-local byte copy keeps the
-     fresh field test distinct from the captured frame test.  An arm-local
-     int is FAIL 21 at 839/836; an initialized outer copy is FAIL 6 at 838/836. */
-  byte controller;
-  if (((u_int)(frame - 1) < 2) &&
-      (((menuDefs[0]->itemControllerJoyRange).fActive != 0 ||
-       ((menuDefs[0]->itemControllerCenterPoint).fActive != 0)))) {
-    rangeValue = ControllerTwistRange(this->player);
-    if (rangeValue < 0xb) goto DrawCtrl_smallAxis;
-    modeBase = 0x1a;
-    controller = (byte)frame;
-    if ((byte)this->fCurrentController == 2) {
-      modeBase = 2;
+  frame = (uint)(byte)this->fCurrentController;
+  if ((1 < frame - 1) ||
+     (((menuDefs->itemControllerJoyRange).fActive == 0 &&
+      ((menuDefs->itemControllerCenterPoint).fActive == 0)))) {
+    if (this->fCurrentController != '\0') {
+      this->ActualDrawController(0,0,0,(int)shakex,(int)shakey);
+      return;
     }
-    if (controller == 2) {
-DrawCtrl_calcModeTwo:
-      frame = modeBase + (rangeValue * 0xd) / 0x81;
-      goto DrawCtrl_axisDone;
+    this->fTextController = '\0';
+    this->fArrowFade = 0x80;
+    this->fTextTypeOn = 0;
+    return;
+  }
+  t = gPadinfo.buf[this->player * 4].data.negcon.twist - 0x80;
+  if (t < 0xb) {
+    fadelevel = 0x23;
+    if (t < -10) {
+      t = -t;
+      if (frame != 2) goto DrawCtrl_calcModeOther;
+      fadelevel = 0x10;
+      goto DrawCtrl_calcModeTwo;
     }
-    /* The retail CFG tests the fresh field read and captured frame separately. */
-    goto DrawCtrl_calcModeOther;
-DrawCtrl_smallAxis:
-    modeBase = 0x23;
-    if (rangeValue >= -10) {
-      goto DrawCtrl_zeroAxis;
-    }
-    rangeValue = -rangeValue;
-    controller = (byte)frame;
-    if ((byte)this->fCurrentController == 2) {
-      modeBase = 0x10;
-    }
-    if (controller == 2) goto DrawCtrl_calcModeTwo;
-DrawCtrl_calcModeOther:
-    frame = modeBase + (rangeValue << 3) / 0x81;
-    goto DrawCtrl_axisDone;
-DrawCtrl_zeroAxis:
     frame = (uint)(frame == 2);
-DrawCtrl_axisDone:
-    this->ActualDrawController(frame,0,0,0,0);
-    return;
   }
-  if (this->fCurrentController != '\0') {
-    this->ActualDrawController(0,0,0,(int)shakex,(int)shakey);
-    return;
+  else {
+    fadelevel = 0x1a;
+    if (frame == 2) {
+      fadelevel = 2;
+DrawCtrl_calcModeTwo:
+      frame = fadelevel + (t * 0xd) / 0x81;
+    }
+    else {
+DrawCtrl_calcModeOther:
+      frame = fadelevel + (t << 3) / 0x81;
+    }
   }
-  this->fTextController = '\0';
-  this->fArrowFade = 0x80;
-  this->fTextTypeOn = 0;
+  fadelevel = 0;
+  t = fadelevel;
+DrawCtrl_callActual:
+  this->ActualDrawController(frame,fadelevel,t,0,0);
   return;
 }
 
@@ -985,15 +896,18 @@ DrawCtrl_axisDone:
 void tScreenControllerConfig::HorzVertLine(short *ArrowLoc,bool type)
 
 {
-  int startx;
-  int starty;
+  int length;
   int endx;
+  int extrabit;
+  int startx;
+  int extrabit2;
+  int starty;
   int endy;
-  int LineCol;
+  int col;
   
   startx = (int)ArrowLoc[2];
-  starty = (int)ArrowLoc[3];
   endx = (int)ArrowLoc[4];
+  starty = (int)ArrowLoc[3];
   endy = (int)ArrowLoc[5];
   if (type) {
     startx = (int)*ArrowLoc;
@@ -1001,58 +915,46 @@ void tScreenControllerConfig::HorzVertLine(short *ArrowLoc,bool type)
     endx = (int)ArrowLoc[2];
     endy = (int)ArrowLoc[3];
   }
-  LineCol = 0x1e1e1e;
+  col = 0x1e1e1e;
   if (0 < this->fArrowFadeDir) {
-    LineCol = CalcFadeVal(0x1e1e1e,this->fArrowFade);
+    col = CalcFadeVal(0x1e1e1e,(int)type);
   }
+  length = (short)(endx - startx);
   if (startx == endx) {
-    int extrabitoff;
-    int extrabit;
-    short length;
-
-    extrabitoff = 0;
-    if (!type) {
-      extrabitoff = endy >= starty;
-    }
     extrabit = 0;
-    if (type == true) {
-      extrabit = endy >= starty;
+    if (!type) {
+      extrabit = (endy >= starty);
     }
-    length = (short)(endy - starty);
+    extrabit2 = 0;
+    if (type) {
+      extrabit2 = (endy >= starty);
+    }
+    length = endy - starty;
     if (this->mult != 0x40) {
-      int brightlength;
-
-      brightlength = ((int)length * (int)this->mult) >> 6;
-      length = (short)brightlength;
+      length = (short)length * (int)this->mult >> 6;
       PSXDrawTransSquare(0xffffff,endx,
-          endy - ((short)brightlength - ((short)brightlength >> 3) -
-                  extrabitoff + extrabit),
-          2,-((short)brightlength >> 3),2);
+                         endy - ((short)length - ((short)length >> 3) - extrabit + extrabit2),
+                         2,-((short)length >> 3),2);
     }
-    PSXDrawTransSquare(LineCol,endx,endy + extrabit,2,
-                       -((int)length - extrabitoff + extrabit),2);
+    PSXDrawTransSquare(col,endx,endy + extrabit2,2,
+                       -((short)length - extrabit + extrabit2),2);
   }
   else {
-    int extrabit;
-    short length;
-
     extrabit = (endx >= startx) * 2;
-    length = (short)(endx - startx);
     if (this->mult != 0x40) {
-      length = (short)(((int)length * (int)this->mult) >> 6);
-      if (extrabit < ((length < 0) ? -(int)length : (int)length)) {
-        int brightlength;
-
-        brightlength = (int)length >> 3;
-        PSXDrawTransSquare(0xffffff,
-            endx - ((int)length - brightlength) + extrabit,starty,
-            -(brightlength + extrabit),1,2);
+      length = (short)length * (int)this->mult >> 6;
+      if ((short)length <= extrabit && -extrabit <= (short)length) {
+        return;
       }
+      PSXDrawTransSquare(0xffffff,
+                         endx - ((short)length - ((short)length >> 3)) + extrabit,
+                         starty,-(((short)length >> 3) + extrabit),1,2);
     }
-    if (extrabit < ((length < 0) ? -(int)length : (int)length)) {
-      PSXDrawTransSquare(LineCol,endx + extrabit,endy,
-                         -((int)length + extrabit),1,2);
+    if ((short)length <= extrabit && -extrabit <= (short)length) {
+      return;
     }
+    PSXDrawTransSquare(col,endx + extrabit,endy,
+                       -((short)length + extrabit),1,2);
   }
   return;
 }
@@ -1061,23 +963,19 @@ void tScreenControllerConfig::HorzVertLine(short *ArrowLoc,bool type)
 void tScreenControllerConfig::DrawArrow(short *ArrowLoc)
 
 {
-  /* SYM-CODEGEN-CARRIER: clampVal
-     MATCH: SLD 1593 covers the entire clamp on one source line.  This is EA's
-     duplicated MIN(MAX(field, 0), 0x40) macro expansion, not a simplified
-     hand-written branch tree; keeping the field expression duplicated gives
-     retail's v1 raw value / a0 sign test / v0 clamp handout.  The named C
-     carrier represents that compiler-created COND_EXPR destination, so it is
-     correctly absent from the SYM local list. */
   short clampVal;
+  int fadeCalc;
+  short m;
+  int hi;
+  
   this->mult = 0;
   settrans(1);
-  /* MATCH: the oracle passes the literal mode (a0 = 0 here, a0 = 1 at the tail);
-     the decompiler had aliased them to the ArrowLoc pointer. */
   FeDraw_SetABRMode(0);
   if (*ArrowLoc != 0) {
     if (this->fArrowFadeDir < 0) {
-      this->mult = (short)(0x40 - (uint)(ushort)this->fArrowFade);
-      if (this->mult < 0) {
+      fadeCalc = 0x40 - (uint)(ushort)this->fArrowFade;
+      this->mult = (short)fadeCalc;
+      if (fadeCalc * 0x10000 < 0) {
         this->mult = 0;
       }
     }
@@ -1086,18 +984,17 @@ void tScreenControllerConfig::DrawArrow(short *ArrowLoc)
     }
     this->HorzVertLine(ArrowLoc,true);
   }
+  clampVal = 0x40;
   if (this->fArrowFadeDir < 0) {
-    this->mult = (short)(0x80 - (uint)(ushort)this->fArrowFade);
-    clampVal = (((((int)this->mult > 0) ? (int)this->mult : 0) < 0x40)
-                    ? (((int)this->mult > 0) ? (int)this->mult : 0) : 0x40);
-  }
-  else {
-    clampVal = 0x40;
+    fadeCalc = 0x80 - (uint)(ushort)this->fArrowFade;
+    hi = fadeCalc * 0x10000 >> 0x10;
+    m = (short)fadeCalc;
+    this->mult = m;
+    if (((hi < 1) || (clampVal = 0x40, hi < 0x40)) && (clampVal = m, hi < 0)) {
+      clampVal = 0;
+    }
   }
   this->mult = clampVal;
-  /* MATCH: zero-insn scheduling barrier keeps the SLD-1596 store before the
-     HorzVertLine argument setup instead of sinking it into the call slot. */
-  __asm__("" : : "i"(0));
   this->HorzVertLine(ArrowLoc,false);
   FeDraw_SetABRMode(1);
   settrans(0);
@@ -1108,54 +1005,42 @@ void tScreenControllerConfig::DrawArrow(short *ArrowLoc)
 void tScreenControllerConfig::DrawBackground()
 
 {
-  /* MATCH (W57, 58->36, count 145->137 EXACT): the SYM 8c block lists only
-     `fade` ($s1), an inlined tOptionsMenu `this` ($a0) and `i` ($s0) -- every
-     other local here was a Ghidra invention costing a callee-saved reg + frame
-     bytes (06A).  animStart/animStop/transDone/trans2 inlined; and the loop's
-     scaleIdx/shapeFlags/shapeX/shapeY were UNINITIALISED READS (real bug) --
-     the oracle's `addiu $a0,$s0,0xA` + three `addu ?,$zero,$zero` shows the
-     call is ScaleShapeExtended(i + 10, 0, 0, 0, fade, 0, NULL). */
   short fade;
+  short animStart;
+  short animStop;
+  void *transDone;
+  void *trans2;
   int i;
-
-  /* MATCH (36->27): the SYM's inlined tOptionsMenu `this` ($a0) is a real
-     pointer -- the oracle materializes `addiu $a0,$v0,11116` and then reads
-     fScreenFade by DISPLACEMENT `lw $v0,116($a0)`; the folded
-     `menuDefs[0]->menuControllerConfig.fScreenFade` form emits one fused load.
-     Only the fade read goes through it (routing the two TransitionIsFinished
-     calls through `om` too measured 48 @135 insns). */
-  /* MATCH (W64, 27->PASS): TransitionIsFinished is a normalized 0/1 result,
-     but its ABI-neutral declaration is `void *`.  Expressing the `!= true`
-     test as the corresponding integer XOR restores retail's immediate `xori`;
-     a pointer comparison made gcc retain constant 1 in $s1 across calls,
-     displaced `fade` to $s2, and added an unnecessary saved register. */
-  /* SYM-CODEGEN-CARRIER: om -- the W57/W64 oracle receipt above proves this
-     pointer is required to retain retail's displaced fScreenFade load. */
-  tOptionsMenu *om = &menuDefs[0]->menuControllerConfig;
-  fade = (short)(om->fScreenFade >> 1);
+  
+  fade = (short)((menuDefs->menuControllerConfig).fScreenFade >> 1);
   if (0x80 < fade) {
     fade = 0x80;
   }
   if ((this->fTransitionedIn == 0) &&
-     (::TransitionIsFinished(&menuDefs[0]->menuControllerConfig) != (void *)0x0)) {
+     (transDone = TransitionIsFinished(&menuDefs->menuControllerConfig),
+     transDone != (void *)0x0)) {
     this->fTransitionedIn = 1;
   }
   if (((fade < 0x81) && (this->fTransitioningIn == 0)) && (this->fCurrentController != '\0')
      ) {
     this->fAnimFade = 1;
-    this->fAnimFadeStart = this->AnimKeyPoints(true,1);
-    this->fAnimFadeStop = this->AnimKeyPoints(true,0);
+    animStart = this->AnimKeyPoints(true,1);
+    this->fAnimFadeStart = animStart;
+    animStop = this->AnimKeyPoints(true,0);
+    this->fAnimFadeStop = animStop;
     this->fTransitioningIn = 1;
     this->fAnimFadeFrame = this->fAnimFadeStart;
     this->fAnimFadeController = (ushort)(byte)this->fCurrentController;
   }
-  if ((((int)(long)::TransitionIsFinished(&menuDefs[0]->menuControllerConfig) ^ 1) != 0) &&
-      (this->fTransitionedIn != 0)) {
+  trans2 = TransitionIsFinished(&menuDefs->menuControllerConfig);
+  if ((trans2 != (void *)0x1) && (this->fTransitionedIn != 0)) {
     if (this->fTransitioningOut != 0) goto ForceVbl_drawCtrlCheck;
     if (this->fCurrentController != '\0') {
       this->fAnimFade = -1;
-      this->fAnimFadeStart = this->AnimKeyPoints(false,1);
-      this->fAnimFadeStop = this->AnimKeyPoints(false,0);
+      animStop = this->AnimKeyPoints(false,1);
+      this->fAnimFadeStart = animStop;
+      animStop = this->AnimKeyPoints(false,0);
+      this->fAnimFadeStop = animStop;
       this->fTransitioningOut = 1;
       this->SuperFastFadeOut = 1;
       this->fAnimFadeFrame = this->fAnimFadeStart;
@@ -1172,68 +1057,59 @@ ForceVbl_drawCtrlCheck:
   }
   i = 0;
   do {
-    ScaleShapeExtended(i + 10,0,0,0,(int)fade,0,(tDrawShapeExtended *)0x0);
+    ScaleShapeExtended(i + 0xa,0,0,0,(int)fade,0,
+               (tDrawShapeExtended *)0x0);
     i = i + 1;
   } while (i < 0xc);
   return;
 }
 
 /* ---- tScreenControllerConfig::DrawForeground  (screencontroller.cpp:1659) ---- */
-/* MATCH/SYM P136 (2026-08-26): exact PASS 410/410.  Reliable records restore
-   TL, i, j, string1, string2, brightstring, astringpointer, brightX, sl, fade,
-   and the nested ColText, ColText2, TextIndex, k, and howfarout declarations.
-   The recorded inline tDialogBase receiver is restored through IsVisible().
-   Direct controller storage, the explicit MIN candidate, and the final square
-   width alias are folded back into their source expressions; the EA MIN macro
-   and reuse of SYM `k` reproduce retail exactly.  Eight optimized-away value
-   webs remain below with measured SYM-CODEGEN-CARRIER receipts. */
 void tScreenControllerConfig::DrawForeground()
 
 {
-  short TL [5];
+  char ch;
+  bool flag;
+  ushort arrowFade;
   short i;
   short j;
+  short fadeDir;
+  int TextIndex;
+  void *transDone;
+  int ColText;
+  char *astringpointer;
+  uint slen;
+  int howfarout;
+  short *pTextLoc;
+  short coord;
+  int k;
+  short *pTL;
+  int ColText2;
+  short TL [5];
   char string1 [40];
   char string2 [40];
   char brightstring [2];
-  char *astringpointer;
-  int brightX;
-  short sl;
-  short fade;
-
+  
   this->SetCurrentController(false);
   this->CheckConfigs();
   brightstring[1] = '\0';
-  if ((this->fFadeTextOut == 0) && (this->fAnim == 0) &&
-      (this->fAnimFade == 0) && (*(int *)this->fFade == 0) &&
-      (::TransitionIsFinished(&menuDefs[0]->menuControllerConfig) != 0) &&
-      (this->fTransitioningOut == 0)) {
-    if (0 < this->fArrowFadeDir) {
+  fadeDir = 8;
+  if ((((this->fFadeTextOut == 0) && (fadeDir = 8, this->fAnim == 0)) &&
+      (fadeDir = 8, this->fAnimFade == 0)) && (fadeDir = 8, *(int *)this->fFade == 0)) {
+    transDone = TransitionIsFinished(&menuDefs->menuControllerConfig);
+    fadeDir = 8;
+    if (((transDone != (void *)0x0) && (fadeDir = 8, this->fTransitioningOut == 0)) &&
+       (fadeDir = -8, 0 < this->fArrowFadeDir)) {
       this->fTextTypeOn = 0;
     }
-    this->fArrowFadeDir = -8;
   }
-  else {
-    this->fArrowFadeDir = 8;
-  }
-  this->fArrowFade = this->fArrowFade + this->fArrowFadeDir;
-  if (this->fArrowFade < 0) {
+  this->fArrowFadeDir = fadeDir;
+  arrowFade = this->fArrowFade + this->fArrowFadeDir;
+  this->fArrowFade = arrowFade;
+  if ((int)((uint)arrowFade << 0x10) < 0) {
     this->fArrowFade = 0;
   }
-  if (0x7f < this->fArrowFade) {
-    this->fArrowFade = 0x80;
-    this->fTextController = this->fCurrentController;
-    if (this->fTextController == '\x06') {
-      this->fTextController = '\x05';
-    }
-    /* SYM-CODEGEN-CARRIER: selectedConfig -- direct member assignment is
-       count-exact FAIL 2 because it moves the fFadeTextOut store ahead of the
-       frontend config-table load. */
-    char selectedConfig = frontEnd.controlConfig[this->player];
-    this->fFadeTextOut = 0;
-    this->fTextConfig = selectedConfig;
-  }
-  else {
+  if (this->fArrowFade < 0x80) {
     if (this->fArrowFade == 0) {
       this->fTextTypeOn = this->fTextTypeOn + 1;
     }
@@ -1243,127 +1119,137 @@ void tScreenControllerConfig::DrawForeground()
     if (this->fArrowFade != 0) {
       FETextRender_SetABR(1,true);
     }
-    {
-      if (this->fTextController != '\0') {
-        int ColText;
-        int ColText2;
-
-        ColText = kRGBVals[(byte)textDefinitions[0xb][3]];
-        ColText2 = CalcFadeVal(ColText,0xffffff,100,(int)this->fArrowFade);
-        i = 0;
-        ColText = CalcFadeVal(ColText,(int)this->fArrowFade);
-        for (; i < NumTexts[(byte)this->fTextController - 1][(byte)this->fTextConfig]; i++) {
-          int TextIndex = (signed char)ControllerItemIndex[(byte)this->fTextController - 1]
-                                                          [(byte)this->fTextConfig][i][0];
-
-          if (TextIndex != -1) {
-            /* SYM-CODEGEN-CARRIER: textLocationOut
-               SYM-CODEGEN-CARRIER: copyCount
-               SYM-CODEGEN-CARRIER: textLocationIn
-               The constant-size memcpy form is FAIL 43 at 411/410; a direct
-               indexed loop is FAIL 182 at 414/410 and shrinks the retail
-               184-byte frame to 176.  These three value webs preserve the
-               halfword-pointer loop emitted by the retail source expansion. */
-            short *textLocationOut = TL;
-            int copyCount = 4;
-            short *textLocationIn = TextLocations[TextIndex];
-
-            do {
-              *textLocationOut++ = *textLocationIn++;
-              copyCount--;
-            } while (copyCount != -1);
-            int k;
-            /* SYM-CODEGEN-CARRIER: textLength -- assigning strlen directly
-               to the SYM SHORT `sl` is FAIL 151 at 411/410 and rotates the
-               function's saved-register allocation. */
-            int textLength = strlen(TextSys_Word((int)TL[2]));
-            sl = (short)textLength;
-            k = MIN(this->fTextTypeOn,(short)textLength);
-            if (this->fTextTypeOn < (short)textLength) {
-              int howfarout;
-
-              sprintf(string2,TextSys_Word((int)TL[2]));
-              if (TL[3] == 0) {
-                j = 0;
-                if (j < this->fTextTypeOn) {
-                  do {
-                    if (j >= (short)strlen(string2)) {
-                      break;
-                    }
-                    string1[j] = string2[j];
-                    j++;
-                  } while (j < this->fTextTypeOn);
-                }
-                string1[j] = '\0';
-                brightstring[0] = string1[j - 1];
+    if (this->fTextController != '\0') {
+      ColText2 = 100;
+      fadeDir = 0;
+      TextIndex = kRGBVals[(byte)textDefinitions[0xb][3]];
+      ColText = CalcFadeVal(TextIndex,0xffffff,100,(int)this->fArrowFade);
+      ColText2 = CalcFadeVal(TextIndex,ColText2);
+      while( true ) {
+        TextIndex = (byte)this->fTextController - 1;
+        if ((int)NumTexts[TextIndex][(byte)this->fTextConfig] <= (int)fadeDir) break;
+        TextIndex = (int)ControllerItemIndex[TextIndex][(byte)this->fTextConfig][fadeDir][0];
+        pTL = TL;
+        if (TextIndex != -1) {
+          k = 4;
+          pTextLoc = TextLocations[TextIndex];
+          do {
+            coord = *pTextLoc;
+            pTextLoc = pTextLoc + 1;
+            k = k + -1;
+            *pTL = coord;
+            pTL = pTL + 1;
+          } while (k != -1);
+          astringpointer = TextSys_Word((int)TL[2]);
+          slen = strlen(astringpointer);
+          i = (short)slen;
+          TextIndex = (int)i;
+          coord = this->fTextTypeOn;
+          if (TextIndex < this->fTextTypeOn) {
+            coord = i;
+          }
+          k = (int)coord;
+          if (this->fTextTypeOn < TextIndex) {
+            astringpointer = TextSys_Word((int)TL[2]);
+            sprintf(string2,astringpointer);
+            howfarout = slen - k;
+            coord = (short)howfarout;
+            if (TL[3] == 0) {
+              TextIndex = 0;
+              coord = 0;
+              if (0 < this->fTextTypeOn) {
+                do {
+                  coord = (short)TextIndex;
+                  slen = strlen(string2);
+                  k = TextIndex << 0x10;
+                  howfarout = k >> 0x10;
+                  TextIndex = TextIndex + 1;
+                  if ((int)(slen << 0x10) <= k) break;
+                  string1[howfarout] = string2[howfarout];
+                  coord = (short)TextIndex;
+                } while (TextIndex * 0x10000 >> 0x10 < (int)this->fTextTypeOn);
               }
-              else {
-                howfarout = textLength - k;
-                for (j = howfarout; j < sl; j++) {
-                  string1[j - (sl - k)] = string2[j];
-                }
-                string1[j - (sl - k)] = '\0';
-                brightstring[0] = string1[0];
-              }
-              FETextRender_SetFont(0);
-              brightX = TL[0];
-              /* SYM-CODEGEN-CARRIER: textWidth -- duplicating the width
-                 expression in the two arms is FAIL 148 at 416/410; reusing
-                 the dead SYM `k` is count-exact FAIL 48 and exchanges the
-                 retail $s0/$s1 value webs across the text loop. */
-              int textWidth = textpixels(string1) - strlen(string1);
-              if (TL[3] == 1) {
-                brightX = brightX - textWidth;
-              }
-              else {
-                brightX = brightX + textWidth;
-              }
-              FETextRender_FullTextRGB(brightstring,(short)brightX,TL[1],ColText2,
-                                       '\0',(ushort)(TL[3] == 0));
-              astringpointer = string1;
+              string1[coord] = '\0';
+              brightstring[0] = string1[coord + -1];
             }
             else {
-              astringpointer = TextSys_Word((int)TL[2]);
+              if (howfarout * 0x10000 >> 0x10 < TextIndex) {
+                do {
+                  j = (short)howfarout;
+                  howfarout = howfarout + 1;
+                  coord = (short)howfarout;
+                  string1[(int)j - (TextIndex - k)] = string2[j];
+                } while (howfarout * 0x10000 >> 0x10 < TextIndex);
+              }
+              string1[(int)coord - (i - k)] = '\0';
+              brightstring[0] = string1[0];
             }
-            FETextRender_FullTextRGB(astringpointer,TL[0],TL[1],ColText,'\0',TL[3]);
-            k = textpixels(astringpointer) - strlen(astringpointer);
-            PSXDrawSquare(0,(int)TL[0],(int)TL[1],
-                          (TL[3] != 0) ? -k : k,7);
+            FETextRender_SetFont(0);
+            k = (int)TL[0];
+            TextIndex = textpixels(string1);
+            slen = strlen(string1);
+            TextIndex = TextIndex - slen;
+            if (TL[3] == 1) {
+              TextIndex = -TextIndex;
+            }
+            astringpointer = string1;
+            FETextRender_FullTextRGB(brightstring,(short)((uint)((k + TextIndex) * 0x10000) >> 0x10),TL[1],ColText
+                       ,'\0',(ushort)(TL[3] == 0));
           }
+          else {
+            astringpointer = TextSys_Word((int)TL[2]);
+          }
+          FETextRender_FullTextRGB
+                    (astringpointer,TL[0],TL[1],ColText2,'\0',TL[3]);
+          TextIndex = textpixels(astringpointer);
+          slen = strlen(astringpointer);
+          TextIndex = TextIndex - slen;
+          if (TL[3] != 0) {
+            TextIndex = -TextIndex;
+          }
+          PSXDrawSquare(0,(int)TL[0],(int)TL[1],TextIndex,7);
         }
+        fadeDir = fadeDir + 1;
       }
     }
-    for (i = 0;
-         i < NumTexts[(byte)this->fTextController - 1][(byte)this->fTextConfig];
-         i++) {
-      int TextIndex = (byte)this->fTextController - 1;
-      /* SYM-CODEGEN-CARRIER: flag -- folding this materialized predicate into
-         the final conjunction is FAIL 55 at 409/410. */
-      bool flag = false;
-      /* SYM-CODEGEN-CARRIER: dialog -- direct negconPopUp member expressions
-         are count-exact FAIL 58 and rotate the global-table address registers. */
-      tDialogYesNo *dialog = &this->negconPopUp;
-
-      /* SYM-INLINE-THIS: IsVisible */
-      if (!((tDialogBase *)dialog)->IsVisible()) {
-        flag = dialog->fCurrentlyRunning == 0;
+    fadeDir = 0;
+    while( true ) {
+      ColText = (byte)this->fTextController - 1;
+      if ((int)NumTexts[ColText][(byte)this->fTextConfig] <= (int)fadeDir) break;
+      flag = false;
+      if ((this->negconPopUp)._base_tDialogInteractive._base_tDialogMessageString._base_tDialogBase.currentlyOn == 0)
+      {
+        flag = (this->negconPopUp)._base_tDialogInteractive.fCurrentlyRunning == 0;
       }
-      if (flag && (TextIndex >= 0)) {
-        TextIndex = (signed char)ControllerItemIndex[TextIndex][(byte)this->fTextConfig][i][1];
-        if (TextIndex != -1) {
-          this->DrawArrow(ArrowLocations[TextIndex]);
-        }
+      if (((flag) && (-1 < ColText)) &&
+         (ColText = (int)ControllerItemIndex[ColText][(byte)this->fTextConfig][fadeDir][1], ColText != -1))
+      {
+        this->DrawArrow(ArrowLocations[ColText]);
       }
+      fadeDir = fadeDir + 1;
     }
     FETextRender_SetABR(0,false);
-    fade = (short)((menuDefs[0]->menuControllerConfig).fScreenFade >> 1);
-    if (0x80 < fade) {
-      fade = 0x80;
+    fadeDir = (short)((menuDefs->menuControllerConfig).fScreenFade >> 1);
+    ColText = 0;
+    if (0x80 < fadeDir) {
+      fadeDir = 0x80;
     }
-    for (i = 0; i < 2; i++) {
-      ScaleShapeExtended(i + 0x16,0,0,0,(int)fade,0,
-                         (tDrawShapeExtended *)0x0);
+    do {
+      ScaleShapeExtended
+                (ColText + 0x16,0,0,0,(int)fadeDir,0,
+                 (tDrawShapeExtended *)0x0);
+      ColText = ColText + 1;
+    } while (ColText * 0x10000 >> 0x10 < 2);
+  }
+  else {
+    this->fArrowFade = 0x80;
+    this->fTextController = this->fCurrentController;
+    if (this->fCurrentController == '\x06') {
+      this->fTextController = '\x05';
     }
+    ch = frontEnd.controlConfig[this->player];
+    this->fFadeTextOut = 0;
+    this->fTextConfig = ch;
   }
   return;
 }
@@ -1384,26 +1270,24 @@ void tScreenControllerConfig::GetShapeInfo(short &numPermShapes,short &numSwapSh
 void tScreenControllerConfig::Initialize()
 
 {
-  /* SYM-CODEGEN-CARRIER: b -- direct fInputPlayer storage is measured FAIL 23
-     (76/73) and rotates the subsequent frontend/menu address schedule. */
-  uint b;
-  /* SYM-CODEGEN-CARRIER: mode -- direct duplicate config loads are part of
-     that same three-instruction regression. */
+  byte b;
   char mode;
-
+  tFEApplication *menus;
+  
   (this->fShaker).active = '\0';
   this->TurnOffShakers();
   this->ClearActuators();
   this->fResetShakeTimeOut = 1;
+  menus = FEApp;
   this->fShakingItem = -1;
-  b = (uint)(byte)FEApp->fInputPlayer;
+  b = menus->fInputPlayer;
   this->fTimeOutStartTick = 0;
   this->CurrentlyLoadedArt = -1;
   this->negconChoice = -1;
-  this->player = b;
-  this->tScreen::Initialize();
+  this->player = (uint)b;
+  this->_base_tScreen.Initialize();
   this->fCurrentController = '\0';
-  SetMenu(&menuDefs[0]->itemControllerSettings,true,(tInsideBoxMenu *)0x0);
+  SetMenu(&menuDefs->itemControllerSettings,true,(tInsideBoxMenu *)0x0);
   this->SetCurrentController(true);
   this->SwapInController();
   this->fPrevController = this->fCurrentController;
@@ -1441,19 +1325,13 @@ void tScreenControllerConfig::Cleanup()
   this->ClearActuators();
   this->TurnOffShakers();
   PadStartCom();
-  this->tScreen::Cleanup();
+  this->_base_tScreen.Cleanup();
   return;
 }
 
 /* ---- tScreenControllerConfig::tScreenControllerConfig  (screencontroller.cpp:1889) ---- */
-/* MATCH (source-only, 2026-08-26): the derived-vtable write must precede the
- * real negconPopUp member constructor.  Carrying that side effect through the
- * earlier aggregate fShaker self-initializer lets GCC eliminate the self-copy
- * completely; the former scalar `mult` carrier left one dead lhu.  Detailed
- * gate: 1 -> PASS 20/20. */
 tScreenControllerConfig::tScreenControllerConfig()
-  : fShaker((this->_vf = (__vtbl_ptr_type (*)[10])tScreenControllerConfig_vtable,
-             this->fShaker))
+
 {
   this->fGotTick = 0;
   this->fAnim = 0;
@@ -1467,80 +1345,28 @@ tScreenControllerConfig::tScreenControllerConfig()
 int tScreenControllerConfig::GetHelpText()
 
 {
-  int retvalue;
-
-  /* MATCH: a real switch, NOT an if-chain.  The oracle's dispatch is gcc-2.8's
-     balance_case_nodes TREE over 3 case nodes {1},{2},{5..6} (root == 2, then
-     slti 3 / slti 7 / slti 5) with the case BODIES in SOURCE order
-     (5|6, 1, 2) and the default -1 as a shared funnel block.  Switching on the
-     field directly (int-promoted) also drops the `andi 0xff` a u_char local
-     re-mask emitted.  SYM-CONFORM (2026-08-16): the case values now flow
-     through retail's named `int retvalue`; gcc collapses that source funnel
-     to the same 24-byte-identical instructions.
-     [SLD 1897=switch, 1899/1903/1906=case bodies, 1912=-1] */
-  switch (this->fCurrentController) {
-  case 5:
-  case 6:
-    retvalue = 0x218;
-    break;
-  case 1:
-    retvalue = 0x219;
-    break;
-  case 2:
-    retvalue = 0x21a;
-    break;
-  default:
-    retvalue = -1;
+  byte isNegcon;
+  
+  isNegcon = this->fCurrentController;
+  if (isNegcon == 2) {
+    return 0x21a;
   }
-  return retvalue;
+  if (isNegcon < 3) {
+    if (isNegcon == 1) {
+      return 0x219;
+    }
+  }
+  else if ((isNegcon < 7) && (4 < isNegcon)) {
+    return 0x218;
+  }
+  return -1;
 }
 
-/* ---- ___23tScreenControllerConfig  (screencontroller.cpp:177) ----
- * MATCH 2026-07-11 (dtor-surgery): tScreenControllerConfig::~tScreenControllerConfig() is now
- * declared INLINE-in-class (nfs4_types.h) with an empty body, so gcc fully expands/collapses it
- * at every implicit member/base-teardown call site (e.g. tAllScreens::~tAllScreens(), which the
- * oracle shows INLINING this class's own negconPopUp + base(tScreen) teardown directly rather
- * than calling this symbol -- ___11tAllScreens FAIL 104->PASS via this surgery).
- *
- * The class's OWN standalone out-of-line destructor symbol (___23tScreenControllerConfig) STILL
- * genuinely exists in the retail binary (used elsewhere, e.g. the manually-materialized vtable's
- * dtor slot in vtables_tscreen2.cpp needs a real, addressable function at this exact VA/name) --
- * gcc-2.8/CC1PLPSX has NO mechanism to emit both an inlined-everywhere copy AND a real named
- * out-of-line copy from ONE C++ destructor declaration (empirically verified: an inline dtor
- * NEVER produces a standalone symbol under this compiler, at any call site, in any TU -- see the
- * dtor-surgery session notes). So the standalone symbol is TRANSCRIBED VERBATIM as a file-scope
- * __asm__ (same technique as blockmove/_patch_gte): this is BYTE-IDENTICAL to what the old
- * out-of-line C++ definition (`tScreenControllerConfig::~tScreenControllerConfig(){ return; }`)
- * used to compile to -- confirmed PASS (17 insns) before AND after this transcription; only the
- * MECHANISM producing those bytes changed (compiler-generated -> hand-transcribed), the bytes
- * did not. Destructs the negconPopUp member (offset 0xB8, tDialogYesNo -> collapses to
- * ___7tScreen) then forwards to the tScreen base (in_chrg propagated via $s1). */
-#if defined(__mips__)
-__asm__(
-    "\t.set noat\n"
-    "\t.set\tnoreorder\n"   /* tab form: turns maspsx's is_reorder OFF (no auto delay nop) */
-    "\t.set noreorder\n"    /* space form: passes through to gnu-as */
-    "\t.globl ___23tScreenControllerConfig\n"
-    "___23tScreenControllerConfig:\n"
-    "\taddiu $29, $29, -32\n"
-    "\tsw    $16, 16($29)\n"
-    "\taddu  $16, $4, $0\n"
-    "\tsw    $17, 20($29)\n"
-    "\taddu  $17, $5, $0\n"
-    "\taddiu $4, $16, 184\n"     /* &this->negconPopUp (+0xB8) */
-    "\tsw    $31, 24($29)\n"
-    "\tjal   ___7tScreen\n"
-    "\t addiu $5, $0, 2\n"     /* delay slot: member sub-object, not in charge */
-    "\taddu  $4, $16, $0\n"
-    "\tjal   ___7tScreen\n"        /* base tScreen part */
-    "\t addu  $5, $17, $0\n"   /* delay slot: forward the original in_chrg */
-    "\tlw    $31, 24($29)\n"
-    "\tlw    $17, 20($29)\n"
-    "\tlw    $16, 16($29)\n"
-    "\tjr    $31\n"
-    "\t addiu $29, $29, 32\n"
-    "\t.set at\n\t.set reorder\n"
-    "\t.set\treorder\n"  /* maspsx tracks .set linearly (no push/pop): restore nop-insertion for the rest of the file (gcc2.8 HOISTS toplevel asm above all fns) */);
-#endif
+/* ---- tScreenControllerConfig::~tScreenControllerConfig  (screencontroller.cpp:177) ---- */
+tScreenControllerConfig::~tScreenControllerConfig()
+
+{
+  return;
+}
 
 /* end of screencontroller.cpp */

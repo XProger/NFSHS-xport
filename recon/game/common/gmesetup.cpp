@@ -1,130 +1,162 @@
 /* game/common/gmesetup.cpp -- RECONSTRUCTED (NFS4 PSX game-setup startup/cleanup; C++ TU)
- *   2 free fns: GameSetup_StartUp(int*) + GameSetup_CleanUp(void).  SYM locals applied
- *   (FrontEndDataStream/$s2, s/$s0, i/$a1, h/$s4, p/$a0, l/$v1).  GTE-free.
- *   100% byte-match on the repo's gcc-2.8.0 (225 insns, pin-free).  Three levers:
- *     1. entry-guard `if (*FrontEndDataStream) do{...}while(*s)` -> param earns $s2
- *        (the guard derefs the PARAM, the back-edge derefs `s`);
- *     2. index-form copy loop `for(i..) p[i]=s[i+2]` -> flips the i/p $a0<->$a1
- *        coalescing the oracle wants (i=$a1 opcode, p=$a0 ptr+call-arg web);
- *     3. in-place store `p += s[1]*0x2D; *p = s[2]` -> the dead-`p` mutate
- *        (`addu a0,a0,v1`) instead of a preserved-base temp.
- *   (Mc-muffin's decomp.me dMkUR seeded the structure; these 3 reconcile it on
- *    the authoritative 2.8.0 allocator, which differs from decomp.me's 2.8.1.)
+ *   2 free fns: GameSetup_StartUp(int*) + GameSetup_CleanUp(void). Full SYM-locals applied.
+ *   GTE-free. Device startup fn-ptr dispatch via Device_gDeviceList[].startupfunc.
  */
-#include "gmesetup_types.h"
+#include "../../nfs4_types.h"
 #include "gmesetup_externs.h"
 
-/* SYM-owned lookup names at 0x80113044..0x801131ec.  The fixed row widths
- * (including each row's terminating/padding NULs) are part of the retail
- * layout; declaration order places them immediately before GameSetup_gData. */
-char GameSetup_gCarNames[51][5] = {
-    "MSLK", "BMWZ", "HSVT", "FORD", "CMRO", "TRAM", "ADB7", "JXKR",
-    "BMWM", "CORV", "F550", "P993", "F375", "DIAB", "MCLK", "MCF1",
-    "X993", "X375", "XCF1", "BNS1", "BNS2", "BNS2", "CCPR", "CHSV",
-    "CBMW", "CCOV", "CCMR", "CDBL", "CHOP", "GUAT", "BMW5", "MERC",
-    "WOLW", "SBUS", "SAND", "RIAT", "ARMY", "COMC", "TON1", "TON2",
-    "VAN",  "BEEP", "PKUP", "PKUP", "F500", "CUCA", "TAXI", "TBUS",
-    "LOGT", "CBUS", "BAD!"
-};
-char GameSetup_gTrackNames[12][4] = {
-    "ALP", "HWY", "CST", "FRN", "PAR", "HIL",
-    "GER", "ENG", "GT1", "GT2", "GT3", "BAD"
-};
-char GameSetup_gPersonalityNames[15][8] = {
-    "Nemesis", "Bullit", "Frost", "Ranger", "Chump",
-    "Snake", "Razor", "Thunder", "Roadhog", "Clutch",
-    "Scooter", "WndrBoy", "Flash", "KikBut", "Laser"
-};
+#ifdef AP_WIN
+extern "C" void NFSHS_HostLog(const char *, ...);
+#endif
 
 /* ---- gmesetup.obj OWNED global (EXT) ---- */
-GameSetup_tData GameSetup_gData;
+extern "C" { GameSetup_tData GameSetup_gData; }
 
-/* ---- intra-TU forward declarations (signature-exact) ---- */
-void GameSetup_StartUp(int *FrontEndDataStream);
-void GameSetup_CleanUp(void);
+/* ---- intra-TU forward declarations (auto-emitted, signature-exact) ---- */
+extern "C" { void GameSetup_StartUp(int *FrontEndDataStream); }
+extern "C" { void GameSetup_CleanUp(void); }
 
 
-/* ---- GameSetup_StartUp__FPi  @0x8009BD9C  [GMESETUP.CPP:155-354] ---- */
-void GameSetup_StartUp(int *FrontEndDataStream)
+/* ---- GameSetup_StartUp__FPi  [GMESETUP.CPP:155-354] SLD-VERIFIED ---- */
+extern "C" void GameSetup_StartUp(int *FrontEndDataStream)
+
 {
-    int i;          /* $a1 -- opcode (reused as the array-store counter) */
-    int *s;         /* $s0 -- data-stream walk pointer */
-    int *p;         /* $a0 -- resolved FEI target pointer */
-    FEI_tList *l;   /* $v1 -- FEI_gList iterator */
-    int *h;         /* $s4 -- Input_gHandler base */
-
-    Input_StartUp();
-
-    h = (int *)&Input_gHandler;
-    s = FrontEndDataStream;
-    if (*FrontEndDataStream != 0)
-    do {
-        i = *s;
-        if (i >= 0x103) {
-            for (l = FEI_gList, p = 0; l->v != 0; l++) {
-                if (l->v == i) {
-                    p = l->p;
-                }
-            }
-            if (p != 0) {
-                p += s[1] * 0x2D;
-                *p = s[2];
-            }
-            s += 3;
+  int*p;
+  int i;
+  int * h;
+  int * s;
+  FEI_tList * l;
+  int iVar1;
+  u_int uVar2;
+  int iVar3;
+  FEI_tList *pFVar4;
+  int *piVar5;
+  int *piVar6;
+  int *piVar7;
+  
+  Input_StartUp();
+  iVar3 = *FrontEndDataStream;
+  piVar7 = FrontEndDataStream;
+  do {
+    if (iVar3 == 0) {
+      purgememadr(FrontEndDataStream);
+      timedwait(100);
+      PAD_update();
+      uVar2 = PAD_state(0);
+      if ((uVar2 & 0xffff) == 0x909) {
+        GameSetup_gData.sgge = 8;
+      }
+      uVar2 = PAD_state(0);
+      if ((uVar2 & 0xffff) == 0xa080) {
+        GameSetup_gData.sgge = 2;
+      }
+      uVar2 = PAD_state(0);
+      if ((uVar2 & 0xffff) == 0xc001) {
+        GameSetup_gData.sgge = 4;
+      }
+      uVar2 = PAD_state(0);
+      if ((uVar2 & 0xffff) == 0x640) {
+        GameSetup_gData.sgge = 0x10;
+      }
+      uVar2 = PAD_state(0);
+      if ((uVar2 & 0xffff) == 0x610) {
+        GameSetup_gData.sgge = 0x20;
+      }
+      uVar2 = PAD_state(0);
+      if ((uVar2 & 0xffff) == 0x910) {
+        GameSetup_gData.sgge = 0x40;
+      }
+      uVar2 = PAD_state(0);
+      if ((uVar2 & 0xffff) == 0x5010) {
+        GameSetup_gData.sgge = 0x80;
+      }
+      uVar2 = PAD_state(0);
+      if ((uVar2 & 0xffff) == 0x620) {
+        GameSetup_gData.sgge = 0x100;
+      }
+      gMasterMusicLevel = GameSetup_gData.userSetting.musicLevel;
+      gMasterSFXLevel = GameSetup_gData.userSetting.sfxLevel;
+      gMasterFENarrationLevel = GameSetup_gData.userSetting.speechLevel;
+      gMasterEngineLevel = GameSetup_gData.userSetting.engineLevel;
+      gMasterAmbientLevel = GameSetup_gData.userSetting.ambientLevel;
+      Device_SetHardCodedKeys();
+      return;
+    }
+    iVar3 = *piVar7;
+#ifdef AP_WIN
+    if (iVar3 == 282 || iVar3 == 283)
+      NFSHS_DIAGNOSTIC_CALL(NFSHS_HostLog("TEST_SETUP_TAG tag=%d car=%d value=%08x stream=%p",
+                    iVar3,piVar7[1],(unsigned int)piVar7[2],piVar7));
+#endif
+    if (iVar3 < 0x103) {
+      pFVar4 = FEI_gList;
+      if (iVar3 < 0x4d) {
+        piVar6 = (int *)0x0;
+        iVar1 = FEI_gList[0].v;
+        while (iVar1 != 0) {
+          if (iVar1 == iVar3) {
+            piVar6 = pFVar4->p;
+          }
+          pFVar4 = pFVar4 + 1;
+          iVar1 = pFVar4->v;
         }
-        else if (i >= 0x4D) {
-            h[i - 0x4D] = s[1];
-            if (GAMESETUP_DEVICE_STARTUP(s[1] & 0xFF) != 0) {
-                GAMESETUP_DEVICE_STARTUP(s[1] & 0xFF)(s[1] >> 8);
+        if (piVar6 != (int *)0x0) {
+          if (*piVar7 < 0x4b) {
+            *piVar6 = piVar7[1];
+          }
+          else {
+            iVar3 = 0;
+            piVar5 = piVar7;
+            if (0 < piVar7[1]) {
+              do {
+                iVar3 = iVar3 + 1;
+                *piVar6 = piVar5[2];
+                piVar6 = piVar6 + 1;
+                piVar5 = piVar5 + 1;
+              } while (iVar3 < piVar7[1]);
             }
-            s += 2;
+          }
         }
-        else {
-            for (l = FEI_gList, p = 0; l->v != 0; l++) {
-                if (l->v == i) {
-                    p = l->p;
-                }
-            }
-            if (p != 0) {
-                if (*s >= 0x4B) {
-                    for (i = 0; i < s[1]; i++) {
-                        p[i] = s[i + 2];
-                    }
-                }
-                else {
-                    *p = s[1];
-                }
-            }
-            if (*s >= 0x4B) {
-                s += s[1];
-            }
-            s += 2;
+        if (0x4a < *piVar7) {
+          piVar7 = piVar7 + piVar7[1];
         }
-    } while (*s != 0);
-
-    purgememadr(FrontEndDataStream);
-    timedwait(100);
-    PAD_update();
-    if ((PAD_state(0) & 0xFFFF) == 0x909)  GameSetup_gData.sgge = 0x8;
-    if ((PAD_state(0) & 0xFFFF) == 0xA080) GameSetup_gData.sgge = 0x2;
-    if ((PAD_state(0) & 0xFFFF) == 0xC001) GameSetup_gData.sgge = 0x4;
-    if ((PAD_state(0) & 0xFFFF) == 0x640)  GameSetup_gData.sgge = 0x10;
-    if ((PAD_state(0) & 0xFFFF) == 0x610)  GameSetup_gData.sgge = 0x20;
-    if ((PAD_state(0) & 0xFFFF) == 0x910)  GameSetup_gData.sgge = 0x40;
-    if ((PAD_state(0) & 0xFFFF) == 0x5010) GameSetup_gData.sgge = 0x80;
-    if ((PAD_state(0) & 0xFFFF) == 0x620)  GameSetup_gData.sgge = 0x100;
-    gMasterMusicLevel       = GameSetup_gData.userSetting.musicLevel;
-    gMasterSFXLevel         = GameSetup_gData.userSetting.sfxLevel;
-    gMasterFENarrationLevel = GameSetup_gData.userSetting.speechLevel;
-    gMasterEngineLevel      = GameSetup_gData.userSetting.engineLevel;
-    gMasterAmbientLevel     = GameSetup_gData.userSetting.ambientLevel;
-    Device_SetHardCodedKeys();
+      }
+      else {
+        Input_gHandler[iVar3 - 0x4d] = piVar7[1];
+        if (Device_gDeviceList[piVar7[1] & 0xff].startupfunc != (u_char **)0x0) {
+          (*(int (*)(...))Device_gDeviceList[piVar7[1] & 0xff].startupfunc)(piVar7[1] >> 8);
+          piVar7 = piVar7 + 2;
+          goto GameSetupStart_iterValuesLoop;
+        }
+      }
+      piVar7 = piVar7 + 2;
+    }
+    else {
+      pFVar4 = FEI_gList;
+      piVar6 = (int *)0x0;
+      iVar1 = FEI_gList[0].v;
+      while (iVar1 != 0) {
+        if (iVar1 == iVar3) {
+          piVar6 = pFVar4->p;
+        }
+        pFVar4 = pFVar4 + 1;
+        iVar1 = pFVar4->v;
+      }
+      if (piVar6 != (int *)0x0) {
+        piVar6[piVar7[1] * 0x2d] = piVar7[2];
+      }
+      piVar7 = piVar7 + 3;
+    }
+GameSetupStart_iterValuesLoop:
+    iVar3 = *piVar7;
+  } while( true );
 }
 
-/* ---- GameSetup_CleanUp__Fv  @0x8009C120 ---- */
-void GameSetup_CleanUp(void)
+/* ---- GameSetup_CleanUp__Fv  [GMESETUP.CPP:369-370] SLD-VERIFIED ---- */
+extern "C" void GameSetup_CleanUp(void)
+
 {
-    return;
+  return;
 }
 
 /* end of gmesetup.cpp */

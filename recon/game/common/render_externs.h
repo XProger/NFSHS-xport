@@ -1,28 +1,26 @@
+#include "../../lib/libfns.h"
 /* render_externs.h -- extern decls for game/psx/render.cpp (NFS4 PSX render orchestration). */
 #ifndef RENDER_EXTERNS_H
 #define RENDER_EXTERNS_H
 
-extern "C" int DrawSync(...);
-extern "C" int GetTPage(...);
-extern "C" void SetDrawMode(...);
-extern "C" void SetDrawStp(...);
-extern "C" void *SetSp(...);
-extern "C" int StoreImage(...);
+typedef void fn_void(void);   /* Draw_SetDrawSyncCallback callback (void(*)(void)) */
 
 /* ---- render globals ---- */
 // [owned->defined in render.cpp] extern DRender_tView   gCView;                 /* 0x... (DRender_tView, 140B) */
 // [owned->defined in render.cpp] extern int   Draw_gPlayer1View, Draw_gPlayer2View, Render_gPauseMenuView;
 // [owned->defined in render.cpp] extern int   Render_gBlurEffectMode, Render_gBlurEffectDepth1, Render_gBlurEffectDepth2;
-extern int   Render_gMenuRenderFlag;
-// gScratchLastWord: fixed-address scratchpad macro, see nfs4_types.h
-// [owned->defined in render.cpp] extern int   gFlip, gPauseRender, gMPauseUpdate, gMPauseUpdateNextTime;
-extern int gFlip;
-extern bool gMPauseUpdate, gMPauseUpdateNextTime;  /* SYM BOOL; C++ source spelling */
-// [owned->defined in render.cpp] extern RECT gPauseMenuRect;  /* SYM: one 8-byte RECT; render.cpp uses -G8 */
-extern Render_DFlipCodegenView gEnviro[] asm("gEnviro");
-extern Render_FlareCodegenView gFlare_LensFlare asm("gFlare_LensFlare");
-/* GameSetup_tData is not present in render.obj's retail type graph. */
-extern int Render_GameSetupWords[] asm("GameSetup_gData");
+extern "C" int   &Render_gMenuRenderFlag;
+extern "C" u_char *&Render_gPacketPtr, *&Render_gPalettePtr;
+extern int   &gScratchLastWord;
+// [owned->defined in render.cpp] extern "C" int   gFlip, gPauseRender, gMPauseUpdate, gMPauseUpdateNextTime;
+extern "C" int gFlip, gMPauseUpdate, gMPauseUpdateNextTime;
+// [owned->defined in render.cpp] extern RECT  gPauseMenuRect;
+extern "C" dflip gEnviro[];
+extern FLARE_DEF gFlare_LensFlare;
+extern "C" extern "C" GameSetup_tData GameSetup_gData;
+#ifdef AP_WIN
+extern "C" void NFSHS_HostTraceFlareState(const void *);
+#endif
 
 /* ---- functions ---- */
 extern void BWorld_OnyxBuildFacets(DRender_tView *v);
@@ -39,10 +37,10 @@ extern void Draw_CheckFirstFrameRender(void);
 extern void Draw_DeInitRenderEngine(void);
 extern void Draw_InitLibRender(void);
 extern void Draw_InitRenderEngine(int,int,int,int,int,int);
-extern void Draw_InitViews(void);
+extern "C" { extern void Draw_InitViews(void); }
 extern void Draw_RestartRenderEngine(void);
-extern void Draw_SetDrawSyncCallback(void (*cb)(void));
-extern int Draw_SetView(int,int,int,int,int,int,int,int,int);
+extern void Draw_SetDrawSyncCallback(fn_void *cb);
+extern "C" { extern int Draw_SetView(int,int,int,int,int,int,int,int,int); }
 extern void Draw_StartFrameRender(void);
 extern void Draw_StartRenderingView(int viewid);
 extern void Draw_StopFrameRender(void);
@@ -54,7 +52,7 @@ extern void GenericPMX_LoadTexture(void);
 extern void Hrz_BuildHorizon(DRender_tView *v);
 extern void Hud_CreateHudViews(void);
 extern void Hud_Render(void);
-extern void Loading_UpdateLoadingScreen(int n);
+extern "C" { extern void Loading_UpdateLoadingScreen(int n); }
 extern void MPause_InitMPause(void);
 extern void MPause_KillMPause(void);
 extern void MPause_Render(void);

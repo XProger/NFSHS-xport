@@ -3,8 +3,16 @@
  *   (chunk visibility, build lists, spike belt, glare effects, render contexts). Self-contained.
  *   Verified vs disasm-v2.txt. NOT original source; SYM-faithful, recompilable C++.
  */
-#include "audioclc_types.h"
+#include "../../nfs4_types.h"
+#include "../../mips_semantics.h"
 #include "audioclc_externs.h"
+
+#if defined(_MSC_VER)
+#include <malloc.h>
+#define NFS4_AUDIOCLC_ALLOCA(bytes) _alloca(bytes)
+#else
+#define NFS4_AUDIOCLC_ALLOCA(bytes) __builtin_alloca(bytes)
+#endif
 
 
 /* ---- audioclc.obj-owned globals (SYM-typed; .data=real EXE bytes, .bss=zero) ---- */
@@ -27,7 +35,7 @@ void AudioClc_SndError(int shandle);
 void AudioClc_SetHorn(Car_tObj *car,int state);
 void AudioClc_HonkHorn(Car_tObj *car,int numBeeps,int ticksOn,int ticksOff);
 void AudioClc_InitSource(AudioClc_tSource *s,Car_tObj *car);
-void AudioClc_StartUp(void);
+extern "C" { void AudioClc_StartUp(void); }
 int AudioClc_CalcDopplerShiftRatio(coorddef *objectPos,coorddef *objectVel);
 int AudioClc_CalcDistance(DRender_tCalcView *view,coorddef *object);
 int AudioClc_CalcAzimuth(DRender_tCalcView *view,coorddef *object);
@@ -56,20 +64,22 @@ void AudioClc_SetHorn(Car_tObj *car,int state)
   int *piVar1;
   AudioClc_tSource *pAVar2;
   int iVar3;
-
+  
   iVar3 = 0;
   pAVar2 = AudioClc_gClosest;
   piVar1 = &AudioClc_gClosest[0].hornCount;
   do {
     if (pAVar2->car == car) {
-      if (state != 0) {
-        pAVar2->horn = 1;
-        pAVar2->hornOn = 0;
+      if (state == 0) {
+        if (piVar1[-3] != 0) {
+          piVar1[-3] = 1;
+          piVar1[-2] = 1;
+          *piVar1 = 1;
+        }
       }
-      else if (pAVar2->horn != 0) {
-        pAVar2->horn = 1;
-        pAVar2->hornOn = 1;
-        pAVar2->hornCount = 1;
+      else {
+        piVar1[-3] = 1;
+        piVar1[-2] = 0;
       }
     }
     iVar3 = iVar3 + 1;
@@ -92,11 +102,11 @@ void AudioClc_HonkHorn(Car_tObj *car,int numBeeps,int ticksOn,int ticksOff)
   pAVar2 = AudioClc_gClosest;
   piVar1 = &AudioClc_gClosest[0].hornCount;
   do {
-    if ((pAVar2->car == car) && (pAVar2->horn == 0)) {
-      pAVar2->horn = ticksOn;
-      pAVar2->hornOn = ticksOn;
-      pAVar2->hornOff = -ticksOff;
-      pAVar2->hornCount = numBeeps;
+    if ((pAVar2->car == car) && (piVar1[-3] == 0)) {
+      piVar1[-3] = ticksOn;
+      piVar1[-2] = ticksOn;
+      piVar1[-1] = -ticksOff;
+      *piVar1 = numBeeps;
     }
     iVar3 = iVar3 + 1;
     piVar1 = piVar1 + 0xe;
@@ -121,15 +131,23 @@ void AudioClc_InitSource(AudioClc_tSource *s,Car_tObj *car)
 }
 
 /* ---- AudioClc_StartUp__Fv  [@0x80074838] ---- */
-void AudioClc_StartUp(void)
+extern "C" void AudioClc_StartUp(void)
 {
   AudioClc_tPlayer*p;
   AudioClc_tSource*c;
   int i;
-
-  p = AudioClc_gPlayer;
-  c = AudioClc_gClosest;
-  i = 0;
+  AudioClc_tPlayer *pAVar1;
+  int iVar2;
+  AudioClc_tSource *s;
+  AudioClc_tPlayer *pAVar3;
+  AudioClc_tSource *s_00;
+  Car_tObj **ppCVar4;
+  
+  pAVar3 = AudioClc_gPlayer;
+  s_00 = AudioClc_gClosest;
+  iVar2 = 0;
+  pAVar1 = AudioClc_gPlayer;
+  ppCVar4 = Cars_gHumanRaceCarList;
   AudioClc_gRandomPhrase = 0;
   AudioClc_gBullHornCount = 0;
   AudioClc_gBumpCopCount = 0;
@@ -138,27 +156,30 @@ void AudioClc_StartUp(void)
   AudioClc_gLastphrase2 = -1;
   AudioClc_gLastphrase3 = -1;
   do {
-    p->cameraMode = -1;
-    p->gameTicks = 0;
-    p->warnings = 0;
-    AudioClc_InitSource(&p->source,(Car_tObj *)0x0);
-    if (GameSetup_gData.commMode >= 2) {
-      if ((i == 0) && (GameSetup_gData.localCar < Cars_gNumHumanRaceCars)) {
-        p->source.car = Cars_gHumanRaceCarList[GameSetup_gData.localCar];
+    s = &pAVar1->source;
+    pAVar3->cameraMode = -1;
+    *(u_int *)((int)(s + -1) + 0x24) = 0;
+    *(u_int *)((int)(s + -1) + 0x28) = 0;
+    AudioClc_InitSource(s,(Car_tObj *)0x0);
+    if (GameSetup_gData.commMode < 2) {
+      if (iVar2 < Cars_gNumHumanRaceCars) {
+        s->car = *ppCVar4;
       }
     }
-    else if (i < Cars_gNumHumanRaceCars) {
-      p->source.car = Cars_gHumanRaceCarList[i];
+    else if ((iVar2 == 0) && (GameSetup_gData.localCar < Cars_gNumHumanRaceCars)) {
+      s->car = Cars_gHumanRaceCarList[GameSetup_gData.localCar];
     }
-    i = i + 1;
-    p = p + 1;
-  } while (i < 2);
-  i = 0;
+    ppCVar4 = ppCVar4 + 1;
+    iVar2 = iVar2 + 1;
+    pAVar1 = (AudioClc_tPlayer *)(s + 1);
+    pAVar3 = pAVar3 + 1;
+  } while (iVar2 < 2);
+  iVar2 = 0;
   do {
-    AudioClc_InitSource(c,(Car_tObj *)0x0);
-    i = i + 1;
-    c = c + 1;
-  } while (i < 4);
+    AudioClc_InitSource(s_00,(Car_tObj *)0x0);
+    iVar2 = iVar2 + 1;
+    s_00 = s_00 + 1;
+  } while (iVar2 < 4);
   AudioClc_gCameraVelocity = (coorddef *)0x0;
   return;
 }
@@ -170,27 +191,82 @@ int AudioClc_CalcDopplerShiftRatio(coorddef *objectPos,coorddef *objectVel)
   coorddef*cameraVel;
   coorddef vectorToSound;
   int relativeVelocity;
-
-  cameraPos = &AudioClc_gRenderView.translation;
-  cameraVel = AudioClc_gCameraVelocity;
-  vectorToSound.x = (objectPos->x - cameraPos->x) >> 8;
-  vectorToSound.y = (objectPos->y - cameraPos->y) >> 8;
-  vectorToSound.z = (objectPos->z - cameraPos->z) >> 8;
-  Math_NormalizeVector(&vectorToSound);
-  relativeVelocity = 0;
+  coorddef *pcVar1;
+  int iVar2;
+  int iVar3;
+  int iVar4;
+  int iVar5;
+  int iVar6;
+  int iVar7;
+  int iVar8;
+  coorddef local_20;
+  
+  pcVar1 = AudioClc_gCameraVelocity;
+  /* @0x800749AC-EC: vectorToSound = (objectPos - AudioClc_gRenderView.translation) >> 8 per axis.
+   * disasm $a1=0x8010E428=&AudioClc_gRenderView.translation; the camera-translation subtraction
+   * was dropped (H41), normalizing the world-space position instead of the camera-relative vector. */
+  local_20.x = (objectPos->x - AudioClc_gRenderView.translation.x) >> 8;
+  local_20.y = (objectPos->y - AudioClc_gRenderView.translation.y) >> 8;
+  local_20.z = (objectPos->z - AudioClc_gRenderView.translation.z) >> 8;
+  Math_NormalizeVector(&local_20);
+  iVar8 = 0;
   if (objectVel != (coorddef *)0x0) {
-    relativeVelocity =
-        vectorToSound.x / 256 * (objectVel->x / 256) +
-        vectorToSound.y / 256 * (objectVel->y / 256) +
-        vectorToSound.z / 256 * (objectVel->z / 256);
+    iVar8 = local_20.x;
+    if (local_20.x < 0) {
+      iVar8 = local_20.x + 0xff;
+    }
+    iVar2 = objectVel->x;
+    if (iVar2 < 0) {
+      iVar2 = iVar2 + 0xff;
+    }
+    iVar6 = local_20.y;
+    if (local_20.y < 0) {
+      iVar6 = local_20.y + 0xff;
+    }
+    iVar3 = objectVel->y;
+    if (iVar3 < 0) {
+      iVar3 = iVar3 + 0xff;
+    }
+    iVar7 = local_20.z;
+    if (local_20.z < 0) {
+      iVar7 = local_20.z + 0xff;
+    }
+    iVar4 = objectVel->z;
+    if (iVar4 < 0) {
+      iVar4 = iVar4 + 0xff;
+    }
+    iVar8 = (iVar8 >> 8) * (iVar2 >> 8) + (iVar6 >> 8) * (iVar3 >> 8) + (iVar7 >> 8) * (iVar4 >> 8);
   }
-  if (cameraVel != (coorddef *)0x0) {
-    relativeVelocity = relativeVelocity -
-        (vectorToSound.x / 256 * (cameraVel->x / 256) +
-         vectorToSound.y / 256 * (cameraVel->y / 256) +
-         vectorToSound.z / 256 * (cameraVel->z / 256));
+  if (pcVar1 != (coorddef *)0x0) {
+    iVar2 = local_20.x;
+    if (local_20.x < 0) {
+      iVar2 = local_20.x + 0xff;
+    }
+    iVar6 = pcVar1->x;
+    if (iVar6 < 0) {
+      iVar6 = iVar6 + 0xff;
+    }
+    iVar3 = local_20.y;
+    if (local_20.y < 0) {
+      iVar3 = local_20.y + 0xff;
+    }
+    iVar7 = pcVar1->y;
+    if (iVar7 < 0) {
+      iVar7 = iVar7 + 0xff;
+    }
+    iVar4 = local_20.z;
+    if (local_20.z < 0) {
+      iVar4 = local_20.z + 0xff;
+    }
+    iVar5 = pcVar1->z;
+    if (iVar5 < 0) {
+      iVar5 = iVar5 + 0xff;
+    }
+    iVar8 = iVar8 - ((iVar2 >> 8) * (iVar6 >> 8) + (iVar3 >> 8) * (iVar7 >> 8) +
+                    (iVar4 >> 8) * (iVar5 >> 8));
   }
-  return fixeddiv(0x1540000,relativeVelocity + 0x1540000);
+  iVar8 = fixeddiv(0x1540000,iVar8 + 0x1540000);
+  return iVar8;
 }
 
 /* ---- AudioClc_CalcDistance__FP17DRender_tCalcViewP8coorddef  [@0x80074b60] ---- */
@@ -201,26 +277,32 @@ int AudioClc_CalcDistance(DRender_tCalcView *view,coorddef *object)
   int z;
   int length;
   int length1;
-
-  x = object->x - (view->translation).x;
-  y = object->y - (view->translation).y;
-  z = object->z - (view->translation).z;
-  x = __builtin_abs(x);
-  y = __builtin_abs(y);
-  z = __builtin_abs(z);
-  if (z < x) {
-    length = x + (z >> 2);
+  int iVar1;
+  int iVar2;
+  int iVar3;
+  
+  iVar3 = object->x - (view->translation).x;
+  if (iVar3 < 0) {
+    iVar3 = -iVar3;
+  }
+  iVar2 = object->y - (view->translation).y;
+  iVar1 = object->z - (view->translation).z;
+  if (iVar2 < 0) {
+    iVar2 = -iVar2;
+  }
+  if (iVar1 < 0) {
+    iVar1 = -iVar1;
+  }
+  if (iVar1 < iVar3) {
+    iVar3 = iVar3 + (iVar1 >> 2);
   }
   else {
-    length = z + (x >> 2);
+    iVar3 = iVar1 + (iVar3 >> 2);
   }
-  if (length < y) {
-    length1 = y + (length >> 2);
+  if (iVar3 < iVar2) {
+    return iVar2 + (iVar3 >> 2);
   }
-  else {
-    length1 = length + (y >> 2);
-  }
-  return length1;
+  return iVar3 + (iVar2 >> 2);
 }
 
 /* ---- AudioClc_CalcAzimuth__FP17DRender_tCalcViewP8coorddef  [@0x80074be8] ---- */
@@ -229,33 +311,102 @@ int AudioClc_CalcAzimuth(DRender_tCalcView *view,coorddef *object)
   coorddef temp;
   int x;
   int y;
-
-  temp.x = object->x - (view->translation).x;
-  temp.y = object->y - (view->translation).y;
-  temp.z = object->z - (view->translation).z;
-  x = temp.x / 256 * ((view->mrotation).m[0] / 256) +
-      temp.y / 256 * ((view->mrotation).m[1] / 256) +
-      temp.z / 256 * ((view->mrotation).m[2] / 256);
-  y = temp.x / 256 * ((view->mrotation).m[6] / 256) +
-      temp.y / 256 * ((view->mrotation).m[7] / 256) +
-      temp.z / 256 * ((view->mrotation).m[8] / 256);
-  if (GameSetup_gData.mirrorTrack != 0) {
-    x = -x;
+  int iVar1;
+  int iVar2;
+  int iVar3;
+  int iVar4;
+  u_int uVar5;
+  int iVar6;
+  int iVar7;
+  int iVar8;
+  int iVar9;
+  
+  iVar8 = object->x - (view->translation).x;
+  iVar9 = object->y - (view->translation).y;
+  iVar6 = object->z - (view->translation).z;
+  if (iVar8 < 0) {
+    iVar8 = iVar8 + 0xff;
   }
-  return (intatan(x >> 8,y >> 8) << 6) & 0xffc0;
+  iVar1 = (view->mrotation).m[0];
+  if (iVar1 < 0) {
+    iVar1 = iVar1 + 0xff;
+  }
+  if (iVar9 < 0) {
+    iVar9 = iVar9 + 0xff;
+  }
+  iVar2 = (view->mrotation).m[1];
+  if (iVar2 < 0) {
+    iVar2 = iVar2 + 0xff;
+  }
+  iVar7 = iVar6;
+  if (iVar6 < 0) {
+    iVar7 = iVar6 + 0xff;
+  }
+  iVar3 = (view->mrotation).m[2];
+  if (iVar3 < 0) {
+    iVar3 = iVar3 + 0xff;
+  }
+  iVar4 = (view->mrotation).m[6];
+  iVar1 = (iVar8 >> 8) * (iVar1 >> 8) + (iVar9 >> 8) * (iVar2 >> 8) + (iVar7 >> 8) * (iVar3 >> 8);
+  if (iVar4 < 0) {
+    iVar4 = iVar4 + 0xff;
+  }
+  iVar2 = (view->mrotation).m[7];
+  if (iVar2 < 0) {
+    iVar2 = iVar2 + 0xff;
+  }
+  if (iVar6 < 0) {
+    iVar6 = iVar6 + 0xff;
+  }
+  iVar7 = (view->mrotation).m[8];
+  if (iVar7 < 0) {
+    iVar7 = iVar7 + 0xff;
+  }
+  if (GameSetup_gData.mirrorTrack != 0) {
+    iVar1 = -iVar1;
+  }
+  uVar5 = intatan(iVar1 >> 8,
+                     (iVar8 >> 8) * (iVar4 >> 8) + (iVar9 >> 8) * (iVar2 >> 8) +
+                     (iVar6 >> 8) * (iVar7 >> 8) >> 8);
+  return (uVar5 & 0x3ff) << 6;
 }
 
 /* ---- AudioClc_CalcCarDirection__FP17DRender_tCalcViewP8Car_tObj  [@0x80074d50] ---- */
 int AudioClc_CalcCarDirection(DRender_tCalcView *view,Car_tObj *car)
 {
   coorddef temp;
-
-  temp.x = (car->N).position.x - (view->translation).x;
-  temp.y = (car->N).position.y - (view->translation).y;
-  temp.z = (car->N).position.z - (view->translation).z;
-  return temp.x / 256 * ((car->N).orientMat.m[6] / 256) +
-         temp.y / 256 * ((car->N).orientMat.m[7] / 256) +
-         temp.z / 256 * ((car->N).orientMat.m[8] / 256);
+  int iVar1;
+  int iVar2;
+  int iVar3;
+  int iVar4;
+  int iVar5;
+  int iVar6;
+  
+  iVar4 = (car->N).position.x - (view->translation).x;
+  iVar6 = (car->N).position.y - (view->translation).y;
+  iVar5 = (car->N).position.z - (view->translation).z;
+  if (iVar4 < 0) {
+    iVar4 = iVar4 + 0xff;
+  }
+  iVar1 = (car->N).orientMat.m[6];
+  if (iVar1 < 0) {
+    iVar1 = iVar1 + 0xff;
+  }
+  if (iVar6 < 0) {
+    iVar6 = iVar6 + 0xff;
+  }
+  iVar2 = (car->N).orientMat.m[7];
+  if (iVar2 < 0) {
+    iVar2 = iVar2 + 0xff;
+  }
+  if (iVar5 < 0) {
+    iVar5 = iVar5 + 0xff;
+  }
+  iVar3 = (car->N).orientMat.m[8];
+  if (iVar3 < 0) {
+    iVar3 = iVar3 + 0xff;
+  }
+  return (iVar4 >> 8) * (iVar1 >> 8) + (iVar6 >> 8) * (iVar2 >> 8) + (iVar5 >> 8) * (iVar3 >> 8);
 }
 
 /* ---- AudioClc_CalcTrackAzimuth__FP17DRender_tCalcViewP8Car_tObj  [@0x80074e24] ---- */
@@ -263,17 +414,59 @@ int AudioClc_CalcTrackAzimuth(DRender_tCalcView *view,Car_tObj *car)
 {
   int x;
   int y;
-
-  x = (car->N).roadMatrix.m[6] / 256 * ((view->mrotation).m[0] / 256) +
-      (car->N).roadMatrix.m[7] / 256 * ((view->mrotation).m[1] / 256) +
-      (car->N).roadMatrix.m[8] / 256 * ((view->mrotation).m[2] / 256);
-  y = (car->N).roadMatrix.m[6] / 256 * ((view->mrotation).m[6] / 256) +
-      (car->N).roadMatrix.m[7] / 256 * ((view->mrotation).m[7] / 256) +
-      (car->N).roadMatrix.m[8] / 256 * ((view->mrotation).m[8] / 256);
-  if (GameSetup_gData.mirrorTrack != 0) {
-    x = -x;
+  int iVar1;
+  int iVar2;
+  int iVar3;
+  int iVar4;
+  u_int uVar5;
+  int iVar6;
+  int iVar7;
+  int iVar8;
+  
+  iVar8 = (car->N).roadMatrix.m[6];
+  if (iVar8 < 0) {
+    iVar8 = iVar8 + 0xff;
   }
-  return (intatan(x >> 8,y >> 8) << 6) & 0xffc0;
+  iVar1 = (view->mrotation).m[0];
+  if (iVar1 < 0) {
+    iVar1 = iVar1 + 0xff;
+  }
+  iVar7 = (car->N).roadMatrix.m[7];
+  if (iVar7 < 0) {
+    iVar7 = iVar7 + 0xff;
+  }
+  iVar2 = (view->mrotation).m[1];
+  if (iVar2 < 0) {
+    iVar2 = iVar2 + 0xff;
+  }
+  iVar6 = (car->N).roadMatrix.m[8];
+  if (iVar6 < 0) {
+    iVar6 = iVar6 + 0xff;
+  }
+  iVar3 = (view->mrotation).m[2];
+  if (iVar3 < 0) {
+    iVar3 = iVar3 + 0xff;
+  }
+  iVar4 = (view->mrotation).m[6];
+  iVar1 = (iVar8 >> 8) * (iVar1 >> 8) + (iVar7 >> 8) * (iVar2 >> 8) + (iVar6 >> 8) * (iVar3 >> 8);
+  if (iVar4 < 0) {
+    iVar4 = iVar4 + 0xff;
+  }
+  iVar2 = (view->mrotation).m[7];
+  if (iVar2 < 0) {
+    iVar2 = iVar2 + 0xff;
+  }
+  iVar3 = (view->mrotation).m[8];
+  if (iVar3 < 0) {
+    iVar3 = iVar3 + 0xff;
+  }
+  if (GameSetup_gData.mirrorTrack != 0) {
+    iVar1 = -iVar1;
+  }
+  uVar5 = intatan(iVar1 >> 8,
+                     (iVar8 >> 8) * (iVar4 >> 8) + (iVar7 >> 8) * (iVar2 >> 8) +
+                     (iVar6 >> 8) * (iVar3 >> 8) >> 8);
+  return (uVar5 & 0x3ff) << 6;
 }
 
 /* ---- AudioClc_SoundOpponentHorn__Fiiii  [@0x80074f5c] ---- */
@@ -282,24 +475,18 @@ void AudioClc_SoundOpponentHorn(int closestIndex,int azimuth,int dop,int dsquare
   AudioClc_tSource*source;
   int cartype;
   int carhornSFX;
-  static char trafficFreqs[50] = {
-    0x58,0x50,0x46,0x41,0x3c,0x32,0x55,0x5a,0x3c,0x2d,
-    0x5a,0x32,0x55,0x4b,0x54,0x4a,0x32,0x46,0x2d,0x48,
-    0x3c,0x3c,0x37,0x46,0x3c,0x2d,0x32,0x4b,0x41,0x52,
-    0x48,0x3c,0x56,0x22,0x2f,0x52,0x2f,0x50,0x1e,0x1e,
-    0x40,0x4a,0x37,0x32,0x34,0x34,0x3e,0x15,0x40,0x15
-  };
+  static char trafficFreqs[50];
   int iamp;
+  int iSFXnum;
+  int iVar1;
   
-  source = AudioClc_gClosest + closestIndex;
-  cartype = source->car->carInfo->carType;
-  carhornSFX = 10;
-  if (cartype == 0x30) {
-    carhornSFX = 0xb;
+  iVar1 = (AudioClc_gClosest[closestIndex].car)->carInfo->carType;
+  iSFXnum = 10;
+  if (iVar1 == 0x30) {
+    iSFXnum = 0xb;
   }
-  iamp = ((0x1324 - dsquare) * 0x7f) / 0x1324;
-  AudioCmn_PlaySFX(closestIndex + 0x25,carhornSFX,
-             (u_int)trafficFreqs[cartype],dop,iamp,azimuth);
+  AudioCmn_PlaySFX(closestIndex + 0x25,iSFXnum,(u_int)"XPFA<2UZ<-Z2UKTJ"[iVar1],dop,
+             ((0x1324 - dsquare) * 0x7f) / 0x1324,azimuth);
   return;
 }
 
@@ -313,35 +500,58 @@ void AudioClc_SilenceOpponentHorn(int closestIndex)
 /* ---- AudioClc_SoundCloseCar__Fii  [@0x80075028] ---- */
 void AudioClc_SoundCloseCar(int playerIndex,int closestIndex)
 {
-  AudioClc_tSource *source;
-  Car_tObj *car;
-  int dsquare;
+  AudioClc_tSource*source;
   int distSq;
   int dop;
   int dst;
   int dir;
+  int c;
+  int iamp;
+  int doppler;
+  int iVar1;
+  int iVar2;
+  int iVar3;
+  int iVar4;
+  int relvel;
+  int iVar5;
+  s_type surface1;
+  s_type surface2;
+  coorddef *objectPos;
+  int *piVar6;
+  Car_tObj *car;
   int azimuth;
-
-  source = &AudioClc_gClosest[closestIndex];
-  car = source->car;
+  int dsquare;
+  
+  car = AudioClc_gClosest[closestIndex].car;
+  objectPos = &(car->N).position;
   if (car == (Car_tObj *)0x0) {
     return;
   }
-  dop = AudioClc_CalcDopplerShiftRatio(&(car->N).position,&(car->N).linearVel);
-  if (dop < 0) {
+  doppler = AudioClc_CalcDopplerShiftRatio(objectPos,&(car->N).linearVel);
+  if (doppler < 0) {
     return;
   }
-  dst = AudioClc_CalcDistance(&AudioClc_gRenderView,&(car->N).position);
-  dir =
-      (((fixeddiv(AudioClc_CalcCarDirection(&AudioClc_gRenderView,car),dst) <
-          0x10001) ?
-         fixeddiv(AudioClc_CalcCarDirection(&AudioClc_gRenderView,car),dst) :
-         0x10000) >= -0x10000) ?
-        ((fixeddiv(AudioClc_CalcCarDirection(&AudioClc_gRenderView,car),dst) <
-          0x10001) ?
-         fixeddiv(AudioClc_CalcCarDirection(&AudioClc_gRenderView,car),dst) :
-         0x10000) :
-        -0x10000;
+  iVar1 = AudioClc_CalcDistance(&AudioClc_gRenderView,objectPos);
+  iVar2 = AudioClc_CalcCarDirection(&AudioClc_gRenderView,car);
+  iVar2 = fixeddiv(iVar2,iVar1);
+  if (iVar2 < 0x10001) {
+    iVar2 = AudioClc_CalcCarDirection(&AudioClc_gRenderView,car);
+    iVar2 = fixeddiv(iVar2,iVar1);
+    if (-0x10001 < iVar2) goto LAB_800750fc;
+    iVar2 = -0x10000;
+  }
+  else {
+LAB_800750fc:
+    iVar2 = AudioClc_CalcCarDirection(&AudioClc_gRenderView,car);
+    iVar2 = fixeddiv(iVar2,iVar1);
+    if (iVar2 < 0x10001) {
+      iVar2 = AudioClc_CalcCarDirection(&AudioClc_gRenderView,car);
+      iVar2 = fixeddiv(iVar2,iVar1);
+    }
+    else {
+      iVar2 = 0x10000;
+    }
+  }
   if (GameSetup_gData.commMode == 1) {
     azimuth = 0x3fff;
     if (playerIndex == 0) {
@@ -351,117 +561,128 @@ void AudioClc_SoundCloseCar(int playerIndex,int closestIndex)
   else {
     azimuth = AudioClc_CalcAzimuth(&AudioClc_gRenderView,&(car->N).position);
   }
-  dsquare = dst / 0x10000;
-  dsquare *= dsquare;
-  distSq = 0x1324;
-  if (dsquare < 0x1324) {
-    distSq = dsquare;
+  iVar3 = iVar1;
+  if (iVar1 < 0) {
+    iVar3 = iVar1 + 0xffff;
   }
-  if (AudioClc_gCameraVelocity != (coorddef *)0x0) {
-    source->relVelocity =
-        ((car->currentSpeed -
-          AudioClc_gPlayer[playerIndex].source.car->currentSpeed) > 0) ?
-        (car->currentSpeed -
-         AudioClc_gPlayer[playerIndex].source.car->currentSpeed) :
-        (AudioClc_gPlayer[playerIndex].source.car->currentSpeed -
-         car->currentSpeed);
+  iVar3 = (iVar3 >> 0x10) * (iVar3 >> 0x10);
+  dsquare = 0x1324;
+  if (iVar3 < 0x1324) {
+    dsquare = iVar3;
+  }
+  if (AudioClc_gCameraVelocity == (coorddef *)0x0) {
+    iVar4 = car->currentSpeed;
+    if (iVar4 < 0) {
+      iVar4 = -iVar4;
+    }
   }
   else {
-    source->relVelocity = __builtin_abs(car->currentSpeed);
+    iVar5 = (AudioClc_gPlayer[playerIndex].source.car)->currentSpeed;
+    iVar4 = car->currentSpeed - iVar5;
+    if (iVar4 < 1) {
+      iVar4 = iVar5 - car->currentSpeed;
+    }
   }
-  source->distSq = distSq;
-  AudioCmn_TrafficSFX(closestIndex + 6,car->carInfo->carType,
-                      (car->flywheelRpm << 0x10) / car->specs->redline,
-                      dop,dst,azimuth,__builtin_abs((car->linearVel_ch).z),dir);
-  {
-    int c;
-
-    c = car->audioCount - 1;
-    while (c >= 0) {
-      if (car->audio[c].channel >= 0) {
-        AudioCmn_TrafficSkidSFX(closestIndex + 0x20,
-            (s_type)car->audio[c].surface1,(s_type)car->audio[c].surface2,
-            car->audio[c].force,dsquare,azimuth);
+  AudioClc_gClosest[closestIndex].relVelocity = iVar4;
+  AudioClc_gClosest[closestIndex].distSq = dsquare;
+  iVar4 = car->specs->redline;
+  iVar5 = car->flywheelRpm << 0x10;
+  if (iVar4 == 0) {
+    trap(0x1c00);
+  }
+  if ((iVar4 == -1) && (iVar5 == -0x80000000)) {
+    trap(0x1800);
+  }
+  relvel = (car->linearVel_ch).z;
+  if (relvel < 0) {
+    relvel = -relvel;
+  }
+  AudioCmn_TrafficSFX(closestIndex + 6,car->carInfo->carType,iVar5 / iVar4,doppler,iVar1,azimuth,relvel,iVar2
+            );
+  iVar1 = car->audioCount + -1;
+  if (-1 < iVar1) {
+    piVar6 = &(car->N).simRoadInfo.quadPts[car->audioCount * 2 + -4].z;
+    do {
+      iVar2 = closestIndex + 0x20;
+      if (piVar6[0x1e7] < 0) {
+        surface1 = (s_type)piVar6[0x1e8];
+        surface2 = (s_type)piVar6[0x1e9];
+        iVar5 = piVar6[0x1ea];
+        iVar2 = -1;
+        iVar4 = dsquare;
       }
       else {
-        AudioCmn_TrafficSkidSFX(-1,
-            (s_type)car->audio[c].surface1,(s_type)car->audio[c].surface2,
-            car->audio[c].force,distSq,azimuth);
+        surface1 = (s_type)piVar6[0x1e8];
+        surface2 = (s_type)piVar6[0x1e9];
+        iVar5 = piVar6[0x1ea];
+        iVar4 = iVar3;
       }
-      c--;
-    }
+      piVar6 = piVar6 + -6;
+      AudioCmn_TrafficSkidSFX(iVar2,surface1,surface2,iVar5,iVar4,azimuth);
+      iVar1 = iVar1 + -1;
+    } while (-1 < iVar1);
   }
-  if ((car->carFlags & 4U) != 0) {
-    if ((car->control).horn != '\0') {
-      AudioClc_SoundOpponentHorn(closestIndex,azimuth,dop,distSq);
-      source->horn = 1;
-    }
-    else if (source->horn != 0) {
-      AudioClc_SilenceOpponentHorn(closestIndex);
-      source->horn = 0;
-    }
-  }
-  else {
-    if (0 < source->horn) {
-      if (0 < source->hornOn) {
-        source->horn--;
+  if ((car->carFlags & 4U) == 0) {
+    iVar1 = AudioClc_gClosest[closestIndex].horn;
+    if (0 < iVar1) {
+      if (0 < AudioClc_gClosest[closestIndex].hornOn) {
+        AudioClc_gClosest[closestIndex].horn = iVar1 + -1;
       }
-      if (source->horn == 0) {
+      if (AudioClc_gClosest[closestIndex].horn == 0) {
         (car->control).horn = '\0';
         AudioClc_SilenceOpponentHorn(closestIndex);
-        source->hornCount--;
-        if (source->hornCount != 0) {
-          source->horn = source->hornOff;
+        iVar1 = AudioClc_gClosest[closestIndex].hornCount + -1;
+        AudioClc_gClosest[closestIndex].hornCount = iVar1;
+        if (iVar1 != 0) {
+          AudioClc_gClosest[closestIndex].horn = AudioClc_gClosest[closestIndex].hornOff;
         }
       }
       else {
         (car->control).horn = '\x01';
-        AudioClc_SoundOpponentHorn(closestIndex,azimuth,dop,distSq);
+        AudioClc_SoundOpponentHorn(closestIndex,azimuth,doppler,dsquare);
       }
+      goto LAB_800753f8;
     }
-    else if (source->horn < 0) {
-      source->horn++;
-      if (source->horn == 0) {
-        source->horn = source->hornOn;
-      }
-    }
+    if ((-1 < iVar1) || (AudioClc_gClosest[closestIndex].horn = iVar1 + 1, iVar1 + 1 != 0))
+    goto LAB_800753f8;
+    iVar1 = AudioClc_gClosest[closestIndex].hornOn;
   }
-  if (car->carInfo->carType - 0x16U < 6) {
-    if ((car->AIFlags & 2U) != 0) {
-      int iamp;
-
-      iamp = ((0x1324 - distSq) * 0x7f) / 0x1324;
-      if (bSirenOn[closestIndex] == 0) {
-        SirenOn(closestIndex,car->carFlags & 0x40);
+  else {
+    if ((car->control).horn == '\0') {
+      if (AudioClc_gClosest[closestIndex].horn != 0) {
+        AudioClc_SilenceOpponentHorn(closestIndex);
+        AudioClc_gClosest[closestIndex].horn = 0;
       }
-      else {
-        UpdateSiren(closestIndex,iamp,dop,azimuth,
-                 car->carFlags & 0x40);
-      }
+      goto LAB_800753f8;
     }
-    else {
+    AudioClc_SoundOpponentHorn(closestIndex,azimuth,doppler,dsquare);
+    iVar1 = 1;
+  }
+  AudioClc_gClosest[closestIndex].horn = iVar1;
+LAB_800753f8:
+  if (car->carInfo->carType - 0x16U < 6) {
+    if ((car->AIFlags & 2U) == 0) {
       if (bSirenOn[closestIndex] != 0) {
         SirenOff(closestIndex);
         freeVoiceChannel(closestIndex + 0x2b);
       }
+    }
+    else if (bSirenOn[closestIndex] == 0) {
+      SirenOn(closestIndex,car->carFlags & 0x40);
+    }
+    else {
+      UpdateSiren(closestIndex,((0x1324 - dsquare) * 0x7f) / 0x1324,doppler,azimuth,
+                 car->carFlags & 0x40);
     }
   }
   return;
 }
 
 /* ---- AudioClc_SoundPlayersCar__Fi  [@0x80075508] ---- */
-/* MATCH: source-PASS 461/461 (2026-08-24).  The former 4-diff residual was
- * thread_jumps redirecting the `(type==5||type==3) && channel>=0` fail edge
- * past the else chain's `bgez channel` re-test.  A zero-byte boundary at the
- * head of the explicit outer else makes that shared entry semantically
- * observable to jump.c; both false paths enter before bgez, and gcc fills its
- * slot with `li v0,1` exactly like retail.  No per-function compiler splice is
- * required. */
 void AudioClc_SoundPlayersCar(int playerIndex)
 {
-  DRender_tCalcView *view;
-  AudioClc_tSource *previous;
-  Car_tObj *car;
+  DRender_tCalcView*view;
+  AudioClc_tSource*previous;
   int azimuth;
   int dsquare;
   int frequency;
@@ -470,175 +691,201 @@ void AudioClc_SoundPlayersCar(int playerIndex)
   int facing;
   int cardir;
   int trkazi;
-
-  view = &AudioClc_gRenderView;
-  previous = &AudioClc_gPlayer[playerIndex].source;
-  car = previous->car;
+  int revLimit;
+  int c;
+  int channel;
+  int iamp;
+  int iVar1;
+  int iVar2;
+  int iVar3;
+  int iVar4;
+  u_int uVar5;
+  int iVar6;
+  coorddef *objectPos;
+  int iVar7;
+  int *piVar8;
+  Car_tObj *car;
+  int iVar9;
+  int iVar10;
+  
+  car = AudioClc_gPlayer[playerIndex].source.car;
   if (car == (Car_tObj *)0x0) {
     return;
   }
-  facing = 0;
-  if ((car->carFlags & 0x200U) != 0) {
-    if (car->desiredDirection != car->direction) {
-      facing = -1;
-    }
-  }
-  else {
-    facing = fixedmult((car->N).orientMat.m[6],
-                       (int)*(signed char *)((car->N).simRoadInfo.slice * 0x20 + (int)BWorldSm_slices + 0xf)) +
-             fixedmult((car->N).orientMat.m[7],
-                       (int)*(signed char *)((car->N).simRoadInfo.slice * 0x20 + (int)BWorldSm_slices + 0x10)) +
-             fixedmult((car->N).orientMat.m[8],
-                       (int)*(signed char *)((car->N).simRoadInfo.slice * 0x20 + (int)BWorldSm_slices + 0x11));
+  iVar7 = 0;
+  if ((car->carFlags & 0x200U) == 0) {
+    iVar10 = fixedmult((car->N).orientMat.m[6],
+                        (int)*(char *)((car->N).simRoadInfo.slice * 0x20 + (int)BWorldSm_slices + 0xf));
+    iVar2 = fixedmult((car->N).orientMat.m[7],
+                       (int)*(char *)((car->N).simRoadInfo.slice * 0x20 + (int)BWorldSm_slices + 0x10));
+    iVar7 = fixedmult((car->N).orientMat.m[8],
+                       (int)*(char *)((car->N).simRoadInfo.slice * 0x20 + (int)BWorldSm_slices + 0x11));
+    iVar7 = iVar10 + iVar2 + iVar7;
     if (GameSetup_gData.reverseTrack != 0) {
-      facing = -facing;
+      iVar7 = -iVar7;
     }
   }
-  if (((car->stats).finishType != 2) &&
-     (!((((GameSetup_gData.raceType == RaceType_HotPursuit || (GameSetup_gData.raceType == RaceType_Id5)) &&
+  else if (car->desiredDirection != car->direction) {
+    iVar7 = -1;
+  }
+  if (((car->stats).finishType == 2) ||
+     (((((GameSetup_gData.raceType == 1 || (GameSetup_gData.raceType == 5)) &&
         ((((*(int *)((char *)Cars_gHumanRaceCarList[0] + 0x260)) & 0x200) != 0 ||
          ((Cars_gNumHumanRaceCars == 2 && (((*(int *)((char *)Cars_gHumanRaceCarList[1] + 0x260)) & 0x200) != 0)))))) &&
-       ((car->carFlags & 0x204U) == 4)))) &&
-      (car->RSControl == 0) && (car->pullOver == 0) && (facing < 0)) {
-    if (((car->N).flightTime == 0) && ((car->collision).smoking == 0)) {
-      car->wrongway++;
-      if (((0x3f < car->wrongway) && ((car->wrongway & 0x1f) == 0)) &&
-         ((car->wrongway < 0x94 || (Hud_BeTheCop != 0)))) {
-        AudioCmn_PlayWrongWaySFX();
-      }
-    }
-  }
-  else {
+       ((car->carFlags & 0x204U) == 4)) ||
+      (((car->RSControl != 0 || (car->pullOver != 0)) || (-1 < iVar7)))))) {
     car->wrongway = 0;
   }
-  dop = AudioClc_CalcDopplerShiftRatio(&(car->N).position,&(car->N).linearVel);
+  else if (((car->N).flightTime == 0) && ((car->collision).smoking == 0)) {
+    uVar5 = car->wrongway + 1;
+    car->wrongway = uVar5;
+    if (((0x3f < (int)uVar5) && ((uVar5 & 0x1f) == 0)) &&
+       (((int)uVar5 < 0x94 || (Hud_BeTheCop != 0)))) {
+#ifndef AP_WIN
+      AudioCmn_PlayWrongWaySFX();
+#endif
+    }
+  }
+#ifdef AP_WIN
+  /* 0x80075568..0x80075748 also updates car->wrongway (+0x3f0),
+     consumed by camera.cpp and DashHUD_CheckWrongWay. Keep that gameplay
+     side effect when muting audio; Doppler/engine/horn work starts below. */
+  return;
+#endif
+  objectPos = &(car->N).position;
+  iVar7 = AudioClc_CalcDopplerShiftRatio(objectPos,&(car->N).linearVel);
   if (GameSetup_gData.commMode == 1) {
-    azimuth = 0xc000;
+    iVar10 = 0xc000;
     if (playerIndex != 0) {
-      azimuth = 0x3fff;
+      iVar10 = 0x3fff;
     }
   }
   else if (Camera_gInfo[playerIndex].mode == 0) {
-    azimuth = 0;
+    iVar10 = 0;
   }
   else {
-    azimuth = AudioClc_CalcAzimuth(view,&(car->N).position);
+    iVar10 = AudioClc_CalcAzimuth(&AudioClc_gRenderView,objectPos);
   }
-  dst = AudioClc_CalcDistance(view,&(car->N).position);
-  cardir =
-      (((fixeddiv(AudioClc_CalcCarDirection(view,car),dst) < 0x10001) ?
-         fixeddiv(AudioClc_CalcCarDirection(view,car),dst) : 0x10000) >=
-       -0x10000) ?
-      ((fixeddiv(AudioClc_CalcCarDirection(view,car),dst) < 0x10001) ?
-       fixeddiv(AudioClc_CalcCarDirection(view,car),dst) : 0x10000) :
-      -0x10000;
-  dsquare = dst / 0x10000;
-  dsquare *= dsquare;
-  {
-    int revLimit;
-
-    if (car->carInfo->Transmission == 1) {
-      revLimit = car->specs->redline + 1000;
-    }
-    else {
-      revLimit = car->specs->redline + 2000;
-    }
-    if (5 < (car->N).flightTime) {
-      revLimit -= 500;
-    }
-    frequency = (car->flywheelRpm * 0x7f) / revLimit;
-  }
-  if (AudioClc_gCameraVelocity != (coorddef *)0x0) {
-    previous->relVelocity = 0;
+  iVar2 = AudioClc_CalcDistance(&AudioClc_gRenderView,&(car->N).position);
+  iVar3 = AudioClc_CalcCarDirection(&AudioClc_gRenderView,car);
+  iVar3 = fixeddiv(iVar3,iVar2);
+  if (iVar3 < 0x10001) {
+    iVar3 = AudioClc_CalcCarDirection(&AudioClc_gRenderView,car);
+    iVar3 = fixeddiv(iVar3,iVar2);
+    iVar9 = -0x10000;
+    if (-0x10001 < iVar3) goto LAB_80075824;
   }
   else {
-    previous->relVelocity = __builtin_abs(car->currentSpeed);
+LAB_80075824:
+    iVar3 = AudioClc_CalcCarDirection(&AudioClc_gRenderView,car);
+    iVar3 = fixeddiv(iVar3,iVar2);
+    iVar9 = 0x10000;
+    if (iVar3 < 0x10001) {
+      iVar3 = AudioClc_CalcCarDirection(&AudioClc_gRenderView,car);
+      iVar9 = fixeddiv(iVar3,iVar2);
+    }
   }
-  trkazi = AudioClc_CalcTrackAzimuth(view,car);
-  AudioTrk_SoundTrack(car,trkazi);
-  AudioCmn_SoundCar(car,dst,frequency,dop,azimuth,trkazi,
-             previous->relVelocity,cardir);
+  iVar3 = iVar2;
+  if (iVar2 < 0) {
+    iVar3 = iVar2 + 0xffff;
+  }
+  iVar3 = (iVar3 >> 0x10) * (iVar3 >> 0x10);
+  if (car->carInfo->Transmission == 1) {
+    iVar6 = car->specs->redline + 1000;
+  }
+  else {
+    iVar6 = car->specs->redline + 2000;
+  }
+  if (5 < (car->N).flightTime) {
+    iVar6 = iVar6 + -500;
+  }
+  iVar1 = car->flywheelRpm * 0x7f;
+  if (iVar6 == 0) {
+    trap(0x1c00);
+  }
+  if ((iVar6 == -1) && (iVar1 == -0x80000000)) {
+    trap(0x1800);
+  }
+  if (AudioClc_gCameraVelocity == (coorddef *)0x0) {
+    iVar4 = car->currentSpeed;
+    if (iVar4 < 0) {
+      iVar4 = -iVar4;
+    }
+    AudioClc_gPlayer[playerIndex].source.relVelocity = iVar4;
+  }
+  else {
+    AudioClc_gPlayer[playerIndex].source.relVelocity = 0;
+  }
+  iVar4 = AudioClc_CalcTrackAzimuth(&AudioClc_gRenderView,car);
+  AudioTrk_SoundTrack(car,iVar4);
+  AudioCmn_SoundCar(car,iVar2,iVar1 / iVar6,iVar7,iVar10,iVar4,
+             AudioClc_gPlayer[playerIndex].source.relVelocity,iVar9);
   if (gMasterSFXLevel == 0) {
     return;
   }
-  {
-    int c;
-    int channel;
-
-    c = car->audioCount - 1;
-    while (c >= 0) {
-      if (car->audio[c].channel == 0x12) {
-        channel = 0x12;
+  iVar2 = car->audioCount + -1;
+  if (-1 < iVar2) {
+    piVar8 = &(car->N).simRoadInfo.quadPts[car->audioCount * 2 + -4].z;
+    do {
+      iVar9 = piVar8[0x1e7];
+      if (iVar9 == 0x12) {
+        iVar9 = 0x12;
         if (playerIndex != 0) {
-          channel = 0x13;
+          iVar9 = 0x13;
         }
       }
-      else if (car->audio[c].channel == 0x14) {
-        channel = 0x14;
-        if (playerIndex != 0) {
-          channel = 0x15;
+      else if ((iVar9 == 0x14) && (iVar9 = 0x14, playerIndex != 0)) {
+        iVar9 = 0x15;
+      }
+      if (((piVar8[0x1e6] == 5) || (piVar8[0x1e6] == 3)) && (-1 < iVar9)) {
+        freeVoiceChannel(iVar9);
+        if (iVar9 - 0x12U < 2) {
+          freeVoiceChannel(iVar9 + 4);
         }
       }
       else {
-        channel = car->audio[c].channel;
-      }
-      if (((car->audio[c].type == 5) ||
-           (car->audio[c].type == 3)) && (channel >= 0)) {
-        freeVoiceChannel(channel);
-        if (channel - 0x12U < 2) {
-          freeVoiceChannel(channel + 4);
+        iVar6 = iVar10;
+        if (((iVar9 < 0) && (GameSetup_gData.commMode != 1)) &&
+           ((piVar8[0x1e8] != 10 && (piVar8[0x1e8] != 8)))) {
+          iVar6 = AudioClc_CalcAzimuth(&AudioClc_gRenderView,&(car->N).collision.collisionPoint);
         }
+        AudioCmn_SFX(iVar9,(s_type)piVar8[0x1e8],(s_type)piVar8[0x1e9],piVar8[0x1ea],iVar3,iVar6);
       }
-      else {
-        /* MATCH: preserve the common else entry before channel's bgez re-test. */
-        __asm__("" : : "i"(0));
-        if ((channel < 0) && (GameSetup_gData.commMode != 1) &&
-            (car->audio[c].surface1 != 10) &&
-            (car->audio[c].surface1 != 8)) {
-          AudioCmn_SFX(channel,car->audio[c].surface1,
-                       car->audio[c].surface2,car->audio[c].force,
-                       dsquare,
-                       AudioClc_CalcAzimuth(view,
-                         &(car->N).collision.collisionPoint));
-        }
-        else {
-          AudioCmn_SFX(channel,car->audio[c].surface1,
-                       car->audio[c].surface2,car->audio[c].force,
-                       dsquare,azimuth);
-        }
-      }
-      c--;
-    }
+      piVar8 = piVar8 + -6;
+      iVar2 = iVar2 + -1;
+    } while (-1 < iVar2);
   }
-  if ((car->control).horn != '\0') {
-    AudioCmn_PlayerHornOn(car->carIndex,dsquare,0x40,azimuth,dop);
-    previous->horn = 1;
+  if ((car->control).horn == '\0') {
+    if (AudioClc_gPlayer[playerIndex].source.horn == 0) goto LAB_80075b0c;
+    iVar2 = AudioCmn_PlayerHornOff(car->carIndex);
   }
-  else if (previous->horn != 0) {
-    previous->horn = AudioCmn_PlayerHornOff(car->carIndex);
+  else {
+    AudioCmn_PlayerHornOn(car->carIndex,iVar3,0x40,iVar10,iVar7);
+    iVar2 = 1;
   }
+  AudioClc_gPlayer[playerIndex].source.horn = iVar2;
+LAB_80075b0c:
   if (car->carInfo->carType - 0x16U < 6) {
-    if ((car->AIFlags & 2U) != 0) {
-      int iamp;
-
-      if (dsquare < 0x1324) {
-        iamp = ((0x1324 - dsquare) * 0x7f) / 0x1324;
-      }
-      else {
-        iamp = 0;
-      }
-      if (bSirenOn[car->carIndex + 4] == 0) {
-        SirenOn(car->carIndex + 4,car->carFlags & 0x40);
-      }
-      else {
-        UpdateSiren(car->carIndex + 4,iamp,dop,azimuth,
-                    car->carFlags & 0x40);
+    if ((car->AIFlags & 2U) == 0) {
+      iVar7 = car->carIndex + 4;
+      if (bSirenOn[iVar7] != 0) {
+        SirenOff(iVar7);
+        freeVoiceChannel(car->carIndex + 0x2f);
       }
     }
     else {
-      if (bSirenOn[car->carIndex + 4] != 0) {
-        SirenOff(car->carIndex + 4);
-        freeVoiceChannel(car->carIndex + 0x2f);
+      if (iVar3 < 0x1324) {
+        iVar2 = ((0x1324 - iVar3) * 0x7f) / 0x1324;
+      }
+      else {
+        iVar2 = 0;
+      }
+      iVar3 = car->carIndex + 4;
+      if (bSirenOn[iVar3] == 0) {
+        SirenOn(iVar3,car->carFlags & 0x40);
+      }
+      else {
+        UpdateSiren(iVar3,iVar2,iVar7,iVar10,car->carFlags & 0x40);
       }
     }
   }
@@ -665,184 +912,105 @@ void AudioClc_ResetClosest(int closestIndex,Car_tObj *car,int playerIndex)
 }
 
 /* ---- AudioClc_GetClosestCars__Fiii  [@0x80075d04] ---- */
-/* MATCH: FAIL 3 (268/267), was 17 -- 2026-08-08 round: three SYM/source
- * truths landed: (1) `__builtin_abs` for the x/y/z folds (17->5; same
- * spelling as the PASSing CalcDistance -- the if(x<0)x=-x form rotated the
- * whole abs region); (2) C++ MIXED-DECL order per the SYM symbol list:
- * `closest` DECL-WITH-INIT *before* the `cl[numclosest]` VLA decl (5->3;
- * the alloca's sp-sub is prologue-hoisted but the s6=sp+16 base BIND stays
- * at the decl point, after the closest computation = retail order);
- * (3) searchdist/patch block-scoped per SYM.  RESIDUAL 3 = ONE extra lui:
- * our translation.x (offset 0) folds to (mem (lo_sum high sym)) with its
- * own high-pseudo, while y/z (+4/+8, not lo_sum-offsettable) force the
- * full address -> loop.c hoists it (p149, REG_EQUIV) -> reload remats as
- * the `la t1`; retail routes the x-load through that shared base too
- * (`lw v0,0(t1)`), ours keeps TWO identical (high sym) pseudos un-merged
- * (expand-created vs loop-created -- never in one cse scope; loop.c
- * combine_movables didn't merge them).  FALSIFIED: y,z,x / z-first orders
- * (120/30 diffs @count-EXACT 267 -- base-reuse works but defs rotate),
- * operand swaps, split stmt, cast-ptr (FE folds back), abs interleave,
- * whole-TU no_split_addresses (9 PASSes break), -fforce-addr (same double
- * lui).  Route: instrument loop.c combine_movables (r11-style) or accept.
- * W59-A4 adds two more falsifications on the same 3: a plain
- * `coorddef *viewpos = &AudioClc_gRenderView.translation;` local with x/y/z read
- * through it is INERT (3 -- the FE folds it back exactly as the cast-ptr note
- * says), and the same local laundered with an identity fence
- * `__asm__("" : "=r"(viewpos) : "0"(viewpos))` REGRESSES to 29 (the opaque base
- * un-CSEs the y/z pair and rotates the whole abs region).  Route unchanged.
- * W63-A10 SEALED (DUAL-LANE: gate PASS 267/267 + psyqproof REAL=0; TU 18/18).
- * The W59-A4 falsification was right about the SPELLING and wrong about the
- * PLACEMENT -- the base pointer has to be declared OUTSIDE THE LOOP.  Inside the
- * body the front end folds it straight back (measured again this wave: an
- * in-body `const int *vp` 3, inert; `(&...translation.y)[-1]` for x 3; x spelled
- * through a byte offset off &y or &z 3; all inert because a NON-LAST `.x` access
- * always wins its own lo_sum fold).  Declared BEFORE the `while (i <
- * Cars_gNumCars)` loop it is exactly ONE (high sym) pseudo -- the one loop.c
- * hoists (REG_EQUIV) and reload rematerialises as retail's `la t1` -- so all
- * three components load off it and the second `lui` disappears.
- * MEASURED THIS WAVE (all real gate runs): pre-loop plain `const int *viewpos`
- * used for x,y,z PASS 267/267 <= KEPT; the same pre-loop pointer with a 13B
- * identity launder 31@270 (the opacity blocks loop.c's hoist -- the launder is
- * the WRONG device here, exactly inverse to Lose's receiver carrier); pre-loop
- * pointer used for y,z only (x left as `.x`) 3@268 plain / 32@271 laundered --
- * so the x access MUST go through the same base;  and the position law behind
- * the old order falsifications: base-reuse appears iff the `.x` access is the
- * LAST of the three (x-last 118@267 COUNT-EXACT, x-middle 102@269, x-first
- * 3@268) -- the FIRST-expanded component owns the lo_sum fold. */
 void AudioClc_GetClosestCars(int playerIndex,int closestIndex,int numclosest)
 {
-  int i;
-  int j;
-  int k;
-  int x;
-  int y;
-  int z;
-  int distance;
-  int distance1;
-  Car_tObj **car;
+  AudioClc_tCLCache *cache = (AudioClc_tCLCache *)
+      NFS4_AUDIOCLC_ALLOCA((unsigned int)numclosest * sizeof(AudioClc_tCLCache));
   AudioClc_tSource *closest = AudioClc_gClosest + closestIndex;
-  AudioClc_tCLCache cl[numclosest];
+  Car_tObj *emptyMarker = (Car_tObj *)(intptr_t)-1;
+  int i, j;
 
-  for (i = 0; i < numclosest; i++) {
-    cl[i].ptr = 0;
-    cl[i].dst = 0x12c0000;
+  for (i = 0; i < numclosest; ++i) {
+    cache[i].ptr = 0;
+    cache[i].dst = 0x12c0000;
   }
 
-  /* MATCH: the listener position must be taken as a LOOP-INVARIANT base
-     BEFORE the loop -- see the header block.  Declared here (not inside the
-     body) it is the single (high sym) pseudo loop.c hoists and reload
-     rematerialises as retail's `la t1`, so all THREE components load off it
-     (`lw v0,0(t1) / lw v1,4(t1) / lw v0,8(t1)`).  The same pointer declared
-     inside the loop body is folded straight back by the front end. */
-  const int *viewpos = (const int *)&AudioClc_gRenderView.translation;
+  for (i = 0; i < Cars_gNumCars; ++i) {
+    Car_tObj *car = Cars_gList[i];
+    int searchdist;
+    int x, y, z, horizontal, distance;
 
-  i = 0;
-  car = Cars_gList;
-  while (i < Cars_gNumCars) {
     if (GameSetup_gData.commMode == 1) {
-      if (((*car)->carFlags & 4U) != 0) {
-        goto AudioClc_nextCar;
+      if ((car->carFlags & 4U) != 0)
+        continue;
+    } else if (car == AudioClc_gPlayer[playerIndex].source.car) {
+      continue;
+    }
+    if (car->N.active == 0)
+      continue;
+
+    searchdist = (car->carFlags & 0x10U) ? 0x320000 : 0x12c0000;
+    x = nfs4_mips_subu_s32(car->N.position.x, AudioClc_gRenderView.translation.x);
+    y = nfs4_mips_subu_s32(car->N.position.y, AudioClc_gRenderView.translation.y);
+    z = nfs4_mips_subu_s32(car->N.position.z, AudioClc_gRenderView.translation.z);
+    if (x < 0) x = nfs4_mips_negu_s32(x);
+    if (y < 0) y = nfs4_mips_negu_s32(y);
+    if (z < 0) z = nfs4_mips_negu_s32(z);
+    horizontal = (z < x) ? nfs4_mips_addu_s32(x, nfs4_mips_sra_s32(z, 2))
+                         : nfs4_mips_addu_s32(z, nfs4_mips_sra_s32(x, 2));
+
+    if (horizontal < 0x1900000) {
+      int patch = CopSpeak_GetEnginePatch(car->carInfo->carType, 0);
+      if (patch >= 0)
+        AudioCmn_GetAsyncSfx(1, patch, 0);
+    }
+    if (horizontal >= searchdist)
+      continue;
+    distance = (horizontal < y)
+             ? nfs4_mips_addu_s32(y, nfs4_mips_sra_s32(horizontal, 2))
+             : nfs4_mips_addu_s32(horizontal, nfs4_mips_sra_s32(y, 2));
+    if (distance >= searchdist)
+      continue;
+
+    for (j = 0; j < numclosest; ++j) {
+      if (distance < cache[j].dst) {
+        int k;
+        for (k = numclosest - 1; j < k; --k)
+          cache[k] = cache[k - 1];
+        cache[j].ptr = car;
+        cache[j].dst = distance;
+        break;
       }
     }
-    else if (*car == AudioClc_gPlayer[playerIndex].source.car) {
-      goto AudioClc_nextCar;
-    }
-
-    if ((*car)->N.active != 0) {
-        int searchdist;
-
-        searchdist = 0x12c0000;
-        if (((*car)->carFlags & 0x10U) != 0) {
-          searchdist = 0x320000;
-        }
-
-        x = (*car)->N.position.x - viewpos[0];
-        y = (*car)->N.position.y - viewpos[1];
-        z = (*car)->N.position.z - viewpos[2];
-        x = __builtin_abs(x);
-        y = __builtin_abs(y);
-        z = __builtin_abs(z);
-
-        if (z < x) {
-          distance = x + (z >> 2);
-        }
-        else {
-          distance = z + (x >> 2);
-        }
-
-        if (distance < 0x1900000) {
-          int patch;
-
-          patch = CopSpeak_GetEnginePatch((*car)->carInfo->carType,0);
-          if (patch >= 0) {
-            AudioCmn_GetAsyncSfx(1,patch,(void *)0);
-          }
-        }
-
-        if (distance < searchdist) {
-          if (distance < y) {
-            distance1 = y + (distance >> 2);
-          }
-          else {
-            distance1 = distance + (y >> 2);
-          }
-
-          if (distance1 < searchdist) {
-            for (j = 0; j < numclosest; j++) {
-              if (distance1 < cl[j].dst) {
-                for (k = numclosest - 1; k > j; k--) {
-                  cl[k].ptr = cl[k - 1].ptr;
-                  cl[k].dst = cl[k - 1].dst;
-                }
-                cl[j].ptr = *car;
-                cl[j].dst = distance1;
-                break;
-              }
-            }
-          }
-        }
-    }
-
-AudioClc_nextCar:
-    i++;
-    car++;
   }
 
-  for (i = 0; i < numclosest; i++) {
+  for (i = 0; i < numclosest; ++i) {
     if (closest[i].car != 0) {
-      for (j = 0; j < numclosest; j++) {
-        if (cl[j].ptr == closest[i].car) {
-          cl[j].ptr = 0;
+      for (j = 0; j < numclosest; ++j) {
+        if (cache[j].ptr == closest[i].car) {
+          cache[j].ptr = 0;
           break;
         }
       }
-      if (j == numclosest) {
-        closest[i].car = (Car_tObj *)-1;
-      }
+      if (j == numclosest)
+        closest[i].car = emptyMarker;
     }
   }
-
-  for (i = 0; i < numclosest; i++) {
-    if (cl[i].ptr != 0) {
-      for (j = 0; j < numclosest; j++) {
-        if ((closest[j].car == 0) || (closest[j].car == (Car_tObj *)-1)) {
-          AudioClc_ResetClosest(j + closestIndex,cl[i].ptr,playerIndex);
+  for (i = 0; i < numclosest; ++i) {
+    if (cache[i].ptr != 0) {
+      for (j = 0; j < numclosest; ++j) {
+        if (closest[j].car == 0 || closest[j].car == emptyMarker) {
+          AudioClc_ResetClosest(j + closestIndex, cache[i].ptr, playerIndex);
           break;
         }
       }
     }
   }
-
-  for (i = 0; i < numclosest; i++) {
-    if (closest[i].car == (Car_tObj *)-1) {
-      AudioClc_ResetClosest(i + closestIndex,0,playerIndex);
-    }
+  for (i = 0; i < numclosest; ++i) {
+    if (closest[i].car == emptyMarker)
+      AudioClc_ResetClosest(i + closestIndex, 0, playerIndex);
   }
 }
 
 /* ---- AudioClc_SoundSpeech__Fv  [@0x80076130] ---- */
 void AudioClc_SoundSpeech(void)
 {
+#ifdef AP_WIN
+  /* The native port intentionally has no SPU/music/speech backend.  Keeping
+     the original speech scheduler alive is both wasted work and unsafe: its
+     reconstructed object graph assumes PsyQ audio objects were initialized. */
+  return;
+#endif
   AudioCmn_SetLevels();
   Speech_Server();
   CopSpeak_Server();
@@ -851,7 +1019,7 @@ void AudioClc_SoundSpeech(void)
 
 /* externs for cross-module symbols not already in audioclc.cpp scope */
 extern int HudBustedOverlay;
-extern int gMasterAmbientLevel;
+extern "C" extern int gMasterAmbientLevel;
 void Camera_GetAudioViewInfo(int cviewP, DRender_tCalcView *cview, coorddef **cvel);
 void AudioCmn_UpdateThunder(void);
 
@@ -863,28 +1031,29 @@ void AudioCmn_UpdateThunder(void);
  *  Pursuit "busted" block re-primes perp engine SFX. */
 void AudioClc_SoundCars(void)
 {
+#ifdef AP_WIN
+  /* Preserve the gameplay prefix of SoundPlayersCar at the original
+     32-Hz call site. SoundCars MIPS 0x80076278..0x8007639C calls player 0
+     in both modes and player 1 only when commMode == 1. */
+  AudioClc_SoundPlayersCar(0);
+  if (GameSetup_gData.commMode == 1) AudioClc_SoundPlayersCar(1);
+  return;
+#endif
+  int i, patch;
 
   AudioClc_SoundSpeech();
   AudioCmn_UpdateThunder();
 
-  if ((GameSetup_gData.raceType == RaceType_HotPursuit || GameSetup_gData.raceType == RaceType_Id5) &&
+  if ((GameSetup_gData.raceType == 1 || GameSetup_gData.raceType == 5) &&
       ((Cars_gHumanRaceCarList[0]->carFlags & 0x200) ||
        (Cars_gNumHumanRaceCars == 2 && (Cars_gHumanRaceCarList[1]->carFlags & 0x200))) &&
       HudBustedOverlay != 0) {
-    /* MATCH: PASS 176/176 (2026-08-08, was FAIL 2 under a w30-a6 "pure
-     * allocator artifact" floor verdict + 505-iter permuter).  Three SYM
-     * truths cracked it together: NO `gs`/`patch` locals (SYM block lists
-     * only `i` -- the calls are NESTED, v0->a1 directly), `i` block-scoped,
-     * and the loop written as a plain `for` (its rotated guard makes
-     * loop.c's strength-reduction giv-init source the HOISTED base pseudo
-     * -> `addu s0,s2` chain; the old explicit if+do-while sourced the
-     * address temp -> `addu s0,a1` = the whole 2-diff residual). */
-    {
-      int i;
-
+    if (0 < GameSetup_gData.numPerps) {
       for (i = 0; i < GameSetup_gData.numPerps; i++) {
-        AudioCmn_GetAsyncSfx(1, CopSpeak_GetEnginePatch(GameSetup_gData.perpInfo[i].CarType, 0), (void *)0);
-        AudioCmn_GetAsyncSfx(1, CopSpeak_GetEnginePatch(GameSetup_gData.perpInfo[i].CarType, 1), (void *)0);
+        patch = CopSpeak_GetEnginePatch(GameSetup_gData.perpInfo[i].CarType, 0);
+        AudioCmn_GetAsyncSfx(1, patch, (void *)0);
+        patch = CopSpeak_GetEnginePatch(GameSetup_gData.perpInfo[i].CarType, 1);
+        AudioCmn_GetAsyncSfx(1, patch, (void *)0);
       }
     }
   }

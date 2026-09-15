@@ -1,14 +1,17 @@
 /* game/common/aiworld.h — reconstructed from game/common/aiworld.cpp (22 fns) */
 #ifndef _GAME_COMMON_AIWORLD_H_
 #define _GAME_COMMON_AIWORLD_H_
-#include "aiworld_types.h"
+#include "../../nfs4_types.h"
 
 int AIWorld_ZSplineDistance__FP8Car_tObjT0(Car_tObj *carObj, Car_tObj *otherCarObj);   /* :29 */
 int AIWorld_ZSplineDistance__FP8coorddefT0P10matrixtdef(coorddef *pos1, coorddef *pos2, matrixtdef *roadMatrix);   /* :38 */
-int AIWorld_ApxSplineDistance__FP8Car_tObjT0(Car_tObj *carObj, Car_tObj *otherCarObj);   /* :52 */
-int AIWorld_ApxSplineDistance__FP8Car_tObji(Car_tObj *carObj, int location);   /* :67 */
-int AIWorld_ApxSplineDistance__FiP8Car_tObj(int location, Car_tObj *carObj);   /* :82 */
-int AIWorld_ApxSplineDistance__Fii(int locationA, int locationB);   /* :87 */
+/* The four PsyQ C++ overloads are distinct symbols in NFS4.SYM.  Keep their
+ * source-level overload set visible to every caller; declaring only the
+ * pointer/pointer form lets -fpermissive turn a slice number into a pointer. */
+int AIWorld_ApxSplineDistance(Car_tObj *carObj, Car_tObj *otherCarObj); /* 0x800730b8 */
+int AIWorld_ApxSplineDistance(Car_tObj *carObj, int location);          /* 0x80073128 */
+int AIWorld_ApxSplineDistance(int location, Car_tObj *carObj);          /* 0x80073194 */
+int AIWorld_ApxSplineDistance(int locationA, int locationB);            /* 0x800731bc */
 int AIWorld_SplineDistance__FP8Car_tObjT0(Car_tObj *carObj, Car_tObj *otherCarObj);   /* :107 */
 int AIWorld_SplineDistance__FP8Car_tObjiP8coorddef(Car_tObj *carObj, int location, coorddef *position);   /* :119 */
 int AIWorld_GameOdometer__FP8Car_tObj(Car_tObj *carObj);   /* :143 */

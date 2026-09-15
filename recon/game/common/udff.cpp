@@ -2,7 +2,7 @@
  *   4 fns: Udff_Opena, Udff_Close, Udff_GetInt, Udff_GetBuffer.
  *   GTE-free. Full SYM-locals applied.
  */
-#include "udff_types.h"
+#include "../../nfs4_types.h"
 #include "udff_externs.h"
 
 /* ---- intra-TU forward declarations (auto-emitted, signature-exact) ---- */
@@ -16,52 +16,36 @@ void Udff_GetBuffer(Udff_tInfo *handle,char *mem,int size);
 Udff_tInfo * Udff_Opena(char *name,char *mem,int abortFlag)
 
 {
-  /* MATCH: SYM has one real local (`newHandle` in $s0).  The source-level
-     labels preserve retail's distinct invalid-argument/file-load purge paths
-     and shared success return without reconstructed assembly. */
+  Udff_tInfo *addr;
+  char *pcVar1;
   Udff_tInfo *newHandle;
-
-  newHandle = reservememadr("udffhandle",0xc,0x10);
-  if (newHandle == (Udff_tInfo *)0x0) {
-    return (Udff_tInfo *)0x0;
-  }
-  if (name != (char *)0x0) {
-    goto haveName;
-  }
-  if (mem == (char *)0x0) {
-    goto purge;
-  }
-  newHandle->type = UDFF_MEMORY;
-  goto memoryHandle;
-
-haveName:
-  if (mem == (char *)0x0) {
-    goto fileHandle;
-  }
-
-purge:
-  if (newHandle != (Udff_tInfo *)0x0) {
-    purgememadr(newHandle);
+  
+  addr = (Udff_tInfo *)reservememadr("udffhandle",0xc,0x10);
+  if (addr != (Udff_tInfo *)0x0) {
+    if (name == (char *)0x0) {
+      if (mem != (char *)0x0) {
+        addr->type = UDFF_MEMORY;
+        addr->handle = 0;
+        addr->memPtr = mem;
+        return addr;
+      }
+    }
+    else if (mem == (char *)0x0) {
+      addr->type = UDFF_FILE;
+      pcVar1 = (char *)loadfileadrz(name,0);
+      addr->memPtr = pcVar1;
+      addr->handle = (intptr_t)pcVar1;
+      if (pcVar1 != (char *)0x0) {
+        return addr;
+      }
+      purgememadr(addr);
+      return (Udff_tInfo *)0x0;
+    }
+    if (addr != (Udff_tInfo *)0x0) {
+      purgememadr(addr);
+    }
   }
   return (Udff_tInfo *)0x0;
-
-memoryHandle:
-  newHandle->handle = 0;
-  newHandle->memPtr = mem;
-  goto success;
-
-fileHandle:
-  newHandle->type = UDFF_FILE;
-  newHandle->memPtr = (char *)loadfileadrz(name,(void *)0x0);
-  newHandle->handle = (int)newHandle->memPtr;
-  if (newHandle->memPtr != (char *)0x0) {
-    goto success;
-  }
-  purgememadr(newHandle);
-  return (Udff_tInfo *)0x0;
-
-success:
-  return newHandle;
 }
 
 /* ---- Udff_Close__FP10Udff_tInfo  [UDFF.CPP:84-100] SLD-VERIFIED ---- */
@@ -86,7 +70,7 @@ int Udff_GetInt(Udff_tInfo *handle)
   int iVar1;
   
   iVar1 = *(int *)handle->memPtr;
-  handle->memPtr = (char *)((int)handle->memPtr + 4);
+  handle->memPtr = handle->memPtr + 4;
   return iVar1;
 }
 

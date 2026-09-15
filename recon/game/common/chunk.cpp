@@ -9,14 +9,15 @@
  *   The rest of the body matches Ghidra's field-resolved output (delay-slot stores verified
  *   against disasm-v2: each call's result lands in the slot of the *following* jal). Self-contained.
  */
-#include "chunk_types.h"
+#include "../../nfs4_types.h"
 #include "chunk_externs.h"
 
 /* ---- chunk.obj-owned globals (.bss zero) ---- */
-CVECTOR      *Chunk_lightTable;      /* @0x8013c818 */
+extern "C" { CVECTOR      *Chunk_lightTable; } /* @0x8013c818 */
 coorddef     *Chunk_chunkCenters;    /* @0x8013c81c */
 
 /* ---- intra-TU forward declarations ---- */
+void InstanceGroup(Chunk *pThis, SerializedGroup *chunkGroup, SimpleMem *mem);
 void Chunk_UpdateSys(DRender_tView *Vi);
 void Chunk_Init(void);
 void Chunk_DeInit(void);
@@ -25,7 +26,7 @@ void Chunk_DeInit(void);
  * SYM-v3 REG locals applied per the disasm-v2 register map (SSA-split across the
  * mutually-exclusive scopes): instGroup=$s1, simGroup=$s4, i/numElements=$s0/$a2,
  * inst=Trk_SimpleInst* walker, index=$v1, size=$a3, simObjs=$v1, count=$a1, geomGroup=$s1. */
-void Chunk::InstanceGroup(SerializedGroup *chunkGroup, SimpleMem *mem)
+void InstanceGroup(Chunk *pThis, SerializedGroup *chunkGroup, SimpleMem *mem)
 {
   SerializedGroup *group;
   SerializedGroup *geomGroup;
@@ -33,97 +34,70 @@ void Chunk::InstanceGroup(SerializedGroup *chunkGroup, SimpleMem *mem)
   Group *pGVar6;
   Trk_Quad *pTVar9;
   short sVar3;
-  char *groupData;
-  SimpleMem *groupMem;
+  u_char *quadCountData;
 
-  groupMem = mem;
-  group = (chunkGroup)->LocateGroupType(0x1c, 0);
-  groupData = (char *)(group + 1);
-  this->firstSimSliceInd = *(short *)(groupData + 10);   /* @0x7B43C group+26 */
+  group = LocateGroupType(chunkGroup, 0x1c, 0);
+  pThis->firstSimSliceInd = *(short *)((u_char *)group + 0x1a);   /* @0x7B43C group+26 */
   /* @0x7B448-0x7B4E4 disasm-v2: byte-exact 32-byte block copy &group[2] -> boundPts/chunkboundPts.
      (Ghidra rendered this unaligned lwl/lwr/swl/swr run as in_t3 register-shuffle garbage.) */
-  this->boundPts[0] = ((RelCoord16 *)(groupData + 16))[0];
-  this->boundPts[1] = ((RelCoord16 *)(groupData + 16))[1];
-  this->boundPts[2] = ((RelCoord16 *)(groupData + 16))[2];
-  this->boundPts[3] = ((RelCoord16 *)(groupData + 16))[3];
-  this->chunkboundPts[0] = ((RelCoord16 *)(groupData + 16))[4];
-  this->chunkboundPts[1] = ((RelCoord16 *)(groupData + 16))[5];
-  this->chunkboundPts[2] = ((RelCoord16 *)(groupData + 16))[6];
-  this->chunkboundPts[3] = ((RelCoord16 *)(groupData + 16))[7];
-  this->chunkInd = *(short *)(groupData + 12);                     /* @0x7B4E8 group+28 */
-  if (CHUNK_COMMMODE != 1) {
-    pGVar6 = (Group *)(chunkGroup)->LocateCreateGroupType(3, groupMem, 0);
-    this->objInstanceBuf = pGVar6;
-    pGVar6 = (Group *)(chunkGroup)->LocateCreateGroupType(0xb, groupMem, 0);
-    this->simObjBuf = pGVar6;
+  memcpy(pThis->boundPts, &group[2], 32);
+  pThis->chunkInd = (short)group[1].m_num_elements;                 /* @0x7B4E8 group+28 */
+  if (GameSetup_gData.commMode != 1) {
+    pGVar6 = (Group *)LocateCreateGroupType(chunkGroup, 3, mem, 0);
+    pThis->objInstanceBuf = pGVar6;
+    pGVar6 = (Group *)LocateCreateGroupType(chunkGroup, 0xb, mem, 0);
+    pThis->simObjBuf = pGVar6;
   }
   else {
-    SerializedGroup *instGroup;   /* $s1  type-3  (instance) group */
     SerializedGroup *simGroup;    /* $s4  type-0xB (sim-object) group */
+    SerializedGroup *instGroup;   /* $s1  type-3  (instance) group */
+    int i;
+    int numElements;
+    int size;
 
-    simGroup  = (chunkGroup)->LocateGroupType(0xb, 0);
-    instGroup = (chunkGroup)->LocateGroupType(3, 0);
+    simGroup  = LocateGroupType(chunkGroup, 0xb, 0);
+    instGroup = LocateGroupType(chunkGroup, 3, 0);
     /* ---- count sim-objects that resolve to a live type-5/term-0 instance ---- */
     if (simGroup == (SerializedGroup *)0x0) {
-      this->simObjBuf = (Group *)0x0;
+      pThis->simObjBuf = (Group *)0x0;
     }
     else {
-      int i = 0;
-      int numElements = simGroup->m_num_elements;
-      Trk_SimpleInst *inst = (Trk_SimpleInst *)(simGroup + 1);
-      for (; i < numElements; i = i + 1) {
-        /* MATCH (reqdelta receipt, allocsim 27/27 on this fn): retail puts the counter
-           `i` in $a2 and the inner while-loop's -1 sentinel in $a3; we had them swapped
-           because p115(i) pri .7741 < p136(-1) pri 1.0.  reqdelta's minimal single dial
-           is refs(i) 8 -> 11, and flow.c weights a ref by loop depth (+2 in-loop, +1
-           outside): these two 0-insn use fences deliver exactly +3.  Count stays 329. */
-        __asm__("" : : "r"(i));
-        if (((volatile Trk_SimObject *)inst)[i].instIndex != 0x7f) {
-          int index = (int)((Trk_SimObject *)inst)[i].instIndex;
+      Trk_SimObject *inst = (Trk_SimObject *)(simGroup + 1);
+      numElements = simGroup->m_num_elements;
+      for (i = 0; i < numElements; i = i + 1) {
+        if (inst->instIndex != 0x7f) {
+          int index = (int)inst->instIndex;
           SerializedGroup *probe = instGroup + 1;
           if (instGroup->m_num_elements <= index) break;
-          while (index--) {
-            probe = (SerializedGroup *)((int)&probe->m_type + (int)(short)probe->m_type);
+          while (index = index - 1, index != -1) {
+            probe = (SerializedGroup *)((u_char *)probe + (short)probe->m_type);
           }
           if (((probe == (SerializedGroup *)0x0) ||
-               (*(char *)((int)&probe->m_type + 2) != '\x05')) ||
-              (*(char *)((int)&probe[2].m_type + 3) != '\0')) break;
+               (((u_char *)probe)[2] != '\x05')) ||
+              (((u_char *)probe)[0x23] != '\0')) break;
         }
+        inst = inst + 1;
       }
-      __asm__("" : : "r"(i));
-      numElements = i;
-      if (numElements == 0) {
-        goto InstanceGroup_noSimObjects;
+      if (i == 0) {
+        pThis->simObjBuf = (Group *)0x0;
       }
-      pGVar6 = (chunkGroup)->CreateLiteGroupDataSize(simGroup, groupMem, numElements * 0x14);
-      this->simObjBuf = pGVar6;
-      pGVar6->m_num_elements = numElements;
-      goto InstanceGroup_simObjectsDone;
-
-InstanceGroup_noSimObjects:
-      this->simObjBuf = (Group *)0x0;
-
-InstanceGroup_simObjectsDone:
-      ;
+      else {
+        pGVar6 = CreateLiteGroupDataSize(chunkGroup, simGroup, mem, i * 0x14);
+        pThis->simObjBuf = pGVar6;
+        pGVar6->m_num_elements = i;
+      }
     }
     /* ---- count instance entries (variable-stride walk) ---- */
+    i = 0;
     if (instGroup == (SerializedGroup *)0x0) {
-      goto InstanceGroup_noInstances;
+      pThis->objInstanceBuf = (Group *)0x0;
     }
-    {
-      Trk_SimpleInst *inst;
-      int numElements;
-      int i;
-      int size;
+    else {
+      Trk_SimpleInst *inst = (Trk_SimpleInst *)(instGroup + 1);
       char cVar2;
       int stride;
-
-      numElements = instGroup->m_num_elements;
-      i = 0;
       size = 0;
-      inst = (Trk_SimpleInst *)(instGroup + 1);
-      while (true) {
-        if (i >= numElements) break;
+      for (; i < instGroup->m_num_elements; i = i + 1) {
         cVar2 = *((char *)inst + 2);
         if (cVar2 == '\x05') {
           if (*((char *)inst + 0x23) != '\0') break;
@@ -131,78 +105,63 @@ InstanceGroup_simObjectsDone:
         else if (cVar2 != '\x01') break;
         stride = (int)*(short *)inst;
         size = size + stride;
-        inst = (Trk_SimpleInst *)((int)inst + stride);
-        i = i + 1;
+        inst = (Trk_SimpleInst *)((u_char *)inst + stride);
       }
-      pGVar6 = (chunkGroup)->CreateLiteGroupDataSize(instGroup, groupMem, size);
-      this->objInstanceBuf = pGVar6;
+      pGVar6 = CreateLiteGroupDataSize(chunkGroup, instGroup, mem, size);
+      pThis->objInstanceBuf = pGVar6;
       pGVar6->m_num_elements = i;
-      goto InstanceGroup_instancesDone;
     }
-
-InstanceGroup_noInstances:
-    this->objInstanceBuf = (Group *)0x0;
-
-InstanceGroup_instancesDone:
-    ;
     /* ---- clamp out-of-range instance indices to 0x7f ---- */
-    if ((this->simObjBuf != (Group *)0x0) && (this->objInstanceBuf != (Group *)0x0)) {
-      int count = this->simObjBuf->m_num_elements;
+    if ((pThis->simObjBuf != (Group *)0x0) && (pThis->objInstanceBuf != (Group *)0x0)) {
+      int count = pThis->simObjBuf->m_num_elements;
       Trk_SimObject *simObjs = (Trk_SimObject *)(simGroup + 1);
-      while (count--) {
-        Trk_SimObject *cur;
-
-        cur = simObjs + count;
-        if (this->objInstanceBuf->m_num_elements <= (int)(u_int)cur->instIndex) {
-          cur->instIndex = 0x7f;
+      while (count = count + -1, count != -1) {
+        if (pThis->objInstanceBuf->m_num_elements <= (int)(u_int)simObjs[count].instIndex) {
+          simObjs[count].instIndex = 0x7f;
         }
       }
     }
   }
   /* ---- geometry sub-groups (always run) ---- */
-  pGVar6 = (Group *)(chunkGroup)->LocateCreateGroupType(0x15, groupMem, 0);
-  this->objSpecialInstanceBuf = pGVar6;
-  pGVar6 = (Group *)(chunkGroup)->LocateCreateGroupType(10, groupMem, 0);
-  this->sfxBuf = pGVar6;
-  pGVar6 = (Group *)(chunkGroup)->LocateCreateGroupType(5, groupMem, 0);
-  this->simQuadBuf = pGVar6;
-  pGVar6 = (Group *)(chunkGroup)->LocateCreateGroupType(6, groupMem, 0);
-  this->simSliceBuf = pGVar6;
-  pGVar6 = (Group *)(chunkGroup)->LocateCreateGroupType(9, groupMem, 0);
-  this->lineBuf = pGVar6;
-  geomGroup = (chunkGroup)->LocateGroupType(0x17, 0);
-  quadGroup = (geomGroup)->LocateGroupType(0x1b, 0);
-  {
-    char *quadData;
-
-    quadData = (char *)(quadGroup + 1);
-    this->quadCounts[0] = *(u_char *)(quadData + 12);
-    this->quadCounts[1] = *(u_char *)(quadData + 14);
-    this->quadCounts[2] = *(u_char *)(quadData + 16);
-    this->quadCounts[3] = *(u_char *)(quadData + 18);
-    this->quadCounts[4] = *(u_char *)(quadData + 20);
-    this->quadCounts[5] = *(u_char *)(quadData + 22);
-    pGVar6 = (Group *)(geomGroup)->LocateCreateGroupType(0x19, groupMem, 0);
-    this->renderQuads[0] = (Trk_Quad *)(pGVar6 + 1);
-    pTVar9 = this->renderQuads[0];
-    pTVar9 = pTVar9 + *(short *)(quadData + 12);
-    this->renderQuads[1] = pTVar9;
-    sVar3 = *(short *)(quadData + 14);
-    this->renderQuads[2] = pTVar9 + sVar3;
-    this->renderQuads[3] = pTVar9 + sVar3 + *(short *)(quadData + 20);
-  }
-  pGVar6 = (Group *)(geomGroup)->LocateCreateGroupType(0x1a, groupMem, 0);
-  this->stripBuf = pGVar6;
-  pGVar6 = (Group *)(geomGroup)->LocateCreateGroupType(0x25, groupMem, 0);
-  this->lorezstripBuf = pGVar6;
-  pGVar6 = (Group *)(geomGroup)->LocateCreateGroupType(0x18, groupMem, 0);
-  this->vertexBuf = pGVar6;
-  pGVar6 = (Group *)(geomGroup)->LocateCreateGroupType(0x27, groupMem, 0);
-  this->objVertexBuf = pGVar6;
-  pGVar6 = (Group *)(geomGroup)->LocateCreateGroupType(0x28, groupMem, 0);
-  this->objQuadBuf = pGVar6;
-  pGVar6 = (Group *)(geomGroup)->LocateCreateGroupType(0x29, groupMem, 0);
-  this->objQuadInstanceBuf = pGVar6;
+  pGVar6 = (Group *)LocateCreateGroupType(chunkGroup, 0x15, mem, 0);
+  pThis->objSpecialInstanceBuf = pGVar6;
+  pGVar6 = (Group *)LocateCreateGroupType(chunkGroup, 10, mem, 0);
+  pThis->sfxBuf = pGVar6;
+  pGVar6 = (Group *)LocateCreateGroupType(chunkGroup, 5, mem, 0);
+  pThis->simQuadBuf = pGVar6;
+  pGVar6 = (Group *)LocateCreateGroupType(chunkGroup, 6, mem, 0);
+  pThis->simSliceBuf = pGVar6;
+  pGVar6 = (Group *)LocateCreateGroupType(chunkGroup, 9, mem, 0);
+  pThis->lineBuf = pGVar6;
+  geomGroup = LocateGroupType(chunkGroup, 0x17, 0);
+  quadGroup = LocateGroupType(geomGroup, 0x1b, 0);
+  quadCountData = (u_char *)quadGroup;
+  pThis->quadCounts[0] = quadCountData[0x1c];
+  pThis->quadCounts[1] = quadCountData[0x1e];
+  pThis->quadCounts[2] = quadCountData[0x20];
+  pThis->quadCounts[3] = quadCountData[0x22];
+  pThis->quadCounts[4] = quadCountData[0x24];
+  pThis->quadCounts[5] = quadCountData[0x26];
+  pGVar6 = (Group *)LocateCreateGroupType(geomGroup, 0x19, mem, 0);
+  pTVar9 = (Trk_Quad *)(pGVar6 + 1);
+  pThis->renderQuads[0] = pTVar9;
+  pTVar9 = pTVar9 + (short)quadGroup[1].m_num_elements;
+  pThis->renderQuads[1] = pTVar9;
+  sVar3 = *(short *)(quadCountData + 0x1e);
+  pThis->renderQuads[2] = pTVar9 + sVar3;
+  pThis->renderQuads[3] = pTVar9 + sVar3 + (short)quadGroup[2].m_length;
+  pGVar6 = (Group *)LocateCreateGroupType(geomGroup, 0x1a, mem, 0);
+  pThis->stripBuf = pGVar6;
+  pGVar6 = (Group *)LocateCreateGroupType(geomGroup, 0x25, mem, 0);
+  pThis->lorezstripBuf = pGVar6;
+  pGVar6 = (Group *)LocateCreateGroupType(geomGroup, 0x18, mem, 0);
+  pThis->vertexBuf = pGVar6;
+  pGVar6 = (Group *)LocateCreateGroupType(geomGroup, 0x27, mem, 0);
+  pThis->objVertexBuf = pGVar6;
+  pGVar6 = (Group *)LocateCreateGroupType(geomGroup, 0x28, mem, 0);
+  pThis->objQuadBuf = pGVar6;
+  pGVar6 = (Group *)LocateCreateGroupType(geomGroup, 0x29, mem, 0);
+  pThis->objQuadInstanceBuf = pGVar6;
   return;
 }
 

@@ -6,171 +6,145 @@
 #include "screenpinkslips.h"
 
 
-/* MATCH (w35-a10): unsized-array asm-label views -- these globals are reached
-   ABSOLUTELY by every oracle (%hi/%lo as an RTL pseudo, CSE-able and
-   delay-slot schedulable); a plain extern leaves cc1plus emitting the lw/sw
-   assembler macro, which GNU-as expands per-access (self-temp / $at). */
-extern tFEApplication *A_FEApp[] __asm__("FEApp");
-#define FEApp A_FEApp[0]
-extern tGlobalMenuDefs *A_menuDefs[] __asm__("menuDefs");
-#define menuDefs A_menuDefs[0]
-extern int A_ticks[] __asm__("ticks");
-#define ticks A_ticks[0]
-
 /* ---- tScreenPinkSlips::DrawBackground  [SCREENPINKSLIPS.CPP:71-194] ---- */
 void tScreenPinkSlips::DrawBackground()
 
 {
-  static int flareextra;
-  RECT r;
-  short i;
-  short j;
-  short tv;
+  bool bVar1;
+  short index;
+  ushort uVar2;
+  uint uVar3;
+  int iVar4;
+  uint uVar5;
+  int j;
+  int flare_intensity;
   tMenuTextState textState;
+  short i;
+  short tv;
+  int iVar8;
+  RECT r;
   tTrackInformation trackInfo;
+  char moviename [80];
   short shapeY;
-  /* SYM-CODEGEN-CARRIER: movieVramX -- the tpage x is a SHORT local (retail
-     rematerializes it as
-     `li $t2,0x200` then sign-extends `sll/sra` into $a2); an int/cast literal
-     folds to a bare `li $a2,512`.  14 -> 10 diffs, count-exact 364/364. */
-  short movieVramX = 0x200;
+  
   i = 0;
   r.x = 0x15b;
   r.y = 0x8f;
   r.w = 0x90;
   r.h = 0xe;
-  while (i < (short)(byte)frontEnd.pinkSlipsNumTracks) {
-    /* SYM-CODEGEN-CARRIER: selected -- folding the predicate into this branch
-       is FAIL 7 at 361/364 instructions and removes retail's $a1 value web. */
-    BOOL selected;
-
+  while( true ) {
+    iVar4 = (int)i;
     textState = textState_Selected;
-    selected = false;
-    if ((i == (short)this->fMenu->fCurrentItem - 1) ||
-        ((i == 0) && ((short)this->fMenu->fCurrentItem == 0))) {
-      selected = true;
+    if ((int)(uint)(byte)frontEnd.pinkSlipsNumTracks <= iVar4) break;
+    flare_intensity = (int)(short)this->fMenu->fCurrentItem;
+    bVar1 = false;
+    if ((iVar4 == flare_intensity + -1) || ((iVar4 == 0 && (flare_intensity == 0)))) {
+      bVar1 = true;
     }
-    if (selected) {
-      int flare_intensity;
-
-      flareextra = flareextra + 1;
-      if (0x3c < flareextra) {
-        flareextra = 0;
+    if (bVar1) {
+      flareextra_248 = flareextra_248 + 1;
+      if (0x3c < flareextra_248) {
+        flareextra_248 = 0;
       }
-      /* MATCH: ONE statement (oracle SLD groups the subu+srl on one line) and
-         the arms in THIS order - the reversed test picks the oracle's commutative
-         `addu $v0,$v1,$v0` in the signed /2 idiom. */
-      flare_intensity =
-          (0x1e >= flareextra ? flareextra : 0x3c - flareextra) / 2;
-      flare_intensity += 0x14;
-      flare_intensity *= 0x80 - this->fScreenFadeVal;
-      if (0 < flare_intensity) {
-        /* SYM-CODEGEN-CARRIER: rx -- direct RECT member use is FAIL 99 at
-           365/364 instructions and rotates the whole saved-register handout. */
-        short rx = r.x;
-        /* SYM-CODEGEN-CARRIER: ry -- paired coordinate snapshot in that
-           receipt; retail keeps both values across Flare_2DHalo. */
-        short ry = r.y;
-
-        Flare_2DHalo(rx + -0xf,ry + 6,flare_intensity / 2,
-                    (flare_intensity * 2) / 3,0x17);
-        DrawShapeExtended(0x38,0,rx + -0x12,ry,
-                   (int)this->fScreenFadeVal,1,(tDrawShapeExtended *)0x0);
+      uVar3 = (uint)flareextra_248 >> 0x1f;
+      uVar5 = flareextra_248;
+      if (0x1e < flareextra_248) {
+        uVar3 = 0x3c - flareextra_248;
+        uVar5 = uVar3 >> 0x1f;
+      }
+      iVar4 = (((int)(uVar5 + uVar3) >> 1) + 0x14) * (0x80 - (this->_base_tScreen).fScreenFadeVal);
+      if (0 < iVar4) {
+        Flare_2DHalo(r.x + -0xf,r.y + 6,iVar4 / 2,(iVar4 * 2) / 3,0x17);
+        DrawShapeExtended(0x38,0,r.x + -0x12,r.y,
+                   (int)(this->_base_tScreen).fScreenFadeVal,1,(tDrawShapeExtended *)0x0);
       }
       textState = textState_Hilighted;
     }
     GetTrack(&trackManager,(ushort)(byte)frontEnd.track[i],&trackInfo);
     frontEnd.pinkSlipsTrackIndex = (char)i;
-    FETextRender_MenuTextPositionedJustify(
-        TextValue(&menuDefs->iteratorTrack,kPlayerBoth),r.x + 10,r.y + 3,0,
-        textState,textType_FlybyHelp);
+    index = TextValue(&menuDefs->iteratorTrack,kPlayerBoth);
+    FETextRender_MenuTextPositionedJustify(index,r.x + 10,r.y + 3,0,textState,textType_FlybyHelp);
     DrawShape_NFS4RoundRectangle(-1,&r,1);
     i = i + 1;
     r.y = r.y + 0xe;
   }
-  {
-    /* SYM-CODEGEN-CARRIER: currentItem -- folding this ushort snapshot into
-       trackIndex is FAIL 5 at 363/364 and loses retail's $v0->$a0 copy. */
-    u_short currentItem = (u_short)this->fMenu->fCurrentItem;
-    /* SYM-CODEGEN-CARRIER: trackIndex -- removing the char snapshot is the
-       same FAIL-5 basin; its guard must read the copied $a0 value. */
-    char trackIndex = (char)currentItem;
-
-    frontEnd.pinkSlipsTrackIndex = trackIndex;
-    /* MATCH: the guard tests the CHAR local (unsigned char on this build),
-       not a fresh `currentItem & 0xff` - that is what makes the `andi` read
-       currentItem's copy ($a0) instead of the raw load ($v0). */
-    if (trackIndex != 0) {
-      frontEnd.pinkSlipsTrackIndex = (char)(currentItem - 1);
-    }
+  uVar2 = (ushort)this->fMenu->fCurrentItem;
+  frontEnd.pinkSlipsTrackIndex = (char)uVar2;
+  if ((uVar2 & 0xff) != 0) {
+    frontEnd.pinkSlipsTrackIndex = frontEnd.pinkSlipsTrackIndex + -1;
   }
   GetTrack(&trackManager,(ushort)(byte)frontEnd.track[(byte)frontEnd.pinkSlipsTrackIndex],
              &trackInfo);
   this->UpdateVideoWall(trackInfo);
-  ::IsShapeFileLoaded((tScreen *)this,&this->fSwapShapes);
-  if ((this->fSwapShapes.fFile != (char *)0x0) &&
-      (-1 < *(signed char *)&this->fTransitionDirection)) {
-    ::UploadSwapShapes((tScreen *)this,4);
+  IsShapeFileLoaded(&this->_base_tScreen,&(this->_base_tScreen).fSwapShapes);
+  if (((this->_base_tScreen).fSwapShapes.fFile != (char *)0x0) && (-1 < this->fTransitionDirection)) {
+    UploadSwapShapes(&this->_base_tScreen,4);
     this->fTransitionDirection = '\x01';
     this->fTVTicks = ticks;
   }
   this->DrawVideoWall();
-  shapeY = (ushort)((this->fFrame & 1U) == 0) << 7;
-  if (VIDEO_state(this->hVideo) != 0) {
-    if (VIDEO_updateframexy(this->hVideo,0x200,shapeY) != 0) {
-      this->fFrame = this->fFrame + 1;
-      shapeY = (ushort)((this->fFrame & 1U) == 0) << 7;
+  bVar1 = (this->fFrame & 1U) == 0;
+  shapeY = (ushort)bVar1 << 7;
+  iVar4 = VIDEO_state(this->hVideo);
+  if (iVar4 == 0) {
+    if (0x100 < ticks - this->fTVTicks) {
+      sprintf(moviename,"%szzzTR%02d.dct",Paths_Paths[0x29],(int)trackInfo.fTrackID);
+      VIDEO_spoolfile(this->hVideo,moviename);
+      VIDEO_startplayback(this->hVideo);
     }
+  }
+  else {
+    iVar4 = VIDEO_updateframexy(this->hVideo,0x200,(uint)bVar1 << 7);
     tv = 0;
-    i = 0;
+    if (iVar4 != 0) {
+      uVar5 = this->fFrame + 1;
+      shapeY = (ushort)((uVar5 & 1) == 0) << 7;
+      this->fFrame = uVar5;
+    }
+    iVar4 = 0;
     do {
       j = 0;
+      iVar8 = (short)iVar4 * 0x40;
       do {
-        this->fTrackTVs[tv].x = j * 0x50 + 0xa0;
-        this->fTrackTVs[tv].y = i * 0x40 + 0x19;
+        this->fTrackTVs[tv].x = (short)j * 0x50 + 0xa0;
+        this->fTrackTVs[tv].y = (short)iVar8 + 0x19;
         this->fTrackTVs[tv].w = 0x50;
         this->fTrackTVs[tv].h = 0x40;
-        this->fTrackTVs[tv].u = j * '(';
-        this->fTrackTVs[tv].v = i * 0x40 + (char)shapeY;
+        this->fTrackTVs[tv].u = (char)j * '(';
+        this->fTrackTVs[tv].v = (char)iVar8 + (char)shapeY;
         this->fTrackTVs[tv].uw = '(';
         this->fTrackTVs[tv].vh = '@';
-        if (i == 1) {
-          this->fTrackTVs[tv].vh--;
+        if ((short)iVar4 == 1) {
+          this->fTrackTVs[tv].vh = '?';
         }
-        this->fTrackTVs[tv].tpage = GetTPage(2,0,movieVramX,(int)shapeY);
+        uVar2 = GetTPage(2,0,0x200,(int)shapeY);
+        j = j + 1;
+        this->fTrackTVs[tv].tpage = uVar2;
         this->fTrackTVs[tv].clut = 0;
-        this->fTrackTVs[tv].state = tv_StateOn;
         this->fTrackTVs[tv].flags = 0x20;
         this->fTrackTVs[tv].tint = 0x808080;
-        j = j + 1;
+        this->fTrackTVs[tv].state = tv_StateOn;
         tv = tv + 1;
-      } while (j < 4);
-      i = i + 1;
-    } while (i < 2);
+      } while (j * 0x10000 >> 0x10 < 4);
+      iVar4 = iVar4 + 1;
+    } while (iVar4 * 0x10000 >> 0x10 < 2);
   }
-  else if (0x100 < ticks - this->fTVTicks) {
-    char moviename [80];
-
-    sprintf(moviename,"%szzzTR%02d.dct",Paths_Paths[0x29],*(signed char *)&trackInfo.fTrackID);  /* MATCH: lb -- plain char is unsigned on this build */
-    VIDEO_spoolfile(this->hVideo,moviename);
-    VIDEO_startplayback(this->hVideo);
-  }
-  i = 0xf0;
+  iVar4 = 0xf0;
   do {
-    PSXDrawTransSquare(0x303030,i,0xf,2,0x81,1);
-    i = i + 0x50;
-  } while (i < 0x1e0);
-  i = 0x4f;
+    PSXDrawTransSquare(0x303030,iVar4,0xf,2,0x81,1);
+    iVar4 = iVar4 + 0x50;
+  } while (iVar4 * 0x10000 >> 0x10 < 0x1e0);
+  iVar4 = 0x4f;
   do {
-    PSXDrawTransSquare(0x202020,0xa0,i,0x141,1,1);
-    i = i + 0x40;
-  } while (i < 0x8f);
+    PSXDrawTransSquare(0x202020,0xa0,iVar4,0x141,1,1);
+    iVar4 = iVar4 + 0x40;
+  } while (iVar4 * 0x10000 >> 0x10 < 0x8f);
   FeDraw_SetABRMode(2);
-  i = 0;
+  iVar4 = 0;
   do {
-    DrawTV(this->fTrackTVs + i);
-    i = i + 1;
-  } while (i < 8);
+    DrawTV(this->fTrackTVs + (short)iVar4);
+    iVar4 = iVar4 + 1;
+  } while (iVar4 * 0x10000 >> 0x10 < 8);
   return;
 }
 
@@ -187,9 +161,9 @@ void tScreenPinkSlips::GetShapeInfo(short &numPermShapes,short &numSwapShapes,ch
   numPermShapes = 0x39;
   numSwapShapes = 4;
   *permFileName = "zPink";
-  sprintf(gSwapFileName,"TR%02dPS",(int)(signed char)trackInfo.fTrackID);
+  sprintf(gSwapFileName,"TR%02dPS",(int)trackInfo.fTrackID);
   *swapFileName = gSwapFileName;
-  this->fPreviousTrack = (short)(signed char)trackInfo.fTrackID;
+  this->fPreviousTrack = (short)trackInfo.fTrackID;
   return;
 }
 
@@ -199,12 +173,7 @@ void tScreenPinkSlips::GetShapeInfo(short &numPermShapes,short &numSwapShapes,ch
 void tScreenPinkSlips::Initialize()
 
 {
-  /* SYM-CODEGEN-CARRIER: iVar1 -- direct ticks storage is measured FAIL 9
-     (83/82) and changes the final load-delay/store schedule. */
   int iVar1;
-  /* SYM-CODEGEN-CARRIER: tmp -- direct hVideo reuse is paired with that
-     one-instruction regression. */
-  int tmp;
   RECT r;
   char moviename [80];
   tTrackInformation trackInfo;
@@ -216,16 +185,15 @@ void tScreenPinkSlips::Initialize()
   ClearImage(&r,'\0','\0','\0');
   DrawSync(0);
   frontEnd.pinkSlipsTrackIndex = '\0';
-  Decrement(&menuDefs->iteratorTrack,kPlayerBoth);
-  Increment(&menuDefs->iteratorTrack,kPlayerBoth);
+  menuDefs->iteratorTrack.Decrement(kPlayerBoth);
+  menuDefs->iteratorTrack.Increment(kPlayerBoth);
   this->fMenu = FEApp->fCurrentMenu[0];
-  this->tScreen::Initialize();
+  this->_base_tScreen.Initialize();
   this->fTVsInitialized = 0;
   GetTrack(&trackManager,(ushort)(byte)frontEnd.track[0],&trackInfo);
-  sprintf(moviename,"%szzzTR%02d.dct",Paths_Paths[0x29],*(signed char *)&trackInfo.fTrackID);  /* MATCH: lb -- plain char is unsigned on this build */
-  tmp = VIDEO_create(0xa0,0x80,0xf0000,0x20000,0x10);
-  this->hVideo = tmp;
-  VIDEO_spoolfile(tmp,moviename);
+  sprintf(moviename,"%szzzTR%02d.dct",Paths_Paths[0x29],(int)trackInfo.fTrackID);
+  this->hVideo = VIDEO_create(0xa0,0x80,0xf0000,0x20000,0x10);
+  VIDEO_spoolfile(this->hVideo,moviename);
   VIDEO_startplayback(this->hVideo);
   iVar1 = ticks;
   this->fFrame = 0;
@@ -247,7 +215,7 @@ void tScreenPinkSlips::Cleanup()
   VIDEO_destroy(this->hVideo);
   purgememadr((void *)this->hVideo);
   frontEnd.pinkSlipsTrackIndex = '\0';
-  this->tScreen::Cleanup();
+  this->_base_tScreen.Cleanup();
   return;
 }
 
@@ -257,21 +225,17 @@ void tScreenPinkSlips::Cleanup()
 void tScreenPinkSlips::UpdateVideoWall(tTrackInformation &trackInfo)
 
 {
-  /* SYM records no locals.  Repeating the explicit
-     `(signed char)(u_char)fTrackID` expression lets GCC CSE one unsigned byte
-     read across the compare and sprintf argument while retaining retail's
-     lbu/sll/sra promotion sequence; the calls then force the later
-     fPreviousTrack assignment to reread the field.  Writing fTVTicks before
-     fTransitionDirection also schedules the ticks load before the -1 store,
-     reproducing retail without the former trackID/iVar1 carriers or volatile. */
-  if ((signed char)(u_char)trackInfo.fTrackID != this->fPreviousTrack) {
-    sprintf(gSwapFileName,"TR%02dPS",(signed char)(u_char)trackInfo.fTrackID);
-    ::AsyncLoadSwapShapeFile((tScreen *)this,gSwapFileName);
+  int iVar1;
+  
+  if ((short)trackInfo.fTrackID != this->fPreviousTrack) {
+    sprintf(gSwapFileName,"TR%02dPS",(int)trackInfo.fTrackID);
+    AsyncLoadSwapShapeFile(&this->_base_tScreen,gSwapFileName);
     this->fTVsInitialized = 0;
-    this->fPreviousTrack = (short)(signed char)trackInfo.fTrackID;
-    if (-1 < *(signed char *)&this->fTransitionDirection) {
-      this->fTVTicks = ticks;
-      *(signed char *)&this->fTransitionDirection = -1;
+    this->fPreviousTrack = (short)trackInfo.fTrackID;
+    iVar1 = ticks;
+    if (-1 < this->fTransitionDirection) {
+      this->fTransitionDirection = -1;
+      this->fTVTicks = iVar1;
     }
     VIDEO_abortplayback(this->hVideo);
   }
@@ -284,92 +248,110 @@ void tScreenPinkSlips::UpdateVideoWall(tTrackInformation &trackInfo)
 void tScreenPinkSlips::DrawVideoWall()
 
 {
-  short i;
-  short j;
-
-  /* MATCH: SLD records only `i` ($s0) and `j` ($s1).  The original reuses `i`
-     for the unsigned-shifted tick delta; introducing a separate tick local
-     displaces `this` from retail's $s2.  The condition order is also material:
-     GCC rotates `j < i && j < 4` into the oracle's entry, top, and bottom tests. */
-  for (i = 0; i < 0x24; i = i + 1) {
-    DrawShapeExtended(i,0,0,0,0,0,(tDrawShapeExtended *)0x0);
-  }
-  if (((this->fSwapShapes.fFlags & 1) != 0) && (this->fTVsInitialized == 0)) {
-    for (i = 0; i < 4; i = i + 1) {
-      InitTV(&this->fImageTVs[i],this->fSwapShapes.fShapes,i);
-    }
+  short tv_ticks;
+  int iVar1;
+  int j;
+  int i_packed;
+  int i;
+  int iVar2;
+  
+  i = 0;
+  do {
+    DrawShapeExtended((short)i,0,0,0,0,0,
+               (tDrawShapeExtended *)0x0);
+    i = i + 1;
+  } while (i * 0x10000 >> 0x10 < 0x24);
+  if ((((this->_base_tScreen).fSwapShapes.fFlags & 1) != 0) && (this->fTVsInitialized == 0)) {
+    iVar2 = 0;
+    i_packed = 0;
+    do {
+      InitTV(this->fImageTVs + (i_packed >> 0x10),(this->_base_tScreen).fSwapShapes.fShapes,
+                 (short)((uint)i_packed >> 0x10));
+      iVar2 = iVar2 + 1;
+      i_packed = iVar2 * 0x10000;
+    } while (iVar2 * 0x10000 >> 0x10 < 4);
     this->fTVsInitialized = 1;
   }
-  i = (short)((u_int)(ticks - this->fTVTicks) >> 2);
-  if (0 < *(signed char *)&this->fTransitionDirection) {
+  tv_ticks = (short)(ticks - this->fTVTicks >> 2);
+  if (this->fTransitionDirection < '\x01') {
     j = 0;
-    while ((j < i) && (j < 4)) {
-      if (this->fImageTVs[imageTVOrder[j]].state == tv_StateOff) {
-        TurnOnTV(&this->fImageTVs[imageTVOrder[j]]);
-      }
-      j = j + 1;
+    if (0 < tv_ticks) {
+      iVar1 = 0;
+      do {
+        if (3 < iVar1 >> 0x10) break;
+        if (this->fImageTVs[imageTVOrder[iVar1 >> 0x10]].state == tv_StateOn) {
+          TurnOffTV(this->fImageTVs + imageTVOrder[iVar1 >> 0x10]);
+        }
+        j = j + 1;
+        iVar1 = j * 0x10000;
+      } while (j * 0x10000 >> 0x10 < (int)tv_ticks);
     }
+    iVar2 = 0;
+    if (tv_ticks < 8) goto DrawVidWall_drawTVLoop;
+    this->fTransitionDirection = '\0';
   }
   else {
     j = 0;
-    while ((j < i) && (j < 4)) {
-      if (this->fImageTVs[imageTVOrder[j]].state == tv_StateOn) {
-        TurnOffTV(&this->fImageTVs[imageTVOrder[j]]);
+    if (0 < tv_ticks) {
+      iVar1 = 0;
+      while (iVar1 < 4) {
+        if (this->fImageTVs[imageTVOrder[iVar1]].state == tv_StateOff) {
+          TurnOnTV(this->fImageTVs + imageTVOrder[iVar1]);
+        }
+        j = j + 1;
+        if ((int)tv_ticks <= j * 0x10000 >> 0x10) break;
+        iVar1 = (int)(short)j;
       }
-      j = j + 1;
-    }
-    if (7 < i) {
-      this->fTransitionDirection = 0;
     }
   }
-  for (i = 0; i < 4; i = i + 1) {
-    DrawTV(&this->fImageTVs[i]);
-  }
+  iVar2 = 0;
+DrawVidWall_drawTVLoop:
+  do {
+    DrawTV(this->fImageTVs + (short)iVar2);
+    iVar2 = iVar2 + 1;
+  } while (iVar2 * 0x10000 >> 0x10 < 4);
   return;
 }
 
 
 
-
 /* ---- tScreenPinkSlips::ProcessInput  [SCREENPINKSLIPS.CPP:371-389] ---- */
-void tScreenPinkSlips::ProcessInput(tPlayer,tInputKeyType &keyval,tMenuCommand &
+void tScreenPinkSlips::ProcessInput(tPlayer fromPlayer,tInputKeyType &keyval,tMenuCommand &command
               )
 
 {
+  uint uVar2;
   tTrackInformation trackInfo;
-  /* SYM-CODEGEN-CARRIER: defs -- direct menuDefs access rematerializes the
-     global base, expanding this function from 79 to 84 instructions and
-     measuring 21 diffs. */
-  tGlobalMenuDefs *defs;
   
   if (keyval == kInput_KeyType_Square) {
     GetTrack(&trackManager,(ushort)(byte)frontEnd.track[(byte)frontEnd.pinkSlipsTrackIndex],
                &trackInfo);
-    /* Keep the first traffic-item base live across the short mode/traffic
-       test.  GCC 2.8.1 then retains it in $a0, as in the retail object,
-       instead of rematerializing menuDefs for the conditional store. */
-    defs = menuDefs;
-    (defs->itemTraffic).fFlags &= 0xfffffffe;
+    uVar2 = (menuDefs->itemTraffic)._base_tMenuItemLeftRightChoice._base_tMenuItemInteractive._base_tMenuItem.fFlags &
+            0xfffffffe;
+    (menuDefs->itemTraffic)._base_tMenuItemLeftRightChoice._base_tMenuItemInteractive._base_tMenuItem.fFlags = uVar2;
     if ((frontEnd.gameMode != '\x01') && (frontEnd.oppNumber == '\x02')) {
-      (defs->itemTraffic).fFlags |= 1;
+      (menuDefs->itemTraffic)._base_tMenuItemLeftRightChoice._base_tMenuItemInteractive._base_tMenuItem.fFlags =
+           uVar2 | 1;
     }
     if (2 < trackInfo.fTrackDifficulty) {
-      (menuDefs->itemTraffic).fFlags =
-           (menuDefs->itemTraffic).fFlags |
+      (menuDefs->itemTraffic)._base_tMenuItemLeftRightChoice._base_tMenuItemInteractive._base_tMenuItem.fFlags =
+           (menuDefs->itemTraffic)._base_tMenuItemLeftRightChoice._base_tMenuItemInteractive._base_tMenuItem.fFlags |
            1;
     }
     if (trackInfo.fIsEgg != '\0') {
-      (menuDefs->itemTraffic).fFlags =
-           (menuDefs->itemTraffic).fFlags |
+      (menuDefs->itemTraffic)._base_tMenuItemLeftRightChoice._base_tMenuItemInteractive._base_tMenuItem.fFlags =
+           (menuDefs->itemTraffic)._base_tMenuItemLeftRightChoice._base_tMenuItemInteractive._base_tMenuItem.fFlags |
            1;
     }
-    if ((frontEnd.gameMode == '\x01') && (frontEnd.raceType == RaceType_HotPursuit)) {
-      (menuDefs->itemTraffic).fFlags =
-           (menuDefs->itemTraffic).fFlags |
+    if ((frontEnd.gameMode == '\x01') && (frontEnd.raceType == '\x01')) {
+      (menuDefs->itemTraffic)._base_tMenuItemLeftRightChoice._base_tMenuItemInteractive._base_tMenuItem.fFlags =
+           (menuDefs->itemTraffic)._base_tMenuItemLeftRightChoice._base_tMenuItemInteractive._base_tMenuItem.fFlags |
            1;
     }
-    (menuDefs->itemLocalSpeech).fFlags =
-         (menuDefs->itemLocalSpeech).fFlags | 1;
+    uVar2 = (menuDefs->itemLocalSpeech)._base_tMenuItemLeftRightChoice._base_tMenuItemInteractive._base_tMenuItem.
+            fFlags | 1;
+    (menuDefs->itemLocalSpeech)._base_tMenuItemLeftRightChoice._base_tMenuItemInteractive._base_tMenuItem.fFlags =
+         uVar2;
   }
   return;
 }
@@ -377,12 +359,13 @@ void tScreenPinkSlips::ProcessInput(tPlayer,tInputKeyType &keyval,tMenuCommand &
 
 
 /* ---- tScreenPinkSlips::dtor  [SCREENPINKSLIPS.CPP:82-389] ---- */
-/* W65-A3 (calltarget): dtor made IMPLICIT (declaration dropped from
- * nfs4_types.h) so every derived dtor and every scope-exit collapses to
- * ___7tScreen the way retail does; the standalone symbol gcc then stops
- * emitting is supplied here, in place, with C linkage. */
-extern "C" void ___7tScreen(void *);
-extern "C" void ___16tScreenPinkSlips(void *thisp) { ___7tScreen(thisp); }
+tScreenPinkSlips::~tScreenPinkSlips()
+
+{
+  
+  this->_base_tScreen.~tScreen();
+  return;
+}
 
 
 

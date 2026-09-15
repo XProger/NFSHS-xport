@@ -2,23 +2,27 @@
  * Harvested from sibling *_externs.h + *.cpp defs + disasm-v2 (AI/Control demangled). */
 #ifndef _GAME_COMMON_CAMERA_EXTERNS_H_
 #define _GAME_COMMON_CAMERA_EXTERNS_H_
+#include "../../nfs4_types.h"
+#include "../../lib/libfns.h"
+#include "aiworld.h"
+
 extern AIDataRecord_BestLine_t *AIDataRecord_BestLine;   /* @0x8013c5a0 */
 extern Car_tObj      *Cars_gSortedList[];
 extern Car_tObj * AILife_IsCarInAnyVisibleArea(Car_tObj *carObj);
 extern Car_tObj *Cars_gList[];
 extern Car_tObj *Cars_gHumanRaceCarList[];
 extern Car_tObj *Cars_gTotalSortedList[];
-extern int AI_GameSetupWords[] asm("GameSetup_gData");
+extern "C" extern GameSetup_tData   GameSetup_gData;
 extern Group              *Object_customObjInst;     /* 0x8013d2c8 */
 extern Group              *Object_customSimObjs;     /* 0x8013d2cc */
-extern int AI_SimGlobalWords[] asm("simGlobal");
-extern char *AI_BWorldSmSlices asm("BWorldSm_slices");
+extern "C" Sim_tSimGlobalVar  simGlobal;          /* Sim.obj   (.gameTicks) */
+extern Trk_NewSlice  *BWorldSm_slices;
 extern int                 Cars_gNumCopCars;
 extern int                 Cars_gNumTrafficCars;
 extern int                AITune_driveSide;
 extern int            Cars_gNumCars;
 extern int            gNumSlices;
-extern int       Cars_gNumHumanRaceCars;
+extern "C" extern int       Cars_gNumHumanRaceCars;
 extern int   Cars_gNumAIRaceCars;
 extern int AIScript_DoReAction(AIScript_t *script,AIScript_tAIReaction testReaction);
 extern int AIScript_GetReactionTicksLeft(AIScript_t *script);
@@ -35,12 +39,7 @@ extern void  BWorldSm_SetSlice(int slice, BWorldSm_Pos *pos);
 extern void AIScript_SubmitPlayerAction(AIScript_t *script,int humCarIndex,AIScript_tPlayAction playerAction, int currentTime64);
 extern void AudioClc_SetHorn(Car_tObj *car,int state);
 int  BWorldSm_FindClosestSlice(coorddef *pt, BWorldSm_Pos *slicePos);
-/* w64 unlock (A21 calltarget): all FOUR overloads -- a single decl made every
- * call bind __FP8Car_tObjT0 via silent 0->pointer conversion (w22-a14 back). */
 int AIWorld_ApxSplineDistance(Car_tObj *a, Car_tObj *b);
-int AIWorld_ApxSplineDistance(Car_tObj *a, int sliceB);
-int AIWorld_ApxSplineDistance(int sliceA, Car_tObj *b);
-int AIWorld_ApxSplineDistance(int sliceA, int sliceB);
 int AIWorld_SplineDistance(Car_tObj *a, Car_tObj *b);
 void  trap(int code);
 void AudioClc_HonkHorn(Car_tObj *carObj, int a, int b, int c);

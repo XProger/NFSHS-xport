@@ -18,7 +18,7 @@ void tScreenDisplay::DrawBackground()
     fade = 0x80;
   }
   do {
-    DrawShapeExtended(i + 0xB,0,0,0,(int)fade,0,    /* oracle 0x80045998: $a0=$s0+0xB (loop counter i + 11), $a1=$a2=$a3=0 */
+    DrawShapeExtended(0xB,0,0,0,(int)fade,0,    /* H15: args 0-3 were uninitialized; oracle 0x80045998 $a0=$s0+0xB=11 (const, set once before loop), $a1=$a2=$a3=0 */
                (tDrawShapeExtended *)0x0);
     i = i + 1;
   } while (i < 0x20);
@@ -38,11 +38,10 @@ void tScreenDisplay::GetShapeInfo(short &numPermShapes,short &numSwapShapes,char
 }
 
 /* ---- tScreenDisplay::~tScreenDisplay  (screendisplay.cpp:41) ---- */
-/* W65-A3 (calltarget): dtor made IMPLICIT (declaration dropped from
- * nfs4_types.h) so every derived dtor and every scope-exit collapses to
- * ___7tScreen the way retail does; the standalone symbol gcc then stops
- * emitting is supplied here, in place, with C linkage. */
-extern "C" void ___7tScreen(void *);
-extern "C" void ___14tScreenDisplay(void *thisp) { ___7tScreen(thisp); }
+tScreenDisplay::~tScreenDisplay()
+
+{
+  return;
+}
 
 /* end of screendisplay.cpp */

@@ -10,8 +10,8 @@
 
 /* anim.obj free fns (demangled). AnimScript ctors/methods now called as C++ class members
  * (ctors via placement-new) -- the flat-mangled externs were removed (defs live in anim.obj). */
-extern int  Anim_GetPos(Trk_AnimateInst *animInst, int flags, int ticks, coorddef *pt, int *animTicks, int *animLength);
-extern int  Anim_GetRotPos(Trk_AnimateInst *animInst, int flags, int ticks, coorddef *pt, matrixtdef *mat);
+extern "C" int  Anim_GetPos(Trk_AnimateInst *animInst, int flags, int ticks, coorddef *pt, int *animTicks, int *animLength);
+extern "C" int  Anim_GetRotPos(Trk_AnimateInst *animInst, int flags, int ticks, coorddef *pt, matrixtdef *mat);
 
 /* ---- EXT data OWNED by object.obj (defined in object.cpp) ---- */
 extern Group              *Object_customObjInst;     /* 0x8013d2c8 */
@@ -19,23 +19,20 @@ extern Group              *Object_customSimObjs;     /* 0x8013d2cc */
 extern Group              *Object_customSFXInst;     /* 0x8013d2d0 */
 extern int                 Object_customSliceNum;    /* 0x8013d2d4 */
 extern ObjectAnim         *gSimObjAnims[450];        /* 0x.. status table [0..0x1c1] */
-/* W65-A8 ORDER IS LOAD-BEARING (first-declaration order == emission order):
- * retail's .sdata run is 0x8013d2c8..0x8013d2dc, IMassObjInst BEFORE the
- * count.  Do NOT re-sort. */
-extern Object_tIMassObjInfo *Object_IMassObjInst;   /* 0x8013d2d8 */
-extern int                 gNumIMassObjects;        /* 0x8013d2dc */
+extern int                 gNumIMassObjects;
+extern Object_tIMassObjInfo *Object_IMassObjInst;
 
 /* ---- cross-TU globals ---- */
-extern Group              *gPersistObjInst;          /* track.obj */
-extern Group              *gPersistObjDef;           /* track.obj */
-extern Trk_ObjectDef     **Track_gObjDefs;           /* draww/track */
-extern Chunk              *Track_chunkList;
+extern "C" Group              *gPersistObjInst;          /* track.obj */
+extern "C" Group              *gPersistObjDef;           /* track.obj */
+extern "C" Trk_ObjectDef     **Track_gObjDefs;           /* draww/track */
+extern "C" Chunk              *Track_chunkList;
 extern Trk_NewSlice       *BWorldSm_slices;
 extern int                 gNumSlices;
-extern AnimDef             gAnimDefs[14];
-extern SaveSurface        *Track_gSaveSurface;
-extern Sim_tSimGlobalVar   simGlobal;
-extern AIHigh_Traffic     *highLevelAIObjs[];        /* per-car AI obj (accidentData_ @+0x20) */
+extern "C" AnimDef             gAnimDefs[14];
+extern "C" SaveSurface        *Track_gSaveSurface;
+extern "C" Sim_tSimGlobalVar   simGlobal;
+extern "C" AIHigh_Traffic     *highLevelAIObjs[];        /* per-car AI obj (accidentData_ @+0x20) */
 extern Car_tObj           *Cars_gTrafficCarList[];
 extern int                 Cars_gNumTrafficCars;
 extern Car_tObj           *Cars_gCopCarList[];

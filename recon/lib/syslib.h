@@ -248,7 +248,7 @@ extern void SetDrawMove(DR_MOVE *p, RECT *rect, int x, int y) ;   /* P34 */
    /* MSC02 */
 extern long VectorNormalSS(SVECTOR *v0, SVECTOR *v1);   /* MSC02 */
 void _VectorNormalS_tail();   /* MSC02 */
-void _VectorNormalSS_kernel();   /* MSC02 */
+void _vec_norm_kernel();   /* MSC02 */
    /* MSC00 */
    /* FGO_01 */
    /* REG11 */
@@ -384,7 +384,7 @@ void _padSetActAlign_snd();   /* PADCMD */
 void _padSetActAlign_rcv();   /* PADCMD */
 void _padSetMainMode();   /* PADCMD */
 void _padSetMainMode_snd();   /* PADCMD */
-int  _padSetMainMode_rcv();   /* PADCMD -- returns 1 if already in the requested mode, else 0 (w48-a3) */
+void _padSetMainMode_rcv();   /* PADCMD */
 void _padCmdParaMode();   /* PADCMD */
 void _padCmdGetStatus();   /* PADCMD */
 void _padCmdSetMap();   /* PADCMD */

@@ -4,33 +4,12 @@
  *   ReSetBlitter (blit fn-ptr), Font_SwitchFont/LoadFont/DeInit/ExitFromGame (lifecycle),
  *   Font_TextXY (string layout), Font_GetUVWH (glyph UV/size).  Full SYM-locals applied.
  */
-#include "font_obj_types.h"
+#include "../../nfs4_types.h"
 #include "font_externs.h"
-#include "psyq_prim_macros.h"
-
-/* gp-rel owning-TU defs: these small (<=G4) globals are extern-declared
- * but OWNED here; tentative defs -> cc1 `.comm` -> stock maspsx gp-rels them
- * (matches the oracle's %gp_rel). section 3.12 #6. (auto: gen_gprel_defs.py) */
-/* W65-A8 REAL DEFECT, decoded from rom/nfs4-f.exe: these three are INITIALISED
- * in retail and we emitted them as zero-valued tentative definitions.
- *   0x8013d854 font_clutx  = ff ff ff ff = -1
- *   0x8013d858 font_cluty  = ff ff ff ff = -1
- *   0x8013d85c font_tint   = 80 80 80 66 = 0x66808080
- * The -1 pair is load-bearing at RUNTIME, not just for the data image:
- * Font_ReleaseClut guards on `if (font_clutx != -1)` before calling
- * Texture_MenuReleaseClutId(...) -- starting at 0 makes that guard TRUE on the
- * first call and releases a CLUT id that was never allocated. */
-int font_clutx = -1;
-int font_cluty = -1;
-u_char gFontSpaceWidth;
-u_long font_abr;
-u_long font_tint = 0x66808080;
-u_short font_currentTPage;
-u_short gFontClut;
 
 /* gCurrentBlitter @0x8013ddec : font.obj-owned glyph-blit fn-ptr (STAT PTR FCN VOID).  BSS;
  *   Font_SetBlitter assigns it, Font_ReSetBlitter resets it to Font_Blit, Font_TextXY calls it. */
-static fontblit gCurrentBlitter;
+fn_void *gCurrentBlitter;
 
 /* ---- intra-TU forward declarations (auto-emitted, signature-exact) ---- */
 void Font_TextColor(int color);
@@ -38,23 +17,26 @@ void Font_TextTint(int rgb);
 void Font_SetABR(int abr);
 void Font_Blit(int x,int y,void *src,int u,int v,charactertbl *ch,int arg6);
 void Font_ComputeColors(int colour,int forecolour,int backcolour,char in_game);
-charactertbl * Font_Getcharacter(int targetindex);
-void Font_SetBlitter(fontblit blitter);
-void Font_ReSetBlitter(void);
+extern "C" { charactertbl * Font_Getcharacter(int targetindex); }
+extern "C" { void Font_SetBlitter(fn_void *blitter); }
+extern "C" { void Font_ReSetBlitter(void); }
 void Font_SwitchFont(char *f1);
-void Font_DeInit(void);
-void Font_ExitFromGame(void);
-int Font_LoadFont(char *f1,int x,int y,char in_game);
+extern "C" { void Font_DeInit(void); }
+extern "C" { void Font_ExitFromGame(void); }
+extern "C" { int Font_LoadFont(char *f1,int x,int y,char in_game); }
 void Font_TextXY(char *string,int x,int y);
-void Font_GetUVWH(char code,int *u,int *v,int *w,int *h,int *yoff);
+extern "C" { void Font_GetUVWH(char code,int *u,int *v,int *w,int *h,int *yoff); }
 
 
 /* ---- Font_TextColor__Fi  [FONT.CPP:83-85] SLD-VERIFIED ---- */
 void Font_TextColor(int color)
 
 {
-  shpfontclut.shapex = (short)((u_int)(u_short)font_clutx + color * 0x10);
-  gFontClut = shpfontclut.shapey << 6 | (u_int)shpfontclut.shapex >> 4 & 0x3f;
+  u_int uVar1;
+  
+  uVar1 = (u_int)(u_short)font_clutx + color * 0x10;
+  shpfontclut.shapex = (short)uVar1;
+  gFontClut = shpfontclut.shapey << 6 | (u_short)(uVar1 >> 4) & 0x3f;
   return;
 }
 
@@ -70,218 +52,195 @@ void Font_TextTint(int rgb)
 void Font_SetABR(int abr)
 
 {
-  int y; /* SYM-CODEGEN-CARRIER: y -- inlining swaps $a2/$a3 (6 diffs, 18/18) */
-
+  unsigned char *shape = currentfont.shape;
   font_abr = abr;
-  y = (*(int *)((*(int *)((u_char *)&(currentfont) + 136)) + 0xc) << 4) >> 20;
+  /* The PSX build keeps the font descriptor alive across overlay changes.
+     In the native unified image, the first frontend Init_RenderingEnvironment
+     reaches this exact retail call before FeTools_init loads tiny.pfn.  Defer
+     only the derived TPage until Font_LoadFont -> Font_SwitchFont establishes
+     currentfont.shape; Font_SwitchFont already recomputes it from font_abr. */
+  if (shape == (unsigned char *)0x0) {
+    return;
+  }
+  shapetbl *shapeInfo = (shapetbl *)shape;
   font_currentTPage =
-       GetTPage(*(u_char *)(*(int *)((u_char *)&(currentfont) + 136)) & 3,abr,
-                  (*(int *)((*(int *)((u_char *)&(currentfont) + 136)) + 0xc) << 0x14) >> 0x14,
-                  y);
+       GetTPage(shapeInfo->type & 3,abr,shapeInfo->shapex,shapeInfo->shapey);
   return;
 }
 
-/* ---- Font_Blit__FiiPviiP12charactertbli  [FONT.CPP:128-152] SLD-FLAG:NONMONO ----
- * SYM (fsize 24, only ra saved): x $a0, y $a1, src $a2, u $a3, v ARG+$t6,
- * ch ARG+$t0; block locals width $t7, height $t0, sprt $t1 (PTR SPRT), dv $a2.
- * NOTE the 7th parameter (tpage) is in the blitter fn-ptr typedef and IS passed by
- * Font_TextXY, but this implementation never reads it (absent from the SYM param
- * list) -- keep it in the signature so the indirect call type matches.
- * width/height are INT locals per the SYM: u_char locals would re-mask every use
- * (andi 0xff) that the oracle does not have. */
-/* ==== 🏆 W53-A4 (2026-08-09): SEALED, PASS 55/55 -- from 38 diffs in ONE edit ====
- * MECHANISM (the sibling FontUpsideDownBlit's clean-room recipe, applied here):
- *  (1) THE SLD IS THE STATEMENT ORDER.  tools/diffsrc.py + the SYM SLD stream give
- *      retail's per-insn line map; grouping by line recovers FONT.CPP's real body:
- *        129 width   130 height   136 dv   137 alloc+bump+addPrim (ONE line)
- *        140 setlen4 143 font_tint 146 x0y0 148 uv/clut 150 w/h 152 SetSemiTrans
- *      Two of those differed from the hill-climbed body: font_tint BEFORE x0y0, and
- *      uv BEFORE w/h.  (Every prior wave climbed positions inside the WRONG basin.)
- *  (2) `dv` IS ONE STATEMENT (line 136 owns `lw a2,12(a2); sll; sra` AND the late-
- *      emitted `addu a2,a2,t6; andi a2,a2,255`): dv = ((src[3]<<4)>>20) + v & 0xff.
- *      Only the `<<8` belongs to the u0 statement (line 148).  The old body split it
- *      the other way and needed a sched fence to hold the chain down; both are gone.
- *  (3) THE LINK IS THE canonical P_TAG BITFIELD addPrim (`P_TAG::addr`), NOT hand-rolled word
- *      RMWs, and there is NO `pal`/`addr24` local (SYM lists only width/height/sprt/dv).
- *      The bitfield write IS the oracle's second `lw v0,0(t3)` read-modify-write, and
- *      MEM_IN_STRUCT_P keeps the 0x1F800000 cell load single (w52 cse struct-alias law).
- *      ⚠ The w45/w46/w49 "P_TAG REGRESSES here 42->48" verdicts were BASIN-RELATIVE --
- *      they were measured with the pal local + the split dv + the wrong statement order.
- *  Everything the pre-seal receipt chased (the {v,pal,mask} -> t3/t4/t6 rotation, the
- *  early `lw v,40(sp)`, the late `addu a0,t1,zero`) dissolved with the correct body:
- *  all were echoes of the wrong basin, not allocator floors.  The full grind receipt
- *  (w39-w50: qty tables, ref-step probes, fence sweeps, stmtclimb runs) is in git
- *  history @ the parent of this commit -- do not re-derive it, the fn is byte-exact. */
-void Font_Blit(int x,int y,void *src,int u,int v,charactertbl *ch,int tpage)
+/* ---- Font_Blit__FiiPviiP12charactertbli  [FONT.CPP:128-152] SLD-FLAG:NONMONO ---- */
+void Font_Blit(int x,int y,void *src,int u,int v,charactertbl *ch,int arg6)
 
 {
-  /* SYM-CODEGEN-CARRIER: tpage -- unused ABI parameter required by the blitter signature */
-  int width;
-  int height;
-  SPRT *sprt;
+  int fontClut;
+  u_int uVar1;
   int dv;
-
-  width = ch->width;                                                  /* SLD 129 */
-  height = ch->height;                                                /* SLD 130 */
-  dv = ((*(int *)((u_char *)src + 0xc) << 4) >> 0x14) + v & 0xff;     /* SLD 136 */
-  sprt = (SPRT *)Render_gPacketPtr;                                   /* SLD 137 */
-  Render_gPacketPtr = (u_char *)sprt + 0x14;
-  setaddr(sprt,getaddr(Render_gPalettePtr));
-  setaddr(Render_gPalettePtr,sprt);
-  *((u_char *)sprt + 3) = 4;                                          /* SLD 140 */
-  *(u_long *)&sprt->r0 = font_tint;                                   /* SLD 143 */
-  *(int *)&sprt->x0 = y << 0x10 | x;                                  /* SLD 146 */
-  *(u_int *)&sprt->u0 = (u_int)gFontClut << 0x10 | dv << 8 | u;       /* SLD 148 */
-  *(u_int *)&sprt->w = height << 0x10 | width;                        /* SLD 150 */
-  SetSemiTrans(sprt,1);                                               /* SLD 152 */
+  int iVar2;
+  int height;
+  int pkt_addr24;
+  int width;
+  int loc_8;
+  u_char uv_x;
+  u_char uv_y;
+  u_long tu3;
+  u_char *prev_pkt;
+  u_char *sprt;
+  shapetbl *fontShape;
+  
+  sprt = (u_char *)Render_gPacketPtr;
+  prev_pkt = (u_char *)Render_gPalettePtr;
+  fontShape = (shapetbl *)src;
+  uv_x = ch->width;
+  uv_y = ch->height;
+  *(u_int *)Render_gPacketPtr =
+       *(u_int *)Render_gPacketPtr & 0xff000000 | *(u_int *)Render_gPalettePtr & 0xffffff;
+  pkt_addr24 = (u_int)Render_gPacketPtr & 0xffffff;
+  Render_gPacketPtr = Render_gPacketPtr + 0x14;
+  *(u_int *)prev_pkt = *(u_int *)prev_pkt & 0xff000000 | pkt_addr24;
+  sprt[3] = 4;
+  tu3 = font_tint;
+  *(int *)(sprt + 8) = (u_int)y << 0x10 | (u_int)x;
+  *(u_long *)(sprt + 4) = tu3;
+  fontClut = (int)gFontClut;
+  *(u_int *)(sprt + 0x10) = (u_int)uv_y << 0x10 | (u_int)uv_x;
+  uVar1 = fontClut << 0x10 | (fontShape->shapey + v & 0xffU) << 8 | u;
+  *(u_int *)(sprt + 0xc) = uVar1;
+  SetSemiTrans(sprt,1);
   return;   /* Font_Blit is void per disasm-v3 (Ghidra void-return mis-infer) */
 }
-/* ---- Font_ComputeColors__Fiiic  [FONT.CPP:168-255] SLD-VERIFIED ----
- * SYM (one fn-scope block, fsize 88): i $t2, r $v0, g $v1, b $a0, fr $t8, fg $t4,
- * fb $a3, br $a2, bg $a1, bb $a0, rgb $v0 (= THE result variable), opaque $s5,
- * fclr AUTO -0x40 (= sp+0x18), bclr AUTO -0x38 (= sp+0x20), fr1 $v1, fg1 $v0, fb1 $s0.
- * Oracle evidence: `opaque = forecolour & 0xff000000` is hoisted to the prologue ($s5);
- * gcc LICMs (fr1<<10)|(fg1<<5) -> $s2, that|0x8000 -> $s3 and fb1 -> $s0 out of the loop,
- * which is why `rgb` is NOT materialised before the loop; the clut walker $t7 is the
- * strength-reduced &shpfontclut.data[i]; the literal 15 is CSE'd between `15 - i` and
- * `colour == 15` ($s1); both `if (rgb == 0) rgb = 0x400;` tails cross-jump into one
- * block (.L800CB62C) while the i<8 / i<12 / i<4 arms branch straight to the store.
- * Divides are SIGNED (mult + magic + sign fixup), not unsigned.
- * w41-a6 PASS (was 6 diffs): the SYM's `r $v0, g $v1, b $a0` are the registers the
- * oracle uses for the THREE blended sums (`addu v0,t8,a2` = fr+br, `addu v1,t4,a1` =
- * fg+bg, `addu a0,a3,a0` = fb+bb, all emitted BEFORE the shifts) -- i.e. r/g/b are the
- * blend accumulators, NOT copies of fclr.  Writing them as `r = fr + br; g = fg + bg;
- * b = fb + bb; rgb = r << 10 | g << 5 | b;` gets the three-up-front emission, but ONLY
- * once the pre-loop `r = fclr.r; ...` copies are dropped and fr1/fg1/fb1 read
- * `fclr.r/g/b` directly -- keeping both uses makes r/g/b loop-carried and costs 117
- * diffs / one insn.  (The inline `(fr+br) << 10 | ...` expression computes sum3 only
- * after the first `or`, which was the 6-diff residual.)
- */
+
+/* ---- Font_ComputeColors__Fiiic  [FONT.CPP:168-280] SLD-VERIFIED ---- */
 void Font_ComputeColors(int colour,int forecolour,int backcolour,char in_game)
 
 {
+  u_int uVar1;
+  int fg1;
+  cluttbl *pcVar2;
+  u_int uVar3;
+  u_int uVar4;
+  int fr1;
+  u_int uVar5;
+  int bb;
+  int iVar6;
+  int bg;
+  int br;
+  int fb;
   int i;
+  int iVar7;
+  int fg;
+  int fb1;
+  int opaque;
+  int fr;
+  CVECTOR fclr;
+  CVECTOR bclr;
   int r;
   int g;
   int b;
-  int fr;
-  int fg;
-  int fb;
-  int br;
-  int bg;
-  int bb;
   int rgb;
-  int opaque;
-  CVECTOR fclr;
-  CVECTOR bclr;
-  int fr1;
-  int fg1;
-  int fb1;
-
-  opaque = forecolour & 0xff000000;
-  shpfontclut.type = 0x23;
-  shpfontclut.next = 0;
+  
+  iVar7 = 0;
+  fclr.b = (u_char)((u_int)forecolour >> 0x10);
+  bb = (int)fclr.b;
+  pcVar2 = &shpfontclut;
   shpfontclut.width = 0x10;
+  fclr.g = (u_char)((u_int)forecolour >> 8);
+  fb = (int)fclr.g;
   shpfontclut.height = 1;
   shpfontclut.centerx = 0;
   shpfontclut.centery = 0;
+  (*(int *)&(shpfontclut)) = 0x23;
   shpfontclut.shapex = (short)font_clutx;
   shpfontclut.shapey = (short)font_cluty;
-  *(long *)&fclr = forecolour;
-  *(long *)&bclr = backcolour;
-  fr1 = (fclr.r * 31) / 255;
-  fg1 = (fclr.g * 31) / 255;
-  fb1 = (fclr.b * 31) / 255;
-  for (i = 0; i < 16; i++) {
-    if ((in_game != 0) && (opaque == 0)) {
-      if (i < 8) {
-        rgb = 0;
-      }
-      else if (i < 12) {
-        rgb = 0x8000 | fr1 << 10 | fg1 << 5 | fb1;
-      }
-      else {
-        rgb = fr1 << 10 | fg1 << 5 | fb1;
-        if (rgb == 0) {
-          rgb = 0x400;
+  uVar1 = (u_int)(bb * 0x1f) / 0xff;
+  r = forecolour & 0xff;
+  uVar5 = ((r * 0x1f) / 0xff) * 0x400;
+  uVar3 = ((u_int)(fb * 0x1f) / 0xff) * 0x20;
+  rgb = uVar5 | uVar3 | uVar1;
+  do {
+    if ((in_game == '\0') || ((forecolour & 0xff000000U) != 0)) {
+      iVar6 = 0xf - iVar7;
+      if (3 < iVar7) {
+        uVar4 = ((int)(r * iVar7 * 0x1f) / 0xef1 +
+                (int)((backcolour & 0xffU) * iVar6 * 0x1f) / 0xef1) * 0x400 |
+                ((int)((u_int)fclr.g * iVar7 * 0x1f) / 0xef1 +
+                (int)(((u_int)backcolour >> 8 & 0xff) * iVar6 * 0x1f) / 0xef1) * 0x20 |
+                (int)((u_int)fclr.b * iVar7 * 0x1f) / 0xef1 +
+                (int)(((u_int)backcolour >> 0x10 & 0xff) * iVar6 * 0x1f) / 0xef1;
+        if (colour == 0xf) {
+          uVar4 = uVar4 | 0x8000;
         }
+        goto FontColors_defaultColor;
       }
+      uVar4 = 0;
     }
     else {
-      fr = (fclr.r * i * 31) / 3825;
-      fg = (fclr.g * i * 31) / 3825;
-      fb = (fclr.b * i * 31) / 3825;
-      br = (bclr.r * (15 - i) * 31) / 3825;
-      bg = (bclr.g * (15 - i) * 31) / 3825;
-      bb = (bclr.b * (15 - i) * 31) / 3825;
-      if (i < 4) {
-        rgb = 0;
-      }
-      else {
-        r = fr + br;
-        g = fg + bg;
-        b = fb + bb;
-        rgb = r << 10 | g << 5 | b;
-        if (colour == 0xf) {
-          rgb = rgb | 0x8000;
-        }
-        if (rgb == 0) {
-          rgb = 0x400;
+      uVar4 = 0;
+      if ((7 < iVar7) && (uVar4 = rgb | 0x8000, 0xb < iVar7)) {
+        uVar4 = rgb;
+FontColors_defaultColor:
+        if (uVar4 == 0) {
+          uVar4 = 0x400;
         }
       }
     }
-    shpfontclut.data[i] = (short)rgb;
-  }
-  Texture_Vramf((shapetbl *)&shpfontclut,font_clutx,font_cluty,font_clutx + colour * 0x10,
-                font_cluty);
-  DrawSync(0);
-  return;
+    pcVar2->data[0] = (short)uVar4;
+    iVar7 = iVar7 + 1;
+    pcVar2 = (cluttbl *)((char *)pcVar2 + 2);
+    if (0xf < iVar7) {
+      Texture_Vramf((shapetbl *)&shpfontclut,font_clutx,font_cluty,font_clutx + colour * 0x10,
+                 font_cluty);
+      DrawSync(0);
+      return;
+    }
+  } while( true );
 }
-/* ---- Font_textbsearch__FiPcUlUl  [FONT.CPP:262-280] SLD-VERIFIED ----
- * SYM (fsize 40, ra+s0-s4): key $s4, base $s2, nmemb $a2, size $s3; locals lim $s1,
- * cmp $v0, ch $s0.  This is the classic BSD bsearch loop (lim halved per iteration,
- * lim-- on the take-the-upper-half side) -- the Ghidra body had it as a while(true)
- * with the lim/nmemb roles fused. */
-static charactertbl *
+
+/* ---- Font_textbsearch__FiPcUlUl  [FONT.CPP:262-280] SLD-VERIFIED ---- */
+charactertbl *
 Font_textbsearch(int key,char *base,u_long nmemb,u_long size)
 
 {
-  int lim;
   int cmp;
+  int iVar1;
   charactertbl *ch;
-
-  for (lim = nmemb; lim != 0; lim >>= 1) {
-    ch = (charactertbl *)(base + (lim >> 1) * size);
-    cmp = key - geti(ch,2);
-    if (cmp == 0) {
-      return ch;
+  charactertbl *p;
+  int lim;
+  
+  while( true ) {
+    if (nmemb == 0) {
+      return (charactertbl *)0x0;
     }
-    if (0 < cmp) {
-      base = (char *)ch + size;
-      lim--;
+    p = (charactertbl *)(base + ((int)nmemb >> 1) * size);
+    iVar1 = geti(p,2);
+    if (key == iVar1) break;
+    if (0 < key - iVar1) {
+      base = (char *)(p->index + size);
+      nmemb = nmemb - 1;
     }
+    nmemb = (int)nmemb >> 1;
   }
-  return (charactertbl *)0x0;
+  return p;
 }
+
 /* ---- Font_Getcharacter__Fi  [FONT.CPP:286-299] SLD-VERIFIED ---- */
-charactertbl * Font_Getcharacter(int targetindex)
+extern "C" charactertbl * Font_Getcharacter(int targetindex)
 
 {
-  u_int base_00; /* SYM-CODEGEN-CARRIER: base_00 -- removal shrinks 35 to 33 insns */
+  int probe_idx;
   charactertbl *ch;
+  charactertbl *p;
   char *base;
-
-  base = (char *)&(currentfont);
-  base_00 = (*(int *)(base + 132));
-  ch = (charactertbl *)((*(int *)(base + 132)) + (targetindex + -0x20) * 0xb);
-  if (geti(ch,2) == targetindex) {
-    return ch;
+  
+  p = (charactertbl *)((u_char *)currentfont.glyphTable + (targetindex + -0x20) * 0xb);
+  probe_idx = geti(p,2);
+  if (probe_idx != targetindex) {
+    p = Font_textbsearch(targetindex,(char *)currentfont.glyphTable,currentfont.glyphCount,0xb);
   }
-  return Font_textbsearch(targetindex,(char *)base_00,(*(int *)(base + 116)),0xb);
+  return p;
 }
 
 /* ---- Font_SetBlitter__FPFiiPviiP12charactertbli_v  [FONT.CPP:305-306] SLD-VERIFIED ---- */
-void Font_SetBlitter(fontblit blitter)
+extern "C" void Font_SetBlitter(fn_void *blitter)
 
 {
   gCurrentBlitter = blitter;
@@ -289,7 +248,7 @@ void Font_SetBlitter(fontblit blitter)
 }
 
 /* ---- Font_ReSetBlitter__Fv  [FONT.CPP:311-312] SLD-VERIFIED ---- */
-void Font_ReSetBlitter(void)
+extern "C" void Font_ReSetBlitter(void)
 
 {
   gCurrentBlitter = Font_Blit;
@@ -297,76 +256,26 @@ void Font_ReSetBlitter(void)
 }
 
 /* ---- Font_SwitchFont__FPc  [FONT.CPP:317-329] SLD-VERIFIED ---- */
-/* w39-a6 FLOOR (2 diffs, count EXACT 27/27): sched2 places the gp-rel `font_abr` load
- * AFTER the three currentfont zero-stores; the oracle places it before.  FALSIFIED:
- * 4 statement positions for `abr_val`, read-at-use, u_long type, volatile stores,
- * reversed store order (6), unsized-array-view extern (3).
- * w41-a6: re-gated at 2 (27/27).  Three more MEASURED NEGATIVE: `abr_val = font_abr;`
- * moved ahead of the `pv1` load (2), the c_val read moved ahead of the three zero stores
- * (5, +1 insn), and `font_abr + 0` to perturb the expression (2).  Mechanism: a sched2
- * ready-list tie -- the gp-rel `font_abr` load feeds only the far-away `jal GetTPage`, so
- * it has the lowest critical-path priority and is issued last; retail issues it first.
- * w45-a3 (still 2, 27/27) -- RECEIPT SHARPENED, mechanism reclassified.  The output is
- * BYTE-IDENTICAL across EVERY source spelling of the read: `abr_val = font_abr;` placed
- * before the three zero stores, after them, or inlined into the GetTPage argument list all
- * gate 2 with the same 27 instructions -- AND SO DOES `*(volatile u_long *)&font_abr`.
- * A volatile MEM cannot be moved by any scheduler, so the placement is NOT a sched1/sched2
- * ready-list tie as the w39/w41 notes claimed; cc1 has already canonicalized the load into
- * that slot before scheduling ever runs.  (Only hoisting the read above `setfont(f1)` moves
- * it -- 9 diffs / 30 insns, because it then has to survive the call.)
- * Storage-shape menu swept precisely this session (w44 section E), all neutral or worse:
- * unsized asm-label view `extern u_long v[] __asm__("font_abr")` 3 (+1 insn), sized [1]
- * view 2 (exactly neutral), sized [4] view 3, pointer-cast-through-view 3.  Rewriting the
- * three zero stores as a struct assignment is 17 (+5 insns).
- * NEW NAMED ANGLE: since the placement survives volatile, the remaining inputs are the ones
- * that change what cc1 EMITS rather than where it schedules -- make the three currentfont
- * zero stores and the font_abr load MAY-ALIAS so cc1's own RTL generation cannot separate
- * them.  Concretely: give `font_abr` a sized [1] STRUCT view (w44 menu item 3, the
- * MEM_IN_STRUCT_P aliasing lever -- the one storage shape that deliberately ADDS aliasing)
- * and write the zero stores through a matching struct view of `currentfont`, so the store
- * group and the load carry the same MEM_IN_STRUCT_P flag.  Untried; the plain sized-[1]
- * SCALAR view above being exactly neutral is consistent with the flag, not the size, being
- * the operative bit. */
 void Font_SwitchFont(char *f1)
 
 {
-  u_char *base; /* SYM-CODEGEN-CARRIER: base -- anchors the MEM_IN_STRUCT_P store view */
-  u_char *pv1; /* SYM-CODEGEN-CARRIER: pv1 -- carries the current font shape pointer */
-  int abr_val; /* SYM-CODEGEN-CARRIER: abr_val -- measured load-placement carrier */
-
-  setfont(f1);
-  base = (u_char *)&(currentfont);
-  pv1 = *(u_char **)(base + 136);
-  abr_val = font_abr;
-  /* w46-a8 SEAL (2 -> PASS, 27/27).  THE MEM_IN_STRUCT_P STORE VIEW, and it is the STORE
-     side alone that is the operative bit -- font_abr is untouched.  Writing the three
-     currentfont zero stores through a STRUCT type sets MEM_IN_STRUCT_P on them, which
-     stops gcc's fixed_scalar_and_varying_struct_p heuristic from declaring the gp-rel
-     `font_abr` scalar load independent of the store group; the load can then no longer
-     sink below them and lands at retail's position (before the three `sw zero`).
-     MEASURED: struct view on the stores alone = PASS (kept); sized-[1] STRUCT view on
-     font_abr as well = 2; sized-[1] scalar array view on font_abr + struct stores = 2;
-     struct view on font_abr alone = 2; a whole-struct assignment of a zeroed temp = 20
-     (+6 insns).  This closes the w39/w41/w45 receipt chain above -- the "cc1 canonicalized
-     the load into that slot before scheduling" reading was right that it is not a
-     scheduler tie, and the alias flag is what actually pins it. */
-  {
-    ((DR_MODE *)(base + 0x94))->tag = 0;
-    ((DR_MODE *)(base + 0x94))->code[0] = 0;
-    ((DR_MODE *)(base + 0x94))->code[1] = 0;
-  }
-  {
-    int arg3 = (*(int *)(pv1 + 0xc) << 4) >> 0x14; /* SYM-CODEGEN-CARRIER: arg3 */
-    font_currentTPage = GetTPage(*(u_char *)pv1 & 3,abr_val,
-                                (*(int *)(pv1 + 0xc) << 0x14) >> 0x14,
-                                arg3);
-  }
-  gFontSpaceWidth = Font_Getcharacter(0x20)->advance;
+  charactertbl *pcVar1;
+  
+  setfont((intptr_t)f1);
+  currentfont.textDraw = (FontTextDraw)0;
+  currentfont.reserved98[0] = 0;
+  currentfont.reserved98[1] = 0;
+  font_currentTPage =
+       GetTPage(((shapetbl *)currentfont.shape)->type & 3,font_abr,
+                ((shapetbl *)currentfont.shape)->shapex,
+                ((shapetbl *)currentfont.shape)->shapey);
+  pcVar1 = Font_Getcharacter(0x20);
+  gFontSpaceWidth = pcVar1->advance;
   return;
 }
 
 /* ---- Font_DeInit__Fv  [FONT.CPP:333-338] SLD-VERIFIED ---- */
-void Font_DeInit(void)
+extern "C" void Font_DeInit(void)
 
 {
   if (font_clutx != -1) {
@@ -378,7 +287,7 @@ void Font_DeInit(void)
 }
 
 /* ---- Font_ExitFromGame__Fv  [FONT.CPP:342-344] SLD-VERIFIED ---- */
-void Font_ExitFromGame(void)
+extern "C" void Font_ExitFromGame(void)
 
 {
   font_clutx = -1;
@@ -386,145 +295,142 @@ void Font_ExitFromGame(void)
   return;
 }
 
-/* ---- Font_LoadFont__FPciic  [FONT.CPP:348-399] SLD-VERIFIED ----
- * SYM (fsize 56, ra+s0-s6): f1 $s3, x $s5, y $s6, in_game $s4 CHAR; block locals
- * shp $s2 (PTR shapetbl), i $s0, l $s1.  Both nibble-swap loops and the colour loop
- * are plain index-form `for`s -- the oracle's `addu a0,s0,s2` / `addiu s1,s1,4`
- * walkers are gcc strength reduction, not source pointers.
- */
-int Font_LoadFont(char *f1,int x,int y,char in_game)
+/* ---- Font_LoadFont__FPciic  [FONT.CPP:348-399] SLD-VERIFIED ---- */
+extern "C" int Font_LoadFont(char *f1,int x,int y,char in_game)
 
 {
+  unsigned char *shp_00;
+  int iVar1;
   int i;
+  int iVar2;
   int l;
+  int iVar3;
+  long *plVar4;
   shapetbl *shp;
-  char *hdr; /* SYM-CODEGEN-CARRIER: hdr -- named header base preserves retail constant association */
-
-  setfont(f1);
-  shp = (shapetbl *)(*(int *)((u_char *)&(currentfont) + 136));
-  l = ((int)shp->width * (int)shp->height) / 2;
-  for (i = 0; i < l; i++) {
-    (&shp->data)[i] = ((&shp->data)[i] & 0xf) << 4 | (&shp->data)[i] >> 4;
+  u_char *pixels;
+  
+  setfont((intptr_t)f1);
+  shp_00 = currentfont.shape;
+  shp = (shapetbl *)shp_00;
+  pixels = (u_char *)&shp->data;
+  iVar3 = ((int)shp->width * (int)shp->height) / 2;
+  iVar2 = 0;
+  iVar1 = 0;
+  if (0 < iVar3) {
+    do {
+      iVar2 = iVar2 + 1;
+      pixels[iVar1] = pixels[iVar1] << 4 | pixels[iVar1] >> 4;
+      iVar1 = iVar2;
+    } while (iVar2 < iVar3);
   }
   if (font_clutx == -1) {
     Texture_GetClutId(1,&font_clutx,&font_cluty);
   }
-  Texture_Vramf(shp,x,y,font_clutx,font_cluty);
+  iVar2 = 0;
+  Texture_Vramf((shapetbl *)shp_00,x,y,font_clutx,font_cluty);
   waitdraw();
-  shp->next = (int)&shpfontclut - (int)shp;
-  for (i = 0; i < l; i++) {
-    (&shp->data)[i] = ((&shp->data)[i] & 0xf) << 4 | (&shp->data)[i] >> 4;
+  *(u_int *)shp_00 = (u_int)*(u_char *)shp_00 |
+                     (u_int)((intptr_t)&shpfontclut - (intptr_t)shp_00) * 0x100;
+  iVar1 = 0;
+  if (0 < iVar3) {
+    do {
+      iVar2 = iVar2 + 1;
+      pixels[iVar1] = pixels[iVar1] << 4 | pixels[iVar1] >> 4;
+      iVar1 = iVar2;
+    } while (iVar2 < iVar3);
   }
-  for (i = 0; i < 0x10; i++) {
-    Font_ComputeColors(i,colourRGB[i],0,in_game);
-  }
+  plVar4 = colourRGB;
+  iVar1 = 0;
+  do {
+    iVar2 = *plVar4;
+    plVar4 = plVar4 + 1;
+    iVar3 = iVar1 + 1;
+    Font_ComputeColors(iVar1,iVar2,0,in_game);
+    iVar1 = iVar3;
+  } while (iVar3 < 0x10);
   Font_ReSetBlitter();
   Font_SwitchFont(f1);
-  /* MATCH (w39-a6): the header base MUST be its own named local.  Written inline as
-   * `X - (int)(f1 - 0x10)` gcc reassociates the constant out (addiu a1,a1,16; subu a1,a1,a0);
-   * the oracle keeps the subexpression whole (addiu v0,a0,-16; subu a1,a1,v0).  PASS 117/117. */
-  hdr = f1 - 0x10;
-  resizememadr(f1,(*(int *)((u_char *)&(currentfont) + 136)) - (int)hdr);
+  resizememadr(f1,(int)(currentfont.shape - (unsigned char *)(f1 + -0x10)));
   Font_TextTint(0x808080);
   Font_TextColor(2);
   return y + shp->height;
 }
-/* ---- Font_TextXY__FPcii  [FONT.CPP:414-453] SLD-VERIFIED ----
- * SYM locals (fn block): str $s4, ch $s1, code $s3; inner block (line ~431): u $s0;
- * tail block (line ~450): dr_mode $a0.  Params x -> $s2, y -> $s6 (REGPARM copies).
- * SLD: 419 code=-1 | 421 while | 423 code=*str++ | 425 if | 433/434 geti | 436-439 blit
- * call | 442 x+=advance | 446 space path (textually LAST => the `else` arm) | 449-453 tail.
- * The scratchpad packet/palette reads live ONLY in the tail block (oracle .L800CBB5C).
- */
-/* w39-a6: 34 -> 28, count EXACT 86/86.  `cfbase = &currentfont` must be the LAST of the
- * three prologue initialisers -- placed first it materializes the %hi/%lo + the $s5 save
- * three insns too early.  w40-a6 28 -> 22: the palette write-back must be written BEFORE
- * the packet-cursor bump (the same order lever that took Weather_CreateSplat 40 -> 6 and
- * Weather_DoWeather's tail 66 -> 60); with the bump 2nd, gcc issues `addiu/sw` ahead of
- * the merge instead of interleaving it.  RESIDUAL 22 = the t1<->t2 rotation of the hoisted
- * 0x00ffffff / 0xff000000 literals plus the bump's 2-slot schedule.  Measured NEGATIVE:
- * dropping the fabricated `tpage` local (32), 0xffffff-first palette spelling (24),
- * dr_mode-first packet spelling (26), dropping `cfbase` for direct &currentfont uses
- * (+2 insns / 52 -- the SYM has no cfbase local but gcc will not hoist the address
- * itself here, so the local stays).
- * w41-a6: re-gated at 22 (86/86), -G8 probe no change.  The dominant half is the SAME
- * t1<->t2 rotation of the hoisted 0x00ffffff / 0xff000000 mask literals that
- * Weather_DoWeather's DR_MODE tail shows -- identical materialization ORDER, reversed
- * registers, i.e. a local_alloc tie on two same-size same-ref-count constants.  A lever
- * for either one should fix both; worth attacking as a pair rather than per-function. */
+
+/* ---- Font_TextXY__FPcii  [FONT.CPP:414-453] SLD-VERIFIED ---- */
 void Font_TextXY(char *string,int x,int y)
 
 {
+  charactertbl *ch_entry_p;
+  int char_w;
+  int char_h;
+  int tpage_packed;
+  DR_MODE *dr_mode;
+  int tpage;
+  int u;
   charactertbl *ch;
   int code;
+  int ch_byte;
   char *str;
-  u_char *cfbase; /* SYM-CODEGEN-CARRIER: cfbase -- direct currentfont uses add 2 insns/52 diffs */
-
-  str = string;
-  code = -1;
-  cfbase = (u_char *)&(currentfont);
-  while (code != 0) {
-    code = *(u_char *)str;
-    str = str + 1;
-    if (0x20 < code) {
-      ch = Font_Getcharacter(code);
-      if (ch != (charactertbl *)0x0) {
-        int u;
-
-        u = geti(ch->u,2);
-        /* `char` is UNSIGNED on this build -> (signed char) forces the oracle's `lb` */
-        (*gCurrentBlitter)(x + *(signed char *)&ch->xoffset,
-                           y + *(signed char *)&ch->yoffset,
-                           *(void **)(cfbase + 136),
-                           u,geti(ch->v,2),(charactertbl *)ch,
-                           *(int *)(cfbase + 120));
-        x = x + *(signed char *)&ch->advance;
-      }
-    }
-    else {
+  u_char *tp1;
+  u_char *p;
+  
+  ch_byte = -1;
+  while (p = (u_char *)Render_gPacketPtr, tp1 = (u_char *)Render_gPalettePtr, ch_byte != 0) {
+    ch_byte = (int)(u_char)*string;
+    string = string + 1;
+    if ((u_int)ch_byte < 0x21) {
       x = x + (u_int)gFontSpaceWidth;
     }
+    else {
+      ch_entry_p = Font_Getcharacter(ch_byte);
+      if (ch_entry_p != 0) {
+        char_w = geti((void *)((u_char *)ch_entry_p + 4),2);
+        char_h = geti((void *)((u_char *)ch_entry_p + 6),2);
+        (*gCurrentBlitter)(x + *(char *)((u_char *)ch_entry_p + 9),
+                           y + *(char *)((u_char *)ch_entry_p + 10),
+                           currentfont.shape,char_w,char_h,ch_entry_p,currentfont.bitmapRowStride);
+        x = x + *(char *)((u_char *)ch_entry_p + 8);
+      }
+    }
   }
-  {
-    DR_MODE *dr_mode;
-
-    dr_mode = (DR_MODE *)Render_gPacketPtr;
-    /* w45-a3: PASS 86/86 (was 8).  This tail IS PsyQ addPrim(pal, dr_mode):
-     *   setaddr(dr_mode, getaddr(pal));  bump;  setaddr(pal, dr_mode);
-     * BOTH halves must go through the P_TAG BITFIELD.  The value side being a
-     * bitfield READ (`getaddr(pal)`, gcc: lw + and) is the load-bearing dial --
-     * a plain `*pal` read gates 22, and mixing one raw word RMW with one bitfield
-     * half gates 8/22.  With both bitfields the cursor bump schedules ahead of the
-     * palette store and its register is recycled for addr24 exactly as retail; bump
-     * POSITION in the source is then irrelevant (all three placements gate 0).
-     * HISTORY: 34 (w39-a6) -> 28 -> 22 (w40-a6) -> 8 (w44) -> PASS.  The standing
-     * "t1<->t2 rotation of the hoisted 0x00ffffff / 0xff000000 mask literals, attack
-     * as a PAIR with Weather_DoWeather's DR_MODE tail" verdict was WRONG: those two
-     * literals only existed because the link was hand-rolled as word RMWs.  Bitfield
-     * stores have no mask constants to rotate. */
-    setaddr(dr_mode,getaddr(Render_gPalettePtr));
-    setaddr(Render_gPalettePtr,dr_mode);
-    Render_gPacketPtr = (u_char *)dr_mode + 0xc;
-    SetDrawMode(dr_mode,0,0,(int)font_currentTPage,(RECT *)0x0);
-  }
+  tpage = (int)font_currentTPage;
+  *(u_int *)Render_gPacketPtr =
+       *(u_int *)Render_gPacketPtr & 0xff000000 | *(u_int *)Render_gPalettePtr & 0xffffff;
+  tpage_packed = (u_int)Render_gPacketPtr & 0xffffff;
+  Render_gPacketPtr = Render_gPacketPtr + 0xc;
+  *(u_int *)tp1 = *(u_int *)tp1 & 0xff000000 | tpage_packed;
+  SetDrawMode((DR_MODE *)p,0,0,tpage,(RECT *)0x0);
   return;
 }
-/* ---- Font_GetUVWH__FcPiN41  [FONT.CPP:541-549] SLD-VERIFIED ----
- * SYM (fsize 48, ra+s0-s5): code $a0 CHAR, u $s1, v $s2, w $s3, h $s4 (ARG), yoff $s5
- * (ARG); one block local: ch $s0.  The Ghidra leftover locals (fclr/bclr/width/...)
- * were dead but their AUTO slots inflated the frame to 64. */
-void Font_GetUVWH(char code,int *u,int *v,int *w,int *h,int *yoff)
+
+/* ---- Font_GetUVWH__FcPiN41  [FONT.CPP:541-549] SLD-VERIFIED ---- */
+extern "C" void Font_GetUVWH(char code,int *u,int *v,int *w,int *h,int *yoff)
 
 {
+  int cmp;
+  charactertbl *pcVar1;
+  int iVar2;
+  int fr1;
+  int height;
+  int i;
+  int fg;
+  int width;
   charactertbl *ch;
-
-  ch = Font_Getcharacter((u_int)(u_char)code);
-  *u = geti(ch->u,2);
-  *v = ((*(int *)((*(int *)((u_char *)&(currentfont) + 136)) + 0xc) << 0x14) >> 0x14) +
-       geti(ch->v,2);
-  *w = (u_int)ch->width;
-  *h = (u_int)ch->height;
-  *yoff = *(signed char *)&ch->yoffset;
+  char *str;
+  int opaque;
+  int fr;
+  CVECTOR fclr;
+  CVECTOR bclr;
+  
+  pcVar1 = Font_Getcharacter((u_int)(u_char)code);
+  iVar2 = geti(pcVar1->u,2);
+  *u = iVar2;
+  iVar2 = geti(pcVar1->v,2);
+  *v = ((shapetbl *)currentfont.shape)->shapex + iVar2;
+  *w = (u_int)pcVar1->width;
+  *h = (u_int)pcVar1->height;
+  *yoff = (int)pcVar1->yoffset;
   return;
 }
+
 /* end of font.cpp */

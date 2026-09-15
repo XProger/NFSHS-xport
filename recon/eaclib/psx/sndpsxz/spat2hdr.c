@@ -4,14 +4,15 @@
  *   Ghidra nfs4-f.exe.c (spat2hdr) + IDA sigs.  Ghidra-ism: iSNDpatchtohdr's 4th out-arg (in_a3) was dropped;
  *   iSNDgettag is the 4-arg (cursor,&id,&val,&ptr) form (Ghidra showed 2, the others adjacent on stack).
  */
-extern int  iSNDgettag(int *cursor, int *id, int *val, int *ptr);   /* sgettag */
+#include "../../../nfs4_types.h"
+extern "C" int iSNDgettag(intptr_t *cursor, unsigned int *id, int *val, intptr_t *ptr); /* sgettag */
 
-extern int  SNDattributessetdef(int *attr);                         /* @0x801035B0 */
-extern int  iSNDpatchtohdr(short *sampleData, int *hdr, int *attr, int *extraOut); /* @0x801035E4 (returns 0) */
+extern "C" void SNDattributessetdef(int *attr);                         /* @0x801035B0 */
+extern "C" void iSNDpatchtohdr(short *sampleData, int *hdr, int *attr, int *extraOut); /* @0x801035E4 */
 
 /* SNDattributessetdef @0x801035B0 : reset a 0xc-byte attribute block to defaults (level -1, pan 0x40,
  *   sustain 0x7f). */
-extern int SNDattributessetdef(int *attr)
+extern "C" void SNDattributessetdef(int *attr)
 {
     *attr = -1;
     *((unsigned char *)attr + 7)  = 0x7f;
@@ -21,28 +22,25 @@ extern int SNDattributessetdef(int *attr)
     *((unsigned char *)attr + 9)  = 0;
     *((unsigned char *)attr + 10) = 0;
     *((unsigned char *)attr + 0xb) = 0;
-    return 0;
 }
 
 /* iSNDpatchtohdr @0x801035E4 : build the SPU playback header (`hdr`, magic 0x5622) + attribute block (`attr`)
  *   + extra word (`extraOut`) from the sample's tag stream (after its 4- or 8-byte prefix per flags bit 1). */
-extern int iSNDpatchtohdr(short *sampleData, int *hdr, int *attr, int *extraOut)
+extern "C" void iSNDpatchtohdr(short *sampleData, int *hdr, int *attr, int *extraOut)
 {
-    short *cursor;
-    int    id, val, ptr;
+    intptr_t cursor;
+    unsigned int id;
+    int val;
+    intptr_t ptr;
     SNDattributessetdef(attr);
-    /* oracle stores sampleData as a default (`sw s0`), computes s0+8 in the bnez delay slot, s0+4 on
-     * fall-through -> a 3-way init + if/else, NOT `x=s0+8; if(!flag)x=s0+4`. */
-    cursor = sampleData;
-    if ((*((unsigned char *)sampleData + 3) & 2) != 0)
-        cursor = sampleData + 4;
-    else
-        cursor = sampleData + 2;
+    cursor = (intptr_t)(sampleData + 4);
+    if ((*((unsigned char *)sampleData + 3) & 2) == 0)
+        cursor = (intptr_t)(sampleData + 2);
     *(unsigned short *)hdr      = 0x5622;
     *((unsigned char *)hdr + 2) = 1;
     *((unsigned char *)hdr + 3) = 5;
     *extraOut = 0;
-    while (iSNDgettag((int *)&cursor, &id, &val, &ptr) != 0) {
+    while (iSNDgettag(&cursor, &id, &val, &ptr) != 0) {
         if (id == 0x80)      *((unsigned char *)attr + 0xb) = (unsigned char)val;
         else if (id == 0x82) *((unsigned char *)hdr + 2)    = (unsigned char)val;
         else if (id == 0x84) *(unsigned short *)hdr         = (unsigned short)val;
@@ -52,5 +50,4 @@ extern int iSNDpatchtohdr(short *sampleData, int *hdr, int *attr, int *extraOut)
         else if (id == 5)    *attr                          = val;
         else if (id == 6)    *((unsigned char *)attr + 6)   = (unsigned char)val;
     }
-    return 0;   /* oracle: `addu v0,zero,zero` before jr ra (void->int, §3.2) */
 }

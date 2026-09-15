@@ -1,32 +1,20 @@
 /* frontend/common/feinput_externs.h - reconstructed externs. NOT original. */
 #ifndef _FE_SCREENS_FEINPUT_EXTERNS_H_
 #define _FE_SCREENS_FEINPUT_EXTERNS_H_
-#include "feinput_types.h"
+#include "../../nfs4_types.h"
+#include "../../lib/libfns.h"
 
 /* ===== globals ===== */
-/* FEInput.obj contains PAD_COMMON but no 84-byte tPadModuleState tag.  SYM
- * proves gPadinfo is owned as anonymous .63fake by pad.obj; raw instructions
- * require the symbol base itself plus a +4 member displacement.  This private
- * foreign-symbol view is therefore a codegen carrier, not a recovered source
- * tag; the canonical type audit accepts only this exact owner/layout. */
-struct FEInput_PadCodegenView {
-    int initialized;
-    PAD_COMMON buf[8];
-    u_char stateBytes[16];
-};
-extern FEInput_PadCodegenView gPadinfo;
-extern tfrontEnd        frontEnd;
-extern int              ticks[];                       /* MATCH: unsized -> separate-temp base load (%3.12 #5) */
-extern int              FeTools_gScrollTicksOut[];      /* @0x800517d0 -- unsized, see above */
+extern "C" tPadModuleState  gPadinfo;
+extern "C" extern tfrontEnd        frontEnd;
+extern "C" int              ticks;
+extern "C" int              FeTools_gScrollTicksOut;        /* @0x800517d0 */
+extern "C" int              debounce[];                     /* @0x80052b60 */
+extern "C" long             nextTick;                       /* @0x80051738 */
 extern tPSXToFEMapping  getKeyMappings[];               /* @0x8005173c */
 
 /* ===== input helpers ===== */
-void  Front_ResetPSXController(int controller, int mode);
-
-extern "C" {
-u_short PAD_state(int padID);
-void PAD_update(void);
-}
+extern "C" { void  Front_ResetPSXController(int controller, int mode); }
 
 /* same-TU fns (forward decls so callers earlier in the file resolve) */
 void  FEInput_VerifyControllerValues(int controller);

@@ -1,7 +1,7 @@
 /* frontend/screens/screentrackrec.cpp  --  RECONSTRUCTED  (track-records screen; C++ TU)
  *   7 member fns of tScreenTrackRecords : tScreen. Member-fn decls in nfs4_types.h. Bodies: Ghidra.
  */
-#include "screentrackrecords_types.h"
+#include "../../nfs4_types.h"
 #include "screentrackrecords_externs.h"
 
 /* ---- tScreenTrackRecords::GetShapeInfo  (screentrackrec.cpp:67) ---- */
@@ -20,10 +20,15 @@ void tScreenTrackRecords::GetShapeInfo(short &numPermShapes,short &numSwapShapes
 void tScreenTrackRecords::Initialize()
 
 {
+  short nShowTrack;
+  tRecordBuffer *recs;
+  
   this->flareextra = 0;
-  this->tScreen::Initialize();
-  this->TrackRecords = (tRecordBuffer *)reservememadr("trkrcrds",0x168,0x10);
-  Stattool_GetRecords(Front_GetTrackRaced(),this->TrackRecords);
+  this->_base_tScreen.Initialize();
+  recs = (tRecordBuffer *)reservememadr("trkrcrds",0x168,0x10);
+  this->TrackRecords = recs;
+  nShowTrack = Front_GetTrackRaced();
+  Stattool_GetRecords(nShowTrack,this->TrackRecords);
   this->fReadNewData = 0;
   return;
 }
@@ -36,7 +41,7 @@ void tScreenTrackRecords::Cleanup()
   purgememadr(this->TrackRecords);
   this->TrackRecords = (tRecordBuffer *)0x0;
   StatChk_ClearNewRecords();
-  this->tScreen::Cleanup();
+  this->_base_tScreen.Cleanup();
   return;
 }
 
@@ -44,241 +49,268 @@ void tScreenTrackRecords::Cleanup()
 void tScreenTrackRecords::DrawOneRecord(int index,bool newrecord,int y)
 
 {
+  int sign;
+  short y_00;
+  int wx2;
+  tMenuTextState rowState;
+  char *word;
+  int newrecordU;
+  int wx;
   tMenuTextState textState;
   char sBuildOutput [80];
-
-  textState = (tMenuTextState)((newrecord != 0) << 1);
+  
+  newrecordU = newrecord;
+  textState = (tMenuTextState)((uint)(newrecordU != 0) << 1);
   if (-1 < this->TrackRecords[index].nBestLap) {
-    if (newrecord != 0) {
-      Flare_2DHalo(TextSys_WordX(0x247) + 3,y + 4,
-                   this->flare_intensity / 2,
-                   (this->flare_intensity * 2) / 3,0x17);
-      DrawShapeExtended(0,0,TextSys_WordX(0x247),y,0,0,
-                        (tDrawShapeExtended *)0x0);
+    if (newrecordU != 0) {
+      wx2 = TextSys_WordX(0x247);
+      wx = this->flare_intensity << 1;
+      sign = wx >> 0x1f;
+      wx = wx / 3 + sign;
+      Flare_2DHalo(wx2 + 3,y + 4,this->flare_intensity / 2,wx - sign,0x17);
+      wx = TextSys_WordX(0x247);
+      DrawShapeExtended(0,0,wx,y,0,0,
+                 (tDrawShapeExtended *)0x0);
     }
-    FETextRender_FullText
-              (this->TrackRecords[index].sName,(short)TextSys_WordX(0x24b),
-               (short)y,textType_TrackRecords,
-               newrecord != 0 ? textState_Hilighted : textState_Selected,0);
-    FETextRender_FullText
-              (TextSys_Word(this->TrackRecords[index].nCar + 0x153),
-               (short)TextSys_WordX(0x24c),(short)y,
-               textType_TrackRecords,textState,0);
-    if (this->TrackRecords[index].nTime != 0) {
-      Stattool_ParseTime(this->TrackRecords[index].nTime,sBuildOutput);
+    wx = TextSys_WordX(0x24b);
+    y_00 = (short)y;
+    if (newrecordU == 0) {
+      rowState = textState_Selected;
     }
     else {
-      sprintf(sBuildOutput,TextSys_Word(0x261));
+      rowState = textState_Hilighted;
     }
     FETextRender_FullText
-              (sBuildOutput,(short)TextSys_WordX(0x24d),(short)y,
-               textType_TrackRecords,
-               newrecord ? textState_Hilighted
-                              : (tMenuTextState)(index != 0),0);
-    Stattool_ParseTime(this->TrackRecords[index].nBestLap,sBuildOutput);
+              (this->TrackRecords[index].sName,(short)wx,y_00,textType_TrackRecords,rowState,0);
+    word = TextSys_Word(this->TrackRecords[index].nCar + 0x153);
+    wx = TextSys_WordX(0x24c);
     FETextRender_FullText
-              (sBuildOutput,(short)TextSys_WordX(0x24e),(short)y,
-               textType_TrackRecords,
-               index != 0 || textState != textState_Unselected
-                 ? textState : textState_Selected,0);
+              (word,(short)wx,y_00,textType_TrackRecords,textState,0);
+    wx = this->TrackRecords[index].nTime;
+    if (wx == 0) {
+      word = TextSys_Word(0x261);
+      sprintf(sBuildOutput,word);
+    }
+    else {
+      Stattool_ParseTime(wx,sBuildOutput);
+    }
+    wx = TextSys_WordX(0x24d);
+    if (newrecordU == 0) {
+      rowState = (tMenuTextState)(index != 0);
+    }
+    else {
+      rowState = textState_Hilighted;
+    }
+    FETextRender_FullText
+              (sBuildOutput,(short)wx,y_00,textType_TrackRecords,rowState,0);
+    Stattool_ParseTime
+              (this->TrackRecords[index].nBestLap,sBuildOutput);
+    wx = TextSys_WordX(0x24e);
+    if ((index == 0) && ((newrecordU != 0) == 0)) {
+      textState = textState_Selected;
+    }
+    FETextRender_FullText
+              (sBuildOutput,(short)wx,y_00,textType_TrackRecords,textState,0);
   }
   return;
 }
 
 /* ---- tScreenTrackRecords::DrawRecords  (screentrackrec.cpp:161) ---- */
-/* MATCH: unsized-array asm-label view -- the oracle loads NewBestLap through a
-   SEPARATE %hi scratch (`lui $v1; lw $a2,%lo(..)($v1)`), not the self-temp form. */
-extern bool NewBestLapA[] asm("NewBestLap");
-
 void tScreenTrackRecords::DrawRecords(short maxitem)
 
 {
-  /* MATCH: the SYM 8c block lists exactly TWO locals -- short nLapIndicator($a0)
-     and short k($s2) (this=$s4, maxitem=$fp; fsize 64, mask $c0ff0000).
-     Ghidra's kk/flareSign/sMenuText/idx/wy/flareTmp/textState are fabricated;
-     they forced a stack home for the short parameter and hid the shared
-     signed-/2 of the ping-pong flare counter (SLD 163-197). */
   short nLapIndicator;
+  int kk;
+  uint flareSign;
+  char *sMenuText;
+  int idx;
+  int wy;
+  uint flareTmp;
   short k;
-
-  this->flareextra = this->flareextra + 1;
-  if (0x3c < this->flareextra) {
+  tMenuTextState textState;
+  
+  kk = this->flareextra + 1;
+  this->flareextra = kk;
+  if (0x3c < kk) {
     this->flareextra = 0;
   }
-  /* MATCH: the signed /2 is written in BOTH arms -- gcc cross-jump-merges the
-     shared `addu; sra 1` tail, leaving the oracle's `slti 0x1F; bnez` that skips
-     only the 60-x subtraction.  A ternary shares the divide in source but emits
-     the addu operands the other way round (addu v0,v0,v1 vs v1,v0). */
-  if (0x1e < this->flareextra) {
-    this->flare_intensity = (0x3c - this->flareextra) / 2;
+  flareTmp = this->flareextra;
+  flareSign = flareTmp >> 0x1f;
+  if (0x1e < (int)flareTmp) {
+    flareSign = 0x3c - flareTmp;
+    flareTmp = flareSign >> 0x1f;
   }
-  else {
-    this->flare_intensity = this->flareextra / 2;
-  }
-  /* MATCH: the oracle STORES then RE-READS flare_intensity here (sw/lw pair).
-     Our cc1 forward-propagates the value and then dead-store-eliminates the
-     first store; a volatile view of the second read restores retail's
-     store->reload (value-preserving codegen device, cf. catalog SF). */
-  this->flare_intensity = (*(volatile int *)&this->flare_intensity + 0x14)
-                          * 0x80;
-  /* MATCH: explicit if/ELSE -- the `= 9` lands in the `bne` DELAY SLOT after the
-     call, so nLapIndicator lives in the caller-saved $a0 the SYM records.  A
-     plain `nLapIndicator = 9;` before the call forces a callee-saved reg. */
-  if (Front_GetLapsForType() == 2) {
+  this->flare_intensity = (int)(flareTmp + flareSign) >> 1;
+  this->flare_intensity = (this->flare_intensity + 0x14) * 0x80;
+  kk = Front_GetLapsForType();
+  nLapIndicator = 9;
+  if (kk == 2) {
     nLapIndicator = 1;
   }
-  else {
-    nLapIndicator = 9;
-  }
-  for (k = 0; k < 8; k = k + 1) {
-    if (maxitem <= k) break;
-    FETextRender_FullText(TextSys_Word(k + 599),(short)TextSys_WordX(0x249),
-                          (short)TextSys_WordY(k + 599),textType_TrackRecords,
-                          (NewRecords[k] == 0) ? textState_Unselected : textState_Hilighted,0);
-    this->DrawOneRecord(k + nLapIndicator,NewRecords[k],TextSys_WordY(k + 599));
-  }
+  k = 0;
+  kk = 0;
+  do {
+    kk = kk >> 0x10;
+    if (maxitem <= kk) break;
+    sMenuText = TextSys_Word(kk + 599);
+    idx = TextSys_WordX(0x249);
+    wy = TextSys_WordY(kk + 599);
+    if (NewRecords[kk] == 0) {
+      textState = textState_Unselected;
+    }
+    else {
+      textState = textState_Hilighted;
+    }
+    FETextRender_FullText(sMenuText,(short)idx,(short)wy,textType_TrackRecords,textState,0);
+    idx = (int)(short)k;
+    kk = TextSys_WordY(idx + 599);
+    this->DrawOneRecord(idx + nLapIndicator,NewRecords[idx],kk);
+    k = k + 1;
+    kk = k * 0x10000;
+  } while (k * 0x10000 >> 0x10 < 8);
   if (8 < maxitem) {
-    this->DrawOneRecord(0,NewBestLapA[0],TextSys_WordY(0x260));
+    kk = TextSys_WordY(0x260);
+    this->DrawOneRecord(0,NewBestLap,kk);
   }
   return;
 }
 
 /* ---- tScreenTrackRecords::DrawBackground  (screentrackrec.cpp:210) ---- */
-static inline int TrackRecordLineY(short y)
-{
-  return y - 0xc;
-}
-
 void tScreenTrackRecords::DrawBackground()
 
 {
-  char string[50];
-  char string2[50];
-  int fade;
-  /* SYM-CODEGEN-CARRIER: clampTmp -- routing the fade clamp through the
-     SYM AUTO short maxitem changes its narrowing and measures 8-93 diffs;
-     this int lifetime is required for retail's unclipped $a1 comparisons. */
-  int clampTmp;
-  /* SYM-CODEGEN-CARRIER: lineFadeCalc -- assigning the nested MIN/MAX clamp
-     directly to the SYM short linefadeval measures 6-145 diffs; this int
-     carrier delays the narrowing until after retail's $s5 clamp sequence. */
-  int lineFadeCalc;
-  short linefadeval;
-  short maxitem;
-  short boxx;
-  short boxy;
-  short boxw;
-  short midy;
-  short j;
+  short fade;
+  int fadeCalc;
+  int boxy;
+  int boxx;
+  int midy;
   int Col;
-  int ColTextSel;
   int ColTextBright;
-  tTexture_ShapeInfo *shape;
-  int lbx;
-  int tt;
+  char *word;
+  int wy;
+  int boxw;
+  int maxitem;
+  int clampTmp;
+  int fadeAmt;
+  short linefadeval;
+  char string [50];
+  char string2 [50];
   tDrawShapeExtended drawflags;
-
-  fade = (this->fScreenFadeVal * 0x134) / 0x80;
-  /* SYM restoration: tt is the declared $s2 int.  Retail uses that same
-     non-overlapping lifetime for this text-fade clamp and later overwrites
-     it with the texture tick offset; a separate fadeAmt name is unnecessary. */
-  tt = fade - 0xb4;
-  if (tt < 0) {
-    tt = 0;
+  
+  fadeCalc = (this->_base_tScreen).fScreenFadeVal * 0x134;
+  if (fadeCalc < 0) {
+    fadeCalc = fadeCalc + 0x7f;
   }
-  if (0x80 < tt) {
-    tt = 0x80;
+  fadeCalc = fadeCalc >> 7;
+  fadeAmt = fadeCalc - 0xb4;
+  if (fadeAmt < 0) {
+    fadeAmt = 0;
   }
-  clampTmp = fade;
-  if (clampTmp < 0) {
+  if (0x80 < fadeAmt) {
+    fadeAmt = 0x80;
+  }
+  clampTmp = fadeCalc;
+  if (fadeCalc < 0) {
     clampTmp = 0;
   }
-  if (0xb4 < clampTmp) {
-    clampTmp = 0xb4;
+  fade = (short)clampTmp;
+  if (0xb4 < fadeCalc) {
+    fade = 0xb4;
   }
-  lineFadeCalc = (fade * 0x80) / 0xb4;
-  if (lineFadeCalc < 0) {
-    lineFadeCalc = 0;
+  fadeCalc = (fadeCalc * 0x80) / 0xb4;
+  clampTmp = fadeCalc;
+  if (fadeCalc < 0) {
+    clampTmp = 0;
   }
-  if (0x80 < lineFadeCalc) {
-    lineFadeCalc = 0x80;
+  linefadeval = (short)clampTmp;
+  if (0x80 < fadeCalc) {
+    linefadeval = 0x80;
   }
-  linefadeval = lineFadeCalc;
-  maxitem = (0xb4 - (short)clampTmp) / 0x14;
-  boxx = TextSys_WordX(0x248);
+  fadeCalc = (0xb4 - fade) / 0x14;
+  clampTmp = TextSys_WordX(0x248);
   boxy = TextSys_WordY(0x256);
-  boxw = TextSys_WordX(0x24f) - boxx;
+  boxx = TextSys_WordX(0x24f);
   midy = TextSys_WordY(0x25f);
-  Col = 0x232323;
-  ColTextSel = CalcFadeVal(kRGBVals[(byte)textDefinitions[0xb][4]],(short)tt);
-  ColTextBright = CalcFadeVal(kRGBVals[(byte)textDefinitions[0xb][5]],(short)tt);
-  this->DrawRecords(maxitem);
-  sprintf(string2,TextSys_Word(0x251),Front_GetLapsForType());
-  sprintf(string,"%s %s",TextSys_Word((short)Front_GetTrackRaced() + 0xd5),string2);
-  FETextRender_FullTextRGB(string,0x104,(short)TextSys_WordY(0x255),ColTextBright,0,2);
-  PSXDrawSquare(0,0x104 - (textpixels(string) >> 1),TextSys_WordY(0x255),textpixels(string),9);
-  shape = &gCurrentShapes[0][0x26];
-  /* MATCH (W57-A7, 28 -> 24): fold's constant reassociation is STATEMENT-granular --
-     written flat, `((w>>1) - cx) - 2` folds to `subu; addiu -2`; retail has
-     `addiu v0,v0,-2; subu s3,v0,a0`, i.e. the -2 is applied to the half-width FIRST.
-     Only a separate statement stops fold from re-associating it back. */
+  Col = CalcFadeVal(kRGBVals[(byte)textDefinitions[0xb][4]],fadeAmt);
+  ColTextBright = CalcFadeVal(kRGBVals[(byte)textDefinitions[0xb][5]],fadeAmt);
+  maxitem = fadeCalc * 0x10000;
+  this->DrawRecords((short)((uint)maxitem >> 0x10));
+  word = TextSys_Word(0x251);
+  wy = Front_GetLapsForType();
+  sprintf(string2,word,wy);
+  fade = Front_GetTrackRaced();
+  word = TextSys_Word(fade + 0xd5);
+  sprintf(string,"%s %s",word,string2);
+  wy = TextSys_WordY(0x255);
+  FETextRender_FullTextRGB
+            (string,0x104,(short)wy,ColTextBright,'\0',2);
+  ColTextBright = textpixels(string);
+  wy = TextSys_WordY(0x255);
+  boxw = textpixels(string);
+  PSXDrawSquare(0,0x104 - (ColTextBright >> 1),wy,boxw,9);
+  if (gCurrentShapes[0x26].width == 0) {
+    trap(0x1c00);
+  }
+  if ((gCurrentShapes[0x26].width == -1) && (ticks == -0x80000000)) {
+    trap(0x1800);
+  }
   {
-    /* SYM-CODEGEN-CARRIER: half -- the separate assignment is the measured
-       statement boundary required to prevent fold's constant reassociation. */
-    short half = ((short)shape->width >> 1) - 2;
-
-    lbx = half - shape->centerx;
+    int shapeWidth = (int)gCurrentShapes[0x26].width;
+    int animationOffset = ticks % shapeWidth;
+    int flareCenterX = shapeWidth / 2 - 2 - (int)gCurrentShapes[0x26].height;
+    if (shapeWidth / 2 < animationOffset) {
+      animationOffset = shapeWidth - animationOffset;
+    }
+    DrawShapeExtended
+              (0x27,0,flareCenterX + animationOffset,TextSys_WordY(0x255) + 1,
+               (int)(this->_base_tScreen).fScreenFadeVal,1,(tDrawShapeExtended *)0x0);
+    DrawShapeExtended
+              (0x27,0,flareCenterX - animationOffset,TextSys_WordY(0x255) + 1,
+               (int)(this->_base_tScreen).fScreenFadeVal,1,(tDrawShapeExtended *)0x0);
   }
-  tt = ticks[0] % (short)shape->width;
-  if (((short)shape->width / 2) < tt) {
-    tt = (short)shape->width - tt;
-  }
-  DrawShapeExtended(0x27,0,lbx + tt,TextSys_WordY(0x255) + 1,
-                    (int)this->fScreenFadeVal,1,(tDrawShapeExtended *)0x0);
-  DrawShapeExtended(0x27,0,lbx - tt,TextSys_WordY(0x255) + 1,
-                    (int)this->fScreenFadeVal,1,(tDrawShapeExtended *)0x0);
   drawflags.tint[0] = 0x505050;
-  DrawShapeExtended(0x26,0x410,-2,0,(int)this->fScreenFadeVal,0,&drawflags);
-  for (j = 0; j < 3; j++) {
-    int xx = TextSys_WordX(j + 0x24c);
-    FETextRender_FullTextRGB(TextSys_Word(j + 0x252),(short)xx,(short)(boxy + 4),
-                             ColTextSel,0,0);
-    if (0 < maxitem) {
-      PSXDrawSquare(Col,xx - 6,(short)boxy + 2,2,(0x80 - linefadeval) / 0x10);
+  DrawShapeExtended
+            (0x26,0x410,-2,0,
+             (int)(this->_base_tScreen).fScreenFadeVal,0,&drawflags);
+  for (fade = 0; ColTextBright = (int)fade, ColTextBright < 3; fade = fade + 1) {
+    wy = TextSys_WordX(ColTextBright + 0x24c);
+    word = TextSys_Word(ColTextBright + 0x252);
+    FETextRender_FullTextRGB
+              (word,(short)wy,(short)((uint)((boxy + 4) * 0x10000) >> 0x10),Col,'\0',0);
+    if (0 < maxitem >> 0x10) {
+      ColTextBright = -(int)linefadeval + 0x80;
+      if (ColTextBright < 0) {
+        ColTextBright = -(int)linefadeval + 0x8f;
+      }
+      PSXDrawSquare
+                (0x232323,wy + -6,(short)boxy + 2,2,ColTextBright >> 4);
     }
   }
-  FETextRender_FullTextRGB(TextSys_Word(0x262),(short)TextSys_WordX(0x249),
-                           (short)(midy + 3),ColTextSel,0,0);
-  PSXDrawBrightEndLine(Col,boxx,(short)boxy + 3,boxw,-1,2,linefadeval,0x23);
-  /* MATCH (W57-A7/W66, 24 -> 6 -> PASS): the SECOND instance of the statement-granular
-     constant-reassociation -- inline, fold rewrites `(midy-0xc) - boxy` into
-     `midy - (boxy+0xc)` (ours emitted `addiu s0,s0,12; subu v0,v0,s0`), and the
-     resulting extra pseudo also flipped the two short temps' $s0/$s1 homes.
-     Naming the `midy - 0xc` half in its own statement fixed both at once.  The
-     final lever is the inlined TrackRecordLineY helper: its short formal creates
-     the retail conversion boundary (`sll; sra; addiu -12`) without the live int
-     local that rotates the saved-register band.  Falsified: direct cast expression
-     (24), `int liney` (52), in-place subtraction, and a separate short local (6). */
-  {
-    PSXDrawBrightEndLine(Col,TextSys_WordX(0x24c) - 6,(short)boxy + 4,2,
-                         TrackRecordLineY((short)midy) - (short)boxy,
-                         1,linefadeval,0);
+  word = TextSys_Word(0x262);
+  ColTextBright = TextSys_WordX(0x249);
+  FETextRender_FullTextRGB
+            (word,(short)ColTextBright,(short)midy + 3,Col,'\0',0);
+  boxy = (int)(short)boxy;
+  PSXDrawBrightEndLine
+            (0x232323,(int)(short)clampTmp,boxy + 3,(int)(short)((short)boxx - (short)clampTmp),-1,2,
+             (int)linefadeval,0x23);
+  clampTmp = TextSys_WordX(0x24c);
+  PSXDrawBrightEndLine
+            (0x232323,clampTmp + -6,boxy + 4,2,((short)midy + -0xc) - boxy,1,(int)linefadeval,0);
+  if (8 < (short)fadeCalc) {
+    fadeCalc = TextSys_WordX(0x24c);
+    clampTmp = TextSys_WordY(0x260);
+    PSXDrawSquare(0x232323,fadeCalc + -6,clampTmp + -1,2,8);
   }
-  if (8 < maxitem) {
-    PSXDrawSquare(Col,TextSys_WordX(0x24c) - 6,TextSys_WordY(0x260) - 1,2,8);
-  }
-  ::DrawBackgroundImage((tScreen *)this,0xb,0x1b,gCurrentShapes[0],0);
+  DrawBackgroundImage(&this->_base_tScreen,0xb,0x1b,gCurrentShapes,0);
   return;
 }
 
 /* ---- tScreenTrackRecords::~tScreenTrackRecords  (screentrackrec.cpp:55) ---- */
-/* W65-A3 (calltarget): dtor made IMPLICIT (declaration dropped from
- * nfs4_types.h) so every derived dtor and every scope-exit collapses to
- * ___7tScreen the way retail does; the standalone symbol gcc then stops
- * emitting is supplied here, in place, with C linkage. */
-extern "C" void ___7tScreen(void *);
-extern "C" void ___19tScreenTrackRecords(void *thisp) { ___7tScreen(thisp); }
+tScreenTrackRecords::~tScreenTrackRecords()
+
+{
+  return;
+}
 
 /* end of screentrackrec.cpp */
-
-tScreenTrackRecords *screenTrackRecords;   /* @0x800520d0; SYM EXT */

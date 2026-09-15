@@ -1,7 +1,7 @@
 /* game/psx/texture.cpp -- RECONSTRUCTED (NFS4 PSX texture/palette/CLUT/PMX loading; C++ TU)
  *   26 fns (Texture_ + FETexture_): palette sharing, CLUT alloc, PMX texture load, VRAM blit. No GTE.
  */
-#include "texture_types.h"
+#include "../../nfs4_types.h"
 #include "texture_externs.h"
 
 /* ---- Texture.obj-OWNED globals (.bss; zero in NFS4.EXE) -- DEFINED here (self-contained;
@@ -22,6 +22,18 @@ int              gNbFreePal4;            /* @0x8013db30 */
 short           *gFreePal8;              /* @0x8013db34 */
 int              gNbFreePal8;            /* @0x8013db38 */
 
+/* The PSH link is a signed 24-bit byte displacement held in bits 31..8.
+   Retail MIPS reads the word, arithmetic-shifts it by eight, then adds it
+   to the current record address. */
+static shapetbl *Texture_NextShape(shapetbl *shape)
+{
+  int link = *(int *)shape;
+  if ((link & (int)0xffffff00U) == 0) {
+    return (shapetbl *)0x0;
+  }
+  return (shapetbl *)((u_char *)shape + (link >> 8));
+}
+
 
 /* ---- Texture_InitPaletteSharing__Fv  [TEXTURE.CPP:64-70] SLD-VERIFIED ---- */
 void Texture_InitPaletteSharing(void)
@@ -29,10 +41,14 @@ void Texture_InitPaletteSharing(void)
 {
   Texture_gNum4bitPal = 0;
   Texture_gNum8bitPal = 0;
-  Texture_gP4bitPmx = reservememadr("pshare 4",0x800,0x10);
-  Texture_gP8bitPmx = reservememadr("pshare 8",0x100,0x10);
-  Texture_gPalette4bit = reservememadr("pal 4bit",0x800,0x10);
-  Texture_gPalette8bit = reservememadr("pal 8bit",0x100,0x10);
+  Texture_gP4bitPmx = (Draw_tPixMap **)reservememadr(
+      "pshare 4",0x200 * sizeof(*Texture_gP4bitPmx),0x10);
+  Texture_gP8bitPmx = (Draw_tPixMap **)reservememadr(
+      "pshare 8",0x40 * sizeof(*Texture_gP8bitPmx),0x10);
+  Texture_gPalette4bit = (char **)reservememadr(
+      "pal 4bit",0x200 * sizeof(*Texture_gPalette4bit),0x10);
+  Texture_gPalette8bit = (char **)reservememadr(
+      "pal 8bit",0x40 * sizeof(*Texture_gPalette8bit),0x10);
   return;
 }
 
@@ -62,67 +78,45 @@ int Texture_CheckForSharedPalette(int test,char *data,Draw_tPixMap *pmx,int bpp)
 {
   int i;
   int j;
-  int count;             /* SYM-CODEGEN-CARRIER: count -- a NAMED entry-count local -- gcc propagates the
-                          * literal into the inner `slti` but keeps the register
-                          * for the `beq j,count` full-match test (oracle $t4). */
-  int num; /* SYM-CODEGEN-CARRIER: num -- direct global bounds swap $t3/$t4 (16 diffs) */
   int *indata;
   int *checkdata;
 
   if (test == 0) {
     return 0;
   }
-  /* MATCH: `i = 0` lives INSIDE each arm -- gcc then knows i==0 at the
-   * strength-reduction giv init and emits a bare `lw t2,%gp_rel(table)` instead
-   * of `base + i*4`; it still cross-jumps the two zeroings into the bpp branch's
-   * delay slot exactly like the oracle. */
-  if (bpp != 0) {
-    i = 0;
-    count = 0x80;
-    num = Texture_gNum8bitPal;
-    while (1) {
-      if (!(i < num)) break;
-      indata = (int *)data;
-      /* MATCH: INDEX form Texture_gPalette8bit[i] (not a walked `pal` pointer) --
-       * loop.c strength-reduces it to the oracle's walking $t2 AND the extra `i`
-       * references lift i's allocno above it (oracle i=$t1, walker=$t2). */
-      checkdata = (int *)Texture_gPalette8bit[i];
-      j = 0;
-      /* MATCH: explicit goto-loop -- a `do { if(..) break; j++; } while(j<N)`
-       * gets rotated by gcc into an entry-jump + top increment/test; the label
-       * form reproduces the oracle's body/increment/bottom-test topology.
-       * Compare operand order is load order: *indata first. */
-inner8:
-      if (*indata++ != *checkdata++) goto done8;
-      j = j + 1;
-      if (j < 0x80) goto inner8;
-done8:
-      if (j == count) {
-        *pmx = *Texture_gP8bitPmx[i];
-        return 1;
-      }
-      i = i + 1;
-    }
-  }
-  else {
-    i = 0;
-    count = 8;
-    num = Texture_gNum4bitPal;
-    while (1) {
-      if (!(i < num)) break;
-      indata = (int *)data;
+  i = 0;
+  if (bpp == 0) {
+    for (; i < Texture_gNum4bitPal; i = i + 1) {
       checkdata = (int *)Texture_gPalette4bit[i];
       j = 0;
-inner4:
-      if (*indata++ != *checkdata++) goto done4;
-      j = j + 1;
-      if (j < 8) goto inner4;
-done4:
-      if (j == count) {
+      indata = (int *)data;
+      do {
+        if (*indata != *checkdata) break;
+        checkdata = checkdata + 1;
+        indata = indata + 1;
+        j = j + 1;
+      } while (j < 8);
+      if (j == 8) {
         *pmx = *Texture_gP4bitPmx[i];
         return 1;
       }
-      i = i + 1;
+    }
+  }
+  else {
+    for (; i < Texture_gNum8bitPal; i = i + 1) {
+      checkdata = (int *)Texture_gPalette8bit[i];
+      j = 0;
+      indata = (int *)data;
+      do {
+        if (*indata != *checkdata) break;
+        checkdata = checkdata + 1;
+        indata = indata + 1;
+        j = j + 1;
+      } while (j < 0x80);
+      if (j == 0x80) {
+        *pmx = *Texture_gP8bitPmx[i];
+        return 1;
+      }
     }
   }
   return 0;
@@ -132,19 +126,22 @@ done4:
 void Texture_AddSharedPalette(char *ptr_to_data,Draw_tPixMap *ptr_to_pmx,int bpp)
 
 {
-  /* MATCH: plain index form with the count re-read at each subscript (no
-   * palslot/pmxslot temps, no cached `n`) -- gcc CSEs the count load and the
-   * common `n*4` scaling exactly like the oracle. */
+  char **palslot;
+  Draw_tPixMap **pmxslot;
+  
   if (bpp == 0) {
+    pmxslot = Texture_gP4bitPmx + Texture_gNum4bitPal;
     Texture_gPalette4bit[Texture_gNum4bitPal] = ptr_to_data;
-    Texture_gP4bitPmx[Texture_gNum4bitPal] = ptr_to_pmx;
+    *pmxslot = ptr_to_pmx;
     Texture_gNum4bitPal = Texture_gNum4bitPal + 1;
     return;
   }
   if (bpp == 1) {
-    Texture_gPalette8bit[Texture_gNum8bitPal] = ptr_to_data;
-    Texture_gP8bitPmx[Texture_gNum8bitPal] = ptr_to_pmx;
+    palslot = Texture_gPalette8bit + Texture_gNum8bitPal;
+    pmxslot = Texture_gP8bitPmx + Texture_gNum8bitPal;
     Texture_gNum8bitPal = Texture_gNum8bitPal + 1;
+    *palslot = ptr_to_data;
+    *pmxslot = ptr_to_pmx;
   }
   return;
 }
@@ -153,20 +150,8 @@ void Texture_AddSharedPalette(char *ptr_to_data,Draw_tPixMap *ptr_to_pmx,int bpp
 void Texture_InitClut(void)
 
 {
-  /* MATCH (w40-a10, 16 -> PASS): the SYM `8c` block for this function lists
-   * EXACTLY TWO named REG locals -- `x` ($7) and `y` ($5) -- and NOTHING else.
-   * The w39 body carried invented `clut` and `cbase` locals SHARED across all
-   * three loop nests, which fused three independent compiler temps into one
-   * pseudo each and mis-coloured loop 1 (retail keeps loop 1's clut in $v1 and
-   * ORs cbase into it IN PLACE so the rotated `sll $v1,$a1,6` fills the
-   * back-edge delay slot; the shared local forced a fresh $v0 dest + a `nop`).
-   * Writing every clut/cbase as an INLINE EXPRESSION -- the SYM-faithful shape
-   * -- gives each nest its own temp and reproduces retail exactly.
-   * (Intermediate evidence: a loop-1-private `clut1` alone = 8 diffs; adding
-   * per-loop `cbase2`/`cbase3` = PASS; per-loop `y` copies REGRESS (26-35), so
-   * `y` really is the one shared counter the SYM names.  The w39 note's
-   * "source-hoisted cbase" lever and its 49-54-diff rotation dead end were
-   * both artifacts of the shared locals.) */
+  int clut;
+  int idx;
   int x;
   int y;
 
@@ -174,52 +159,76 @@ void Texture_InitClut(void)
   gNbFreePal4 = 0;
   do {
     y = 0;
-    for (; y < 0x78; y++) {
-      gFreePal4[gNbFreePal4++] = (u_short)(y * 0x40) | ((u_short)(x >> 4) & 0x3f);
-    }
+    clut = 0;
+    do {
+      y = y + 1;
+      idx = gNbFreePal4 + 1;
+      gFreePal4[gNbFreePal4] = (u_short)clut | (u_short)(x >> 4) & 0x3f;
+      clut = y * 0x40;
+      gNbFreePal4 = idx;
+    } while (y < 0x78);
     x = x + 0x10;
   } while (x < 0x100);
   x = 0;
   do {
     y = 0;
-    for (; y < 0x20; y++) {
-      gFreePal4[gNbFreePal4++] = (u_short)(0x2000 + y * 0x40) | ((u_short)(x >> 4) & 0x3f);
-    }
+    clut = 0x2000;
+    do {
+      y = y + 1;
+      idx = gNbFreePal4 + 1;
+      gFreePal4[gNbFreePal4] = (u_short)clut | (u_short)(x >> 4) & 0x3f;
+      clut = clut + 0x40;
+      gNbFreePal4 = idx;
+    } while (y < 0x20);
     x = x + 0x10;
   } while (x < 0x80);
   x = 0;
   gNbFreePal8 = 0;
   do {
     y = 0;
-    for (; y < 8; y++) {
-      gFreePal8[gNbFreePal8++] = (u_short)(0x1e00 + y * 0x40) | ((u_short)(x >> 4) & 0x3f);
-    }
+    clut = 0x1e00;
+    do {
+      y = y + 1;
+      idx = gNbFreePal8 + 1;
+      gFreePal8[gNbFreePal8] = (u_short)clut | (u_short)(x >> 4) & 0x3f;
+      gNbFreePal8 = idx;
+      clut = clut + 0x40;
+    } while (y < 8);
     x = x + 0x100;
   } while (x < 0x100);
   return;
 }
 
 /* ---- Texture_GetClutId__FiPiT1  [TEXTURE.CPP:221-254] SLD-VERIFIED ---- */
-void Texture_GetClutId(int bpp,int *xclut,int *yclut)
+extern "C" void Texture_GetClutId(int bpp,int *xclut,int *yclut)
 
 {
+  int newNb8;
+  int newNb4;
+  short *freelist;
+  int count;
+  int idx;
   short id;
-
-  /* MATCH: direct global decrement + index (no newNb4/newNb8/freelist/count
-   * scaffolding) -- the oracle zeroes `id` before the bpp branch and both arms
-   * cross-jump into one shared `base + idx*2; lhu` tail. */
+  
   id = 0;
   if (bpp == 0) {
-    if (gNbFreePal4 != 0) {
-      gNbFreePal4 = gNbFreePal4 - 1;
-      id = gFreePal4[gNbFreePal4];
-    }
+    idx = gNbFreePal4 + -1;
+    newNb8 = gNbFreePal8;
+    newNb4 = idx;
+    freelist = gFreePal4;
+    count = gNbFreePal4;
   }
   else {
-    if (gNbFreePal8 != 0) {
-      gNbFreePal8 = gNbFreePal8 - 1;
-      id = gFreePal8[gNbFreePal8];
-    }
+    idx = gNbFreePal8 + -1;
+    newNb8 = idx;
+    newNb4 = gNbFreePal4;
+    freelist = gFreePal8;
+    count = gNbFreePal8;
+  }
+  if (count != 0) {
+    id = (u_int)(u_short)freelist[idx];
+    gNbFreePal4 = newNb4;
+    gNbFreePal8 = newNb8;
   }
   *xclut = (id & 0x3f) << 4;
   *yclut = (int)(id << 0x10) >> 0x16;
@@ -231,13 +240,15 @@ void Texture_MenuReleaseClutId(short id)
 
 {
   int yclut;
-
+  
   yclut = (int)((u_int)(u_short)id << 0x10) >> 0x16;
   if (yclut < 0x1e8) {
-    gFreePal8[gNbFreePal8++] = id;
+    gFreePal8[gNbFreePal8] = id;
+    gNbFreePal8 = gNbFreePal8 + 1;
     return;
   }
-  gFreePal4[gNbFreePal4++] = id;
+  gFreePal4[gNbFreePal4] = id;
+  gNbFreePal4 = gNbFreePal4 + 1;
   return;
 }
 
@@ -245,43 +256,46 @@ void Texture_MenuReleaseClutId(short id)
 void Texture_ColorCarPalette(char *from,char *to,int numentry)
 
 {
-  numentry = numentry + -1;
-  from = from + Texture_CarColor * 0x20;
-  if (numentry != -1) {
+  int count;
+  short *src;
+  short entry;
+  
+  count = numentry + -1;
+  src = (short *)(from + Texture_CarColor * 0x20);
+  if (numentry != 0) {
     do {
-      *(short *)to = *(short *)from;
-      from = from + 2;
-      numentry = numentry + -1;
-      to = (char *)((int)to + 2);
-    } while (numentry != -1);
+      entry = *src;
+      src = src + 1;
+      count = count + -1;
+      *(short *)to = entry;
+      to = to + 2;
+    } while (count != -1);
   }
   return;
 }
 
 /* ---- Texture_CopyPalette__FPciii  [TEXTURE.CPP:339-352] SLD-VERIFIED ---- */
-/* SYM locals (no separate 'slot' local -- fold the address inline, SYM order i/dest/source).
- * `zero` is a runtime-zero device (permuter-derived, cf. methodology sec 3.13 "^ zero"):
- * a typed 0-holder shared by the counter init AND the initial-guard compare is what pins
- * i/dest onto the oracle's t0/t1 pair instead of the reverse coloring. Pin-free (plain C). */
 void Texture_CopyPalette(char *data,int width,int x,int y)
 
 {
-  short *dest;
-  int i;
+  short entry;
+  Texture_pal8bit *slot;
   short *source;
-  u_char zero; /* SYM-CODEGEN-CARRIER: zero -- pins retail's counter/destination coloring */
-
-  zero = 0;
-  i = zero;
-  (Texture_palCopy + Texture_palNum)->x = x;
-  (Texture_palCopy + Texture_palNum)->y = y;
-  dest = (Texture_palCopy + Texture_palNum)->pal;
+  int i;
+  short *dest;
+  
+  i = 0;
+  slot = Texture_palCopy + Texture_palNum;
+  dest = slot->pal;
   source = (short *)data;
-  if (zero < width) {
+  slot->x = x;
+  slot->y = y;
+  if (0 < width) {
     do {
-      *dest = *source;
+      entry = *source;
       source = source + 1;
       i = i + 1;
+      *dest = entry;
       dest = dest + 1;
     } while (i < width);
   }
@@ -293,27 +307,24 @@ void Texture_CopyPalette(char *data,int width,int x,int y)
 void Texture_ProcessPaletteCopy(Texture_pal8bit *palCopy,int palStart,int palNum)
 
 {
+  Texture_pal8bit *src;
   int i;
   RECT r;
   short tmpPal [16];
 
-  /* MATCH: INDEX form palCopy[i].* everywhere and NO `src` walker -- a walking
-   * `src` pointer makes gcc build a SECOND induction variable for `src->pal`
-   * (= src+8), costing an extra saved reg and 4 insns.  With the index form
-   * loop.c strength-reduces to the oracle's single $s0 walker (+0x208/iter) and
-   * rematerializes `s0+8` in the back-edge delay slot.  `i = i + 1` LAST (after
-   * the LoadImage call) is what puts the increment in the oracle's slot. */
   if (palCopy != (Texture_pal8bit *)0x0) {
     i = palStart;
     r.w = 0x10;
     r.h = 1;
     if (i < palNum) {
+      src = palCopy + i;
       do {
-        Texture_ColorCarPalette((char *)palCopy[i].pal,(char *)tmpPal,0x10);
-        r.x = (short)palCopy[i].x;
-        r.y = (short)palCopy[i].y;
-        LoadImage(&r,(u_long *)tmpPal);
+        Texture_ColorCarPalette((char *)src->pal,(char *)tmpPal,0x10);
+        r.x = (short)src->x;
         i = i + 1;
+        r.y = (short)src->y;
+        src = src + 1;
+        LoadImage(&r,(u_long *)tmpPal);
       } while (i < palNum);
     }
   }
@@ -335,92 +346,44 @@ void Texture_LoadImage(RECT *imgrect,u_long *p)
 void Texture_Vramf(shapetbl *shp,int x,int y,int clutx,int cluty)
 
 {
-  int rowpix; /* SYM-CODEGEN-CARRIER: rowpix -- preserves the signed row-rounding sequence */
-  int rowround; /* SYM-CODEGEN-CARRIER: rowround -- in-place rounded row width */
-  u_int kind; /* SYM-CODEGEN-CARRIER: kind -- unsigned range-test carrier */
-  shapetbl *nextshp; /* SYM-CODEGEN-CARRIER: nextshp -- list advance funnels through a temp that is
-                          * then copied into shp (oracle: addu a0,...; addu s0,a0). */
+  int rowpix;
+  int rowround;
+  u_char kind;
   RECT r;
-  int deadfrm[4]; /* SYM-CODEGEN-CARRIER: deadfrm -- SYM says fsize=80 with `r` the ONLY named AUTO
-                          * (at -0x40 => sp+0x10) and mask=$80ff0000 (ra + s0-s7,
-                          * NO $fp).  16 bytes of gcc temp space sit above `r`;
-                          * this filler reproduces the frame size. */
-
+  
   if (shp != (shapetbl *)0x0) {
     do {
       kind = *(u_char *)shp & 0xf7;
-      /* MATCH: the TEX arm is the fall-through and is emitted FIRST (the oracle
-       * hoists (y&0xfff)<<16 into $s7 BEFORE (cluty&0xfff)<<16 into $s6, which
-       * follows the RTL order of the two arm bodies); the CLUT body sits
-       * out-of-line at the beq target.  The three range tests must be SEPARATE
-       * nested ifs -- as one `&&` chain gcc folds `0x3f<kind && kind<0x44`
-       * into `(u)(kind-0x40) < 4` and drops the `0x22<kind` test entirely.
-       * The LoadImage call is written in BOTH arms; gcc cross-jumps only the
-       * `jal` itself, matching the oracle's per-arm a0/a1 setup. */
-      if (kind != 0x23) {
-        if (0x22 < kind) { if (kind < 0x44) { if (0x3f < kind) {
-          /* MATCH: two real BITFIELD assignments (lw / and ~0xfff / or x&0xfff /
-           * and 0xf000ffff / or (y&0xfff)<<16 / sw), NOT one fused
-           * `word & 0xf000f000 | ...` expression which collapses to a single
-           * `and`.
-           * MATCH (w40-a10, 18 -> PASS): the shapex write must be spelled as the
-           * RAW-WORD read-modify-write; only the shapey write stays a bitfield
-           * assignment.  MECHANISM, read off cc1's own `-dL` loop dump
-           * (`Loop from 30 to 264: 84 real insns`): with BOTH as bitfield
-           * assignments the RTL for `shp->shapex = x` is
-           *   andi r95,x,0xfff / lw r96,12(shp) / and r97,r96,r98 / ior r97,r95
-           * so the `x & 0xfff` movable has life 4 and loop.c logs
-           *   `Insn 63: regno 95 (life 4), savings 1  moved to 279`
-           * -- it hoists it into $fp, costing the extra `sw fp`/`lw fp` pair
-           * (109 vs 107) and shifting every frame offset.  Retail's loop.c
-           * refused it, exactly as ours refuses the IDENTICAL clutx movable one
-           * arm later (`Insn 163: regno 114 (life 4), savings 1 not desirable`)
-           * and the second 0xf000ffff constant (`Insn 79 ... not desirable`
-           * where the first, `Insn 67`, with the same life/savings, moved) --
-           * i.e. the cost model is STATEFUL and we sit one movable over retail's
-           * budget edge.  Writing the shapex store as `word = (word &
-           * 0xfffff000) | (x & 0xfff)` makes gcc evaluate the `|`'s LEFT operand
-           * first, so the andi lands immediately before its use (life 1) and
-           * loop.c declines it -- the same disposition retail's build reached.
-           * Byte-identical merged sequence either way (`lw / andi / and $s2 /
-           * or / and $a1 / or $s7 / sw`).  Falsified: bitfield-store order swap
-           * (35 diffs, and it inverts which mask is hoisted), flag-store first
-           * (32), r.x/r.y first (24), a block-local `xf` copy (18), an explicit
-           * `(x & 0xfff)` cast (18), raw-word RMW for shapey too (66) or for
-           * shapey only (68). */
-          *(u_int *)((char *)shp + 0xc) =
-              (*(u_int *)((char *)shp + 0xc) & 0xfffff000) | (x & 0xfff);
-          shp->shapey = y;
+      if (kind == 0x23) {
+        if (-1 < clutx) {
+          *(u_int *)&(*(u_int *)((char *)shp + 0xc)) =
+               *(u_int *)&(*(u_int *)((char *)shp + 0xc)) & 0xf000f000 | clutx & 0xfffU | (cluty & 0xfffU) << 0x10;
           *(u_char *)shp = *(u_char *)shp | 8;
-          r.x = (short)x;
-          r.y = (short)y;
-          rowpix = shp->width * shapedepth(shp);
-          rowround = rowpix + 0xf;
-          if (rowround < 0) {
-            rowround = rowpix + 0x1e;
-          }
-          r.w = (short)(rowround >> 4);
-          r.h = shp->height;
-          Texture_LoadImage(&r,(u_long *)&shp->data);
-        } } }
+          r.x = (short)clutx;
+          r.y = (short)cluty;
+          r.w = shp->width;
+          r.h = 1;
+          goto TexVramf_loadImageEmit;
+        }
       }
-      else if (-1 < clutx) {
-        shp->shapex = clutx;
-        shp->shapey = cluty;
+      else if (((0x22 < kind) && (kind < 0x44)) && (0x3f < kind)) {
+        *(u_int *)&(*(u_int *)((char *)shp + 0xc)) =
+             *(u_int *)&(*(u_int *)((char *)shp + 0xc)) & 0xf000f000 | x & 0xfffU | (y & 0xfffU) << 0x10;
         *(u_char *)shp = *(u_char *)shp | 8;
-        r.x = (short)clutx;
-        r.y = (short)cluty;
-        r.w = shp->width;
-        r.h = 1;
+        r.x = (short)x;
+        r.y = (short)y;
+        rowpix = shapedepth(shp);
+        rowpix = shp->width * rowpix;
+        rowround = rowpix + 0xf;
+        if (rowround < 0) {
+          rowround = rowpix + 0x1e;
+        }
+        r.w = (short)(rowround >> 4);
+        r.h = shp->height;
+TexVramf_loadImageEmit:
         Texture_LoadImage(&r,(u_long *)&shp->data);
       }
-      if ((*(u_int *)shp & 0xffffff00) != 0) {
-        nextshp = (shapetbl *)((int)shp + ((int)*(u_int *)shp >> 8));
-      }
-      else {
-        nextshp = (shapetbl *)0x0;
-      }
-      shp = nextshp;
+      shp = Texture_NextShape(shp);
     } while (shp != (shapetbl *)0x0);
   }
   return;
@@ -432,47 +395,34 @@ void Texture_Vramcf(shapetbl *shp,int x,int y,int clutx,int cluty)
 {
   char*s;
   int rowbytes;
-  int height;
-  int h; /* SYM-CODEGEN-CARRIER: h -- preserves the signed height copy */
-  int rowall; /* SYM-CODEGEN-CARRIER: rowall -- masked row width reused by both paths */
-  int off; /* SYM-CODEGEN-CARRIER: off -- shared row-tail byte offset */
-  short ybot; /* SYM-CODEGEN-CARRIER: ybot -- shared bottom-row coordinate */
+  u_short height;
+  int rowall;
+  int off;
+  short ybot;
   RECT r;
 
-  /* MATCH: mask INTO rowall (ONE statement) -- the oracle parks the MASKED value
-   * in the callee-saved reg and derives BOTH rowbytes and r.w from it. */
-  rowall = (shp->width * shapedepth(shp) + 0xf) & 0xfffffff0;
-  rowbytes = (int)rowall >> 3;
-  /* MATCH: the odd/simple case is the BRANCH TARGET (beqz/bnez skip forward) and
-   * the two-blit path is the FALL-THROUGH, with a SECOND textual Vramf call laid
-   * out after it -- an `if (simple) {...} else {...}` inverts both. */
-  if ((rowbytes & 2) != 0) {
-    height = (u_short)shp->height;
-    if ((height & 1) == 0) {
-      h = (short)height;
-      off = (h + -1) * rowbytes;
-      /* MATCH: ONE base pointer (&shp->data + off) reused as s-2 / s+2 -- the
-       * SYM names it `s`; separate (char*)shp + 0xe/0x12 + off forms build two
-       * independent addu chains. */
-      s = &shp->data + off;
-      ybot = y + h;
-      r.y = ybot + -2;
-      r.x = (short)x;
-      r.w = 1;
-      r.h = 2;
-      LoadImage(&r,(u_long *)(s + -2));
-      r.x = (short)x + 1;
-      r.y = ybot + -1;
-      r.w = ((int)rowall >> 4) + -1;
-      r.h = 1;
-      LoadImage(&r,(u_long *)(s + 2));
-      shp->height = shp->height + -1;
-      Texture_Vramf(shp,x,y,clutx,cluty);
-      shp->height = h;
-      return;
-    }
+  rowall = shp->width * shapedepth(shp) + 0xf;
+  rowbytes = (int)(rowall & 0xfffffff0) >> 3;
+  if (((rowbytes & 2) == 0) || (height = shp->height, (height & 1) != 0)) {
+    Texture_Vramf(shp,x,y,clutx,cluty);
   }
-  Texture_Vramf(shp,x,y,clutx,cluty);
+  else {
+    off = ((short)height + -1) * rowbytes;
+    ybot = (short)y + height;
+    r.y = ybot + -2;
+    r.w = 1;
+    r.h = 2;
+    r.x = (short)x;
+    LoadImage(&r,(u_long *)((char *)shp + 0xe + off));
+    r.x = (short)x + 1;
+    r.y = ybot + -1;
+    r.w = ((int)rowall >> 4) + -1;
+    r.h = 1;
+    LoadImage(&r,(u_long *)((char *)shp + 0x12 + off));
+    shp->height = shp->height + -1;
+    Texture_Vramf(shp,x,y,clutx,cluty);
+    shp->height = height;
+  }
   return;
 }
 
@@ -480,90 +430,64 @@ void Texture_Vramcf(shapetbl *shp,int x,int y,int clutx,int cluty)
 int Texture_GetTranslucencyMode(shapetbl *shp)
 
 {
-  u_short abr;
-
-  /* MATCH (w40-a10, 4 -> PASS): `return 0` must be the loop's POST-EXIT
-   * fall-through (`if (shp == 0) break;` + a trailing `return 0;`), NOT an
-   * inline early-return inside the guard.  Written inline, gcc's post-reload
-   * cross-jump pass merges the two `jr ra` tails (`move v0,0; jr ra` and the
-   * bare `jr ra`), leaving `move v0,0; j <shared tail>`; reorg then EAGER-
-   * STEALS that `move` into the `beqz $a0` delay slot -- 28 insns vs the
-   * oracle's 30, with the oracle's separate `.L800DFF08: jr ra; addu v0,zero,
-   * zero` block gone.  As the post-loop block it stays its own return block
-   * and dbr fills its OWN `jr ra` slot with the `move`.  (This REFUTES the
-   * catalog's "dual `jr ra` tails always cross-jump-merge" negative for this
-   * shape; `goto ret0;`+label and the `else { return 0; }` arm PASS too, the
-   * `return 0` position is what matters, not the spelling.  A named `zero`
-   * local instead regresses to 9.)
-   * NOTE the clamp must stay IN PLACE (`if (abr == 3) abr = 2;` then one
-   * return): jump-opt splits it into the oracle's own `bne v0,a3,.L800DFF10;
-   * jr ra; addiu v0,2` tail.  Explicit two-return spellings measured
-   * 14/16/19. */
+  u_int abr;
+  
   while( true ) {
-    if (shp == (shapetbl *)0x0) break;
-    if (*(char *)shp == 'k') {
-      abr = (u_short)shp->width >> 5 & 3;
-      if (abr == 3) { abr = 2; }
-      return abr;
+    if (shp == (shapetbl *)0x0) {
+      return 0;
     }
-    if ((*(u_int *)shp & 0xffffff00) != 0) {
-      shp = (shapetbl *)((int)&(*(u_int *)((char *)shp + 0x0)) + ((int)*(u_int *)shp >> 8));
-    }
-    else {
-      shp = (shapetbl *)0x0;
-    }
+    if (*(char *)shp == 'k') break;
+    shp = Texture_NextShape(shp);
   }
-  return 0;
+  abr = (u_short)shp->width >> 5 & 3;
+  if (abr == 3) {
+    return 2;
+  }
+  return abr;
 }
 
 /* ---- Texture_LoadPmx__FPcT0iiiiiP12Draw_tPixMap  [TEXTURE.CPP:538-667] SLD-FLAG:NONMONO ---- */
-void Texture_LoadPmx(char *f,char *n,int ctrl,int rx,int ry,int cx,int cy,Draw_tPixMap *pmx)
+extern "C" void Texture_LoadPmx(char *f,char *n,int ctrl,int rx,int ry,int cx,int cy,Draw_tPixMap *pmx)
 
 {
-  /* SYM-driven local set (rule 8): shpptr=$s0 x=$s5 y=$s6 u=$a0 v=$a1 h=$fp
-   * bpp=$s4 clutptr=$s1, and the AUTO spill slots w@sp+24 rotated@sp+28
-   * bshapex@32 bshapey@36 bwidth@40 bheight@44 bpp_real@48 bwidthclut@52.
-   * The earlier reconstruction folded all of these into inline expressions and
-   * came out 316 diffs; materializing them as real C locals (with bshapex/
-   * bshapey/clutptr as the 12-bit `shapex`/`shapey`/`next` BITFIELDS rather
-   * than hand-rolled shifts and a `paloff` int) is the whole match. */
-  shapetbl *shpptr;
-  int x;
-  int y;
-  int u;
-  int v;
-  int w;
-  int h;
   int rotated;
-  int bpp;
   int bshapex;
   int bshapey;
   int bwidth;
   int bheight;
+  int bpp_real;
+  shapetbl*clutptr;
+  int bwidthclut;
+  shapetbl *shpptr;
+  u_char typebyte;
+  int bpp;
+  short savew;
+  short saveh;
+  u_int flags;
+  int x;
+  int y;
+  int w;
+  int h;
+  short palw;
+  short palmode;
+  int transmode;
+  int u;
+  int v;
+  int xwrap;
 
+  shpptr = (shapetbl *)n;
   if (f != (char *)0x0) {
     shpptr = (shapetbl *)locateshapez(f,n);
   }
-  else {
-    shpptr = (shapetbl *)n;
-  }
   if (shpptr != (shapetbl *)0x0) {
-    int bpp_real;
-
-    bshapex = shpptr->shapex;
-    bshapey = shpptr->shapey;
-    bpp = shpptr->type & 3;
-    bpp_real = bpp;
-    bwidth = shpptr->width;
-    bheight = shpptr->height;
-    if (((ctrl & 8U) != 0) && (bpp_real != 0)) {
+    flags = *(u_int *)((char *)shpptr + 0xc);
+    typebyte = *(u_char *)shpptr;
+    savew = shpptr->width;
+    saveh = shpptr->height;
+    bpp = typebyte & 3;
+    if (((ctrl & 8U) != 0) && ((typebyte & 3) != 0)) {
       bpp = 0;
     }
-    /* MATCH: the masked word goes through its OWN temp before the != 0 test --
-     * a direct `(word & 0x4000) != 0` lets gcc fold the single-bit test into
-     * `srl 14; andi 1`; the temp keeps the oracle's `andi 0x4000; sltu zero,v0`. */
-    { int fl = *(u_int *)((char *)shpptr + 0xc) & 0x4000; /* SYM-CODEGEN-CARRIER: fl -- blocks single-bit fold */
-      rotated = (fl != 0); }
     if (rx == -1) {
       x = 0;
       y = 0xa0;
@@ -571,33 +495,35 @@ void Texture_LoadPmx(char *f,char *n,int ctrl,int rx,int ry,int cx,int cy,Draw_t
       shpptr->height = 1;
     }
     else {
-      x = shpptr->shapex + rx;
-      y = shpptr->shapey + ry;
+      x = ((int)(flags << 0x14) >> 0x14) + rx;
+      y = ((int)(flags << 4) >> 0x14) + ry;
     }
-    w = shpptr->width;
-    h = shpptr->height;
+    w = (u_char)shpptr->width;
+    h = (u_char)shpptr->height;
     if ((ctrl & 1U) == 0) {
       w = w + -1;
       h = h + -1;
     }
-    if (bpp != 2) {
-      shapetbl *clutptr;
-      int bwidthclut;
-
-      clutptr = (shapetbl *)((int)shpptr + (*(int *)shpptr >> 8));
-      bwidthclut = clutptr->width;
+    if (bpp == 2) {
+      Texture_Vramcf(shpptr,x,y,0,0);
+    }
+    else {
+      clutptr = Texture_NextShape(shpptr);
+      palw = clutptr->width;
       if (bpp == 0) {
-        clutptr->width = 0x10;
+        palmode = 0x10;
       }
       else {
-        clutptr->width = 0x100;
+        palmode = 0x100;
       }
+      clutptr->width = palmode;
       if (Texture_CheckForSharedPalette(ctrl & 0x40,&clutptr->data,pmx,bpp) == 0) {
         if (cx == -1) {
           Texture_GetClutId(bpp,&cx,&cy);
         }
         else if (cx == -3) {
-          pmx->pad2 = (u_short)TextureProcess_DepthColorCluts(&clutptr->data,clutptr->width);
+          pmx->pad2 = (u_short)TextureProcess_DepthColorCluts(&clutptr->data,
+                             (int)clutptr->width);
         }
         else if (cx == -2) {
           cy = 0xa0;
@@ -605,24 +531,22 @@ void Texture_LoadPmx(char *f,char *n,int ctrl,int rx,int ry,int cx,int cy,Draw_t
           clutptr->width = 1;
         }
         if ((ctrl & 2U) != 0) {
-          pmx->flag = (u_short)(TextureProcess_TransColorCheck(&clutptr->data,clutptr->width) << 1);
+          pmx->flag = (u_short)(TextureProcess_TransColorCheck(&clutptr->data,
+                             (int)clutptr->width) << 1);
         }
-        if (((ctrl & 8U) != 0) && (bpp_real != 0)) {
+        if (((ctrl & 8U) != 0) && ((typebyte & 3) != 0)) {
           if (Texture_palCopy != (Texture_pal8bit *)0x0) {
-            Texture_CopyPalette(&clutptr->data,bwidthclut,cx,cy);
+            Texture_CopyPalette(&clutptr->data,(int)palw,cx,cy);
           }
           if ((ctrl & 0x10U) != 0) {
             Texture_ColorCarPalette(&clutptr->data,&clutptr->data,0x10);
           }
         }
-        /* MATCH: GetClut arm FIRST -- the oracle keeps two separate
-         * `sh v0,2(s2)` stores (the fall-through one sits in a `j`'s delay
-         * slot); with the 0xffff arm first gcc cross-jumps them into one. */
-        if (0 <= cx) {
-          pmx->clut = GetClut(cx,cy);
+        if (cx < 0) {
+          pmx->clut = 0xffff;
         }
         else {
-          pmx->clut = 0xffff;
+          pmx->clut = GetClut(cx,cy);
         }
         if ((ctrl & 0x40U) != 0) {
           Texture_AddSharedPalette(&clutptr->data,pmx,bpp);
@@ -634,44 +558,48 @@ void Texture_LoadPmx(char *f,char *n,int ctrl,int rx,int ry,int cx,int cy,Draw_t
       else {
         Texture_Vramcf(shpptr,x,y,cx,cy);
       }
-      clutptr->width = (short)bwidthclut;
+      clutptr->width = palw;
     }
-    else {
-      Texture_Vramcf(shpptr,x,y,0,0);
+    transmode = Texture_GetTranslucencyMode(shpptr);
+    pmx->tpage = GetTPage(bpp,transmode,x,y);
+    xwrap = x;
+    if (x < 0) {
+      xwrap = x + 0x3f;
     }
-    pmx->tpage = GetTPage(bpp,Texture_GetTranslucencyMode(shpptr),x,y);
-    u = x % 0x40;
-    v = y % 0x100;
+    x = x + (xwrap >> 6) * -0x40;
     if (bpp == 0) {
-      u = u * 4;
+      x = x * 4;
     }
+    u = (u_char)x;
     if (bpp == 1) {
-      u = u << 1;
+      u = (u_char)(x << 1);
     }
-    if (rotated != 0) {
-      pmx->u0 = u;
-      pmx->v0 = v + h;
-      pmx->u1 = u;
-      pmx->v1 = v;
-      pmx->u2 = u + w;
-      pmx->v2 = v + h;
-      pmx->u3 = u + w;
-      pmx->v3 = v;
-    }
-    else {
+    v = (u_char)y;
+    if ((flags & 0x4000) == 0) {
       pmx->u0 = u;
       pmx->v0 = v;
-      pmx->u1 = u + w;
+      pmx->u1 = u + (char)w;
       pmx->v1 = v;
       pmx->u2 = u;
-      pmx->v2 = v + h;
-      pmx->u3 = u + w;
-      pmx->v3 = v + h;
+      pmx->v2 = v + (char)h;
+      pmx->u3 = u + (char)w;
+      pmx->v3 = v + (char)h;
     }
-    shpptr->width = (short)bwidth;
-    shpptr->height = (short)bheight;
-    shpptr->shapex = bshapex;
-    shpptr->shapey = bshapey;
+    else {
+      pmx->u0 = u;
+      pmx->v0 = v + (char)h;
+      pmx->u1 = u;
+      pmx->v1 = v;
+      pmx->u2 = u + (char)w;
+      pmx->v2 = v + (char)h;
+      pmx->u3 = u + (char)w;
+      pmx->v3 = v;
+    }
+    shpptr->width = savew;
+    shpptr->height = saveh;
+    *(u_int *)((char *)shpptr + 0xc) =
+         *(u_int *)((char *)shpptr + 0xc) & 0xf000f000 | (u_int)((int)(flags << 0x14) >> 0x14) & 0xfffU |
+         (((u_int)((int)(flags << 4) >> 0x14) & 0xfffU) << 0x10);
   }
   return;
 }
@@ -680,40 +608,39 @@ void Texture_LoadPmx(char *f,char *n,int ctrl,int rx,int ry,int cx,int cy,Draw_t
 void Texture_CloneUVPmx(Draw_tPixMap *pmx,int mode,Draw_tPixMap *rpmx)
 
 {
-  /* MATCH: each u/v pair is copied as ONE 16-bit unit (oracle: lhu/sh at
-   * 0/4/8/0xC) -- the per-byte `t = pmx->vN; rpmx->uM = pmx->uN; rpmx->vM = t;`
-   * form emits 3 insns per pair (110 insns vs 88). */
+  u_char t;
+
   *rpmx = *pmx;
   switch(mode) {
   case 0:
-    *(u_short *)&rpmx->u0 = *(u_short *)&pmx->u1;
-    *(u_short *)&rpmx->u1 = *(u_short *)&pmx->u0;
-    *(u_short *)&rpmx->u2 = *(u_short *)&pmx->u3;
-    *(u_short *)&rpmx->u3 = *(u_short *)&pmx->u2;
+    t = pmx->v1; rpmx->u0 = pmx->u1; rpmx->v0 = t;
+    t = pmx->v0; rpmx->u1 = pmx->u0; rpmx->v1 = t;
+    t = pmx->v3; rpmx->u2 = pmx->u3; rpmx->v2 = t;
+    t = pmx->v2; rpmx->u3 = pmx->u2; rpmx->v3 = t;
     return;
   case 1:
-    *(u_short *)&rpmx->u3 = *(u_short *)&pmx->u1;
-    *(u_short *)&rpmx->u1 = *(u_short *)&pmx->u3;
-    *(u_short *)&rpmx->u2 = *(u_short *)&pmx->u0;
-    *(u_short *)&rpmx->u0 = *(u_short *)&pmx->u2;
+    t = pmx->v1; rpmx->u3 = pmx->u1; rpmx->v3 = t;
+    t = pmx->v3; rpmx->u1 = pmx->u3; rpmx->v1 = t;
+    t = pmx->v0; rpmx->u2 = pmx->u0; rpmx->v2 = t;
+    t = pmx->v2; rpmx->u0 = pmx->u2; rpmx->v0 = t;
     return;
   case 2:
-    *(u_short *)&rpmx->u0 = *(u_short *)&pmx->u2;
-    *(u_short *)&rpmx->u1 = *(u_short *)&pmx->u0;
-    *(u_short *)&rpmx->u3 = *(u_short *)&pmx->u1;
-    *(u_short *)&rpmx->u2 = *(u_short *)&pmx->u3;
+    t = pmx->v2; rpmx->u0 = pmx->u2; rpmx->v0 = t;
+    t = pmx->v0; rpmx->u1 = pmx->u0; rpmx->v1 = t;
+    t = pmx->v1; rpmx->u3 = pmx->u1; rpmx->v3 = t;
+    t = pmx->v3; rpmx->u2 = pmx->u3; rpmx->v2 = t;
     return;
   case 3:
-    *(u_short *)&rpmx->u0 = *(u_short *)&pmx->u3;
-    *(u_short *)&rpmx->u1 = *(u_short *)&pmx->u2;
-    *(u_short *)&rpmx->u3 = *(u_short *)&pmx->u0;
-    *(u_short *)&rpmx->u2 = *(u_short *)&pmx->u1;
+    t = pmx->v3; rpmx->u0 = pmx->u3; rpmx->v0 = t;
+    t = pmx->v2; rpmx->u1 = pmx->u2; rpmx->v1 = t;
+    t = pmx->v0; rpmx->u3 = pmx->u0; rpmx->v3 = t;
+    t = pmx->v1; rpmx->u2 = pmx->u1; rpmx->v2 = t;
     return;
   case 4:
-    *(u_short *)&rpmx->u0 = *(u_short *)&pmx->u1;
-    *(u_short *)&rpmx->u1 = *(u_short *)&pmx->u3;
-    *(u_short *)&rpmx->u3 = *(u_short *)&pmx->u2;
-    *(u_short *)&rpmx->u2 = *(u_short *)&pmx->u0;
+    t = pmx->v1; rpmx->u0 = pmx->u1; rpmx->v0 = t;
+    t = pmx->v3; rpmx->u1 = pmx->u3; rpmx->v1 = t;
+    t = pmx->v2; rpmx->u3 = pmx->u2; rpmx->v3 = t;
+    t = pmx->v0; rpmx->u2 = pmx->u0; rpmx->v2 = t;
   }
   return;
 }
@@ -731,88 +658,84 @@ void Texture_InitTrackTexture(void)
 }
 
 /* ---- Texture_InitMenuClut__Fv  [TEXTURE.CPP:743-776] SLD-VERIFIED ---- */
-void Texture_InitMenuClut(void)
+extern "C" void Texture_InitMenuClut(void)
 
 {
-  short *pal4; /* SYM-CODEGEN-CARRIER: pal4 -- loop pointer base */
-  short *pal8; /* SYM-CODEGEN-CARRIER: pal8 -- second-loop pointer base */
-  u_short clut; /* SYM-CODEGEN-CARRIER: clut -- in-place CLUT sequence value */
-  int cbase; /* SYM-CODEGEN-CARRIER: cbase -- source-hoisted loop invariant */
+  short *pal4;
+  short *pal8;
+  int idx;
+  u_short clut;
   int y;
   int x;
   
-  gFreePal4 = reservememadr("4 bits cluts",0x300,0);
-  gFreePal8 = reservememadr("8 bits cluts",0x1180,0);
+  gFreePal4 = (short *)reservememadr("4 bits cluts",0x300,0);
+  gFreePal8 = (short *)reservememadr("8 bits cluts",0x1180,0);
   pal4 = gFreePal4;
-  /* MATCH: no `idx` temp (read/increment the counter global in place) and
-   * `pal8 = gFreePal8` loaded once BEFORE the SECOND loop, not inside the first
-   * one -- the misplaced load forced an extra `addu t2,v0,zero` copy of the
-   * reservememadr result (40 -> 14 diffs).
-   * PASS (w39-a10, was 14).  The last three insns came from:
-   *  (a) counter POST-INCREMENT `palN[gNbFreePalN++] = ...` (14 -> 10): puts
-   *      `addiu v1,v1,1` before `addu v0,v0,t1` and frees the counter load's
-   *      delay slot for `y++`;
-   *  (b) inner loop as `for (clut = K; y < N; y++)` with `y = 0` on its own
-   *      line before it (10 -> 4);
-   *  (c) SOURCE-HOISTED `cbase = (u_short)(x + 0x200 >> 4) & 0x3f;` as its own
-   *      statement BEFORE the clut init (4 -> 0).  loop.c appends its hoisted
-   *      copy of an in-expression invariant AFTER the preheader statements, so
-   *      the `li a1,<clut>` came out ahead of the andi chain; retail has the
-   *      andi chain first, which only a real source-level hoist reproduces. */
   x = 0;
   gNbFreePal4 = 0;
   do {
     y = 0;
-    cbase = (u_short)(x + 0x200 >> 4) & 0x3f;
-    for (clut = 0x7a00; y < 0x18; y++) {
-      pal4[gNbFreePal4++] = clut | cbase;
+    clut = 0x7a00;
+    do {
+      y = y + 1;
+      idx = gNbFreePal4 + 1;
+      pal4[gNbFreePal4] = clut | (u_short)(x + 0x200 >> 4) & 0x3f;
+      pal8 = gFreePal8;
       clut = clut + 0x40;
-    }
+      gNbFreePal4 = idx;
+    } while (y < 0x18);
     x = x + 0x10;
   } while (x < 0x100);
-  pal8 = gFreePal8;
-  pal8 = gFreePal8;
   x = 0;
   gNbFreePal8 = 0;
   do {
     y = 0;
-    cbase = (u_short)(x + 0x200 >> 4) & 0x3f;
-    for (clut = 0x5700; y < 0x8c; y++) {
-      pal8[gNbFreePal8++] = clut | cbase;
+    clut = 0x5700;
+    do {
+      y = y + 1;
+      idx = gNbFreePal8 + 1;
+      pal8[gNbFreePal8] = clut | (u_short)(x + 0x200 >> 4) & 0x3f;
+      gNbFreePal8 = idx;
       clut = clut + 0x40;
-    }
+    } while (y < 0x8c);
     x = x + 0x100;
   } while (x < 0x100);
   return;
 }
 
 /* ---- Texture_InitMenuTexture__Fv  [TEXTURE.CPP:792-795] SLD-VERIFIED ---- */
-void Texture_InitMenuTexture(void)
+extern "C" void Texture_InitMenuTexture(void)
 
 {
+  Draw_tPixMap **ppDVar1;
   int i;
-
+  
   i = 7;
+  ppDVar1 = gMenuPixmap + 7;
   do {
-    gMenuPixmap[i] = (Draw_tPixMap *)0x0;
+    *ppDVar1 = (Draw_tPixMap *)0x0;
     i = i + -1;
+    ppDVar1 = ppDVar1 + -1;
   } while (-1 < i);
   return;
 }
 
 /* ---- Texture_CleanupMenuTexture__Fv  [TEXTURE.CPP:799-807] SLD-VERIFIED ---- */
-void Texture_CleanupMenuTexture(void)
+extern "C" void Texture_CleanupMenuTexture(void)
 
 {
+  Draw_tPixMap **ppDVar1;
   int i;
   
   i = 0;
+  ppDVar1 = gMenuPixmap;
   do {
-    if (gMenuPixmap[i] != (Draw_tPixMap *)0x0) {
-      Texture_MenuReleaseClutId(gMenuPixmap[i]->clut);
+    if (*ppDVar1 != (Draw_tPixMap *)0x0) {
+      Texture_MenuReleaseClutId((*ppDVar1)->clut);
     }
-    gMenuPixmap[i] = (Draw_tPixMap *)0x0;
+    *ppDVar1 = (Draw_tPixMap *)0x0;
     i = i + 1;
+    ppDVar1 = ppDVar1 + 1;
   } while (i < 8);
   return;
 }
@@ -821,27 +744,28 @@ void Texture_CleanupMenuTexture(void)
 void Texture_LoadMenuTexture(void)
 
 {
+  char *shapefile;
   Draw_tPixMap *pmx;
   char *shpfile;
   char name [255];
-
+  
   if (gMenuPixmap[0] == (Draw_tPixMap *)0x0) {
     sprintf(name,"%sshow.psh",Paths_Paths[0x19]);
-    shpfile = (char *)loadfileadr(name,0);
+    shapefile = (char *)loadfileadr(name,0);
     Texture_ResetPaletteSharing();
-    Texture_LoadPmx(shpfile,"show",0,0x380,0x180,-1,-1,gMenuPixmapAlloc);
+    Texture_LoadPmx(shapefile,"show",0,0x380,0x180,-1,-1,gMenuPixmapAlloc);
     gMenuPixmap[0] = gMenuPixmapAlloc;
-    Texture_LoadPmx(shpfile,"shad",0,0x380,0x180,-1,-1,gMenuPixmapAlloc + 1);
+    Texture_LoadPmx(shapefile,"shad",0,0x380,0x180,-1,-1,gMenuPixmapAlloc + 1);
     gMenuPixmap[1] = gMenuPixmapAlloc + 1;
-    Texture_LoadPmx(shpfile,"lgt3",0,0x380,0x180,-1,-1,gMenuPixmapAlloc + 2);
+    Texture_LoadPmx(shapefile,"lgt3",0,0x380,0x180,-1,-1,gMenuPixmapAlloc + 2);
     gMenuPixmap[3] = gMenuPixmapAlloc + 2;
-    Texture_LoadPmx(shpfile,"lgta",0,0x380,0x180,-1,-1,gMenuPixmapAlloc + 3);
+    Texture_LoadPmx(shapefile,"lgta",0,0x380,0x180,-1,-1,gMenuPixmapAlloc + 3);
     gMenuPixmap[4] = gMenuPixmapAlloc + 3;
-    Texture_LoadPmx(shpfile,"lgtb",0,0x380,0x180,-1,-1,gMenuPixmapAlloc + 4);
+    Texture_LoadPmx(shapefile,"lgtb",0,0x380,0x180,-1,-1,gMenuPixmapAlloc + 4);
     gMenuPixmap[5] = gMenuPixmapAlloc + 4;
-    Texture_LoadPmx(shpfile,"lgtc",0,0x380,0x180,-1,-1,gMenuPixmapAlloc + 5);
+    Texture_LoadPmx(shapefile,"lgtc",0,0x380,0x180,-1,-1,gMenuPixmapAlloc + 5);
     gMenuPixmap[6] = gMenuPixmapAlloc + 5;
-    purgememadr(shpfile);
+    purgememadr(shapefile);
   }
   return;
 }
@@ -854,9 +778,19 @@ void Texture_KillTrackTexture(void)
 }
 
 /* ---- Texture_KillMenuTexture__Fv  [TEXTURE.CPP:855-858] SLD-VERIFIED ---- */
-void Texture_KillMenuTexture(void)
+extern "C" void Texture_KillMenuTexture(void)
 
 {
+  u_short abr;
+  int u;
+  int v;
+  int *checkdata;
+  int *indata;
+  short *dest;
+  int height;
+  char *shpfile;
+  char name [255];
+  
   purgememadr(gFreePal4);
   purgememadr(gFreePal8);
   return;

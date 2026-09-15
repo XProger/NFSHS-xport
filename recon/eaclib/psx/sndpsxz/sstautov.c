@@ -3,22 +3,24 @@
  *   1 fn @0x800E9DE8.  SNDSTRM_autovol -- set a stream's auto-volume ramp.  Ghidra nfs4-f.exe.c + IDA sig
  *   (`this` is the stream tag).
  */
-extern int  sndgs[];
-extern int  iSNDstreamgetstreamptr(int tag);    /* sst */
-extern void SNDautovol(int chan, int steps, int targetVol);   /* sautovol */
+#include "../../../lib/snd.h"
 
-extern int SNDSTRM_autovol(int tag, int steps, int vol);   /* @0x800E9DE8 */
+extern "C" int  sndgs[];
+extern "C" SndStreamState *iSNDstreamgetstreamptr(int tag); /* sst */
+extern "C" void SNDautovol(int chan, int steps, int targetVol);   /* sautovol */
+
+extern "C" int SNDSTRM_autovol(int tag, int steps, int vol);   /* @0x800E9DE8 */
 
 /* SNDSTRM_autovol @0x800E9DE8 : store the target vol (+0x54) and start an auto-volume ramp over steps/10. */
-extern int SNDSTRM_autovol(int tag, int steps, int vol)
+extern "C" int SNDSTRM_autovol(int tag, int steps, int vol)
 {
-    int s;
-    if ((signed char)sndgs[0xf] == '\0')
+    SndStreamState *s;
+    if ((char)sndgs[0xf] == '\0')
         return -10;
     s = iSNDstreamgetstreamptr(tag);
     if (s == 0)
         return -8;
-    *(char *)(s + 0x54) = (char)vol;
-    SNDautovol(*(int *)(s + 8), steps / 10, vol);
+    ((signed char *)s->params)[8] = (signed char)vol;
+    SNDautovol(s->playResult, steps / 10, vol);
     return 0;
 }

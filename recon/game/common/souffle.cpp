@@ -2,16 +2,8 @@
  *   10 fns: Get/Move AngleWind, GetGustWind, Souffle_Add/DoSouffle/CircleClip/InsertFacet,
  *   Init/Restart/Kill TrackSouffle. GTE-free. Full SYM-locals applied.
  */
-#include "souffle_types.h"
+#include "../../nfs4_types.h"
 #include "souffle_externs.h"
-
-/* gp-rel owning-TU defs: these small (<=G4) globals are extern-declared
- * but OWNED here; tentative defs -> cc1 `.comm` -> stock maspsx gp-rels them
- * (matches the oracle's %gp_rel). section 3.12 #6. (auto: gen_gprel_defs.py) */
-Souffle_tISouffle *gISouffle;
-int gCISouffle;
-int gTMoveSouffle;
-int gWindDir;
 
 /* ---- intra-TU forward declarations (auto-emitted, signature-exact) ---- */
 void GetGustWind(Souffle_tISouffle *is);
@@ -58,13 +50,16 @@ void GetAngleWind(Souffle_tISouffle *is)
 void MoveAngleWind(Souffle_tISouffle *is)
 
 {
-  is->angle = is->angle + is->aspeed;
-  if (is->aspeed < -8) {
-    is->aspeed = is->aspeed + 1;
+  int iVar1;
+  
+  iVar1 = is->aspeed;
+  is->angle = is->angle + iVar1;
+  if (iVar1 < -8) {
+    is->aspeed = iVar1 + 1;
     return;
   }
-  if (8 < is->aspeed) {
-    is->aspeed = is->aspeed + -1;
+  if (8 < iVar1) {
+    is->aspeed = iVar1 + -1;
   }
   return;
 }
@@ -75,89 +70,114 @@ Souffle_Add(coorddef *soufflept,int type,coorddef *vec,int velVX,int ground,int 
 
 {
   int i;
-  int limit;
+  int iVar1;
+  u_char bVar2;
   int maxc;
   int inserti;
+  int iVar3;
+  int iVar4;
   Souffle_tISouffle *is;
+  Souffle_tISouffle *pSVar5;
   coorddef vempty;
-
-  inserti = 0;
+  
+  iVar3 = 0;
   if (gCISouffle == 0x3c) {
-    i = 1;
-    limit = 0x3c;
-    maxc = gISouffle[0].cycle;
-    while (i < limit) {
-      if (gISouffle[i].cycle < maxc) {
-        inserti = i;
-        maxc = gISouffle[i].cycle;
+    iVar1 = 1;
+    bVar2 = gISouffle->cycle;
+    pSVar5 = gISouffle;
+    do {
+      if ((u_char)pSVar5[1].cycle < bVar2) {
+        iVar3 = iVar1;
+        bVar2 = pSVar5[1].cycle;
       }
-      i++;
-    }
+      iVar1 = iVar1 + 1;
+      pSVar5 = pSVar5 + 1;
+    } while (iVar1 < 0x3c);
   }
   else {
-    inserti = gCISouffle;
+    iVar3 = gCISouffle;
     gCISouffle = gCISouffle + 1;
   }
-
-  is = gISouffle + inserti;
-  is->source = *soufflept;
-  is->cycle = 0;
-  is->type = type;
-  is->id = inserti;
-  is->ground = ground;
-  is->colour = colour;
-
+  pSVar5 = gISouffle + iVar3;
+  iVar1 = soufflept->y;
+  iVar4 = soufflept->z;
+  (pSVar5->source).x = soufflept->x;
+  (pSVar5->source).y = iVar1;
+  (pSVar5->source).z = iVar4;
+  pSVar5->cycle = '\0';
+  pSVar5->type = (char)type;
+  pSVar5->id = (char)iVar3;
+  pSVar5->ground = ground;
+  pSVar5->colour = colour;
   if (vec == (coorddef *)0x0) {
     vec = &vempty;
     vempty.x = 0;
     vempty.y = 0;
     vempty.z = 0;
   }
-
-  switch (type) {
-  case 1:
-  case 2:
-  case 3:
-  case 6:
-    GetGustWind(is);
-    is->wind = 1;
-    GetAngleWind(is);
-    break;
-
-  case 4:
-  case 8:
-  case 10:
-  case 12:
-    is->rndpixmap = velVX;
-    /* fall through */
-  case 7:
-  case 9:
-  case 11:
-  case 13:
-  case 14:
-  case 0x101:
-    is->motion.x = vec->x >> 5;
-    is->motion.y = vec->y >> 6;
-    is->motion.z = vec->z >> 5;
-    is->wind = 0;
-    GetAngleWind(is);
-    break;
+  if (type == 9) goto Souffle_setMotion;
+  if (type < 10) {
+    if (type == 4) {
+Souffle_setRndPixmap:
+      pSVar5->rndpixmap = velVX;
+      goto Souffle_setMotion;
+    }
+    if (type < 5) {
+      if (type < 1) goto Souffle_emitAndReturn;
+    }
+    else {
+      if (type == 7) goto Souffle_setMotion;
+      if (7 < type) goto Souffle_setRndPixmap;
+      if (type != 6) goto Souffle_emitAndReturn;
+    }
+    GetGustWind(pSVar5);
+    pSVar5->wind = '\x01';
   }
-
-  Sfx_Add(is);
-  return is;
+  else {
+    if (type == 0xc) goto Souffle_setRndPixmap;
+    if (type < 0xd) {
+      if (type == 10) goto Souffle_setRndPixmap;
+      if (type != 0xb) goto Souffle_emitAndReturn;
+    }
+    else if ((0xe < type) && (type != 0x101)) goto Souffle_emitAndReturn;
+Souffle_setMotion:
+    (pSVar5->motion).x = vec->x >> 5;
+    (pSVar5->motion).y = vec->y >> 6;
+    iVar3 = vec->z;
+    pSVar5->wind = '\0';
+    (pSVar5->motion).z = iVar3 >> 5;
+  }
+  GetAngleWind(pSVar5);
+Souffle_emitAndReturn:
+  Sfx_Add(pSVar5);
+  return pSVar5;
 }
 
 /* ---- Souffle_DoSouffle__Fv  [SOUFFLE.CPP:176-295] SLD-VERIFIED ---- */
 void Souffle_DoSouffle(void)
 
 {
+  char cVar1;
   int iVar2;
+  Souffle_tISouffle *pSVar3;
+  int speed;
+  u_int uVar4;
+  int iVar5;
+  int iVar6;
+  int wave;
+  int *piVar7;
+  int iVar8;
+  Souffle_tISouffle *is;
+  Souffle_tISouffle *pSVar9;
   int i;
+  int iVar10;
   coorddef w;
+  coorddef motion;
+  coorddef extramotion;
   
-  if (0 < SOUFFLE_GAME_TICKS - gTMoveSouffle) {
-    gTMoveSouffle = SOUFFLE_GAME_TICKS;
+  if (0 < simGlobal.gameTicks - gTMoveSouffle) {
+    gTMoveSouffle = simGlobal.gameTicks;
+    iVar10 = 0;
     if (gCISouffle != 0) {
       gWindDir = gWindDir + 2;
       iVar2 = fastintcos(gWindDir);
@@ -166,114 +186,132 @@ void Souffle_DoSouffle(void)
       w.z = fixedmult(iVar2,0xccc);
       w.y = 0;
     }
-    for (i = 0; i < gCISouffle; i++) {
-      Souffle_tISouffle *is = gISouffle + i;
-      coorddef motion = is->motion;
-      if (is->wind != '\0') {
+    iVar2 = 0;
+    for (; iVar10 < gCISouffle; iVar10 = iVar10 + 1) {
+      pSVar9 = (Souffle_tISouffle *)(&gISouffle->type + iVar2);
+      motion.x = (pSVar9->motion).x;
+      motion.y = (pSVar9->motion).y;
+      motion.z = (pSVar9->motion).z;
+      if (pSVar9->wind != '\0') {
         motion.x = motion.x + w.x;
         motion.y = motion.y + w.y;
         motion.z = motion.z + w.z;
       }
       if (Replay_ReplayMode == 2) {
-        int speed = 2 - SOUFFLE_REPLAY_SPEED;
-        if (0 < speed) {
-          motion.x = motion.x >> speed;
-          motion.y = motion.y >> speed;
-          motion.z = motion.z >> speed;
+        uVar4 = 2 - Replay_ReplayInterface.speed;
+        if (0 < (int)uVar4) {
+          motion.x = motion.x >> (uVar4 & 0x1f);
+          motion.z = motion.z >> (uVar4 & 0x1f);
+          motion.y = motion.y >> (uVar4 & 0x1f);
         }
-        if (speed < 0) {
+        if ((int)uVar4 < 0) {
           motion.x = motion.x << 1;
-          motion.y = motion.y << 1;
           motion.z = motion.z << 1;
+          motion.y = motion.y << 1;
         }
       }
-      (is->source).x = (is->source).x + motion.x;
-      (is->source).y = (is->source).y + motion.y;
-      (is->source).z = (is->source).z + motion.z;
-      {
-        int dampingSpeed = (is->motion).x;
-        if (dampingSpeed < 0) {
-          (is->motion).x = dampingSpeed + 0xa3d;
-          if (0 < dampingSpeed + 0xa3d) {
-            (is->motion).x = 0;
-          }
-        }
-        else if ((0 < dampingSpeed) && ((is->motion).x = dampingSpeed + -0xa3d, dampingSpeed + -0xa3d < 0)) {
-          (is->motion).x = 0;
+      (pSVar9->source).x = (pSVar9->source).x + motion.x;
+      (pSVar9->source).y = (pSVar9->source).y + motion.y;
+      iVar5 = (pSVar9->motion).x;
+      (pSVar9->source).z = (pSVar9->source).z + motion.z;
+      if (iVar5 < 0) {
+        (pSVar9->motion).x = iVar5 + 0xa3d;
+        if (0 < iVar5 + 0xa3d) {
+          (pSVar9->motion).x = 0;
         }
       }
-      {
-        int dampingSpeed = (is->motion).z;
-        if (dampingSpeed < 0) {
-          (is->motion).z = dampingSpeed + 0xa3d;
-          if (0 < dampingSpeed + 0xa3d) {
-            (is->motion).z = 0;
-          }
-        }
-        else if ((0 < dampingSpeed) && ((is->motion).z = dampingSpeed + -0xa3d, dampingSpeed + -0xa3d < 0)) {
-          (is->motion).z = 0;
+      else if ((0 < iVar5) && ((pSVar9->motion).x = iVar5 + -0xa3d, iVar5 + -0xa3d < 0)) {
+        (pSVar9->motion).x = 0;
+      }
+      iVar5 = (pSVar9->motion).z;
+      if (iVar5 < 0) {
+        (pSVar9->motion).z = iVar5 + 0xa3d;
+        if (0 < iVar5 + 0xa3d) {
+          (pSVar9->motion).z = 0;
         }
       }
-      if (is->type == '\r') {
-        coorddef extramotion = is->extramotion;
-        int wave = fastintsin(is->angle);
+      else if ((0 < iVar5) && ((pSVar9->motion).z = iVar5 + -0xa3d, iVar5 + -0xa3d < 0)) {
+        (pSVar9->motion).z = 0;
+      }
+      if (pSVar9->type == '\r') {
+        extramotion.x = (pSVar9->extramotion).x;
+        extramotion.z = (pSVar9->extramotion).z;
+        iVar5 = fastintsin(pSVar9->angle);
         if (Replay_ReplayMode == 2) {
-          int speed = 2 - SOUFFLE_REPLAY_SPEED;
-          if (0 < speed) {
-            extramotion.x = extramotion.x >> speed;
-            extramotion.y = extramotion.y >> speed;
-            extramotion.z = extramotion.z >> speed;
+          uVar4 = 2 - Replay_ReplayInterface.speed;
+          if (0 < (int)uVar4) {
+            extramotion.x = extramotion.x >> (uVar4 & 0x1f);
+            extramotion.z = extramotion.z >> (uVar4 & 0x1f);
           }
-          if (speed < 0) {
+          if ((int)uVar4 < 0) {
             extramotion.x = extramotion.x << 1;
-            extramotion.y = extramotion.y << 1;
             extramotion.z = extramotion.z << 1;
           }
         }
-        (is->source).x = (is->source).x + (extramotion.x * wave >> 0x11);
-        (is->source).z = (is->source).z + (extramotion.z * wave >> 0x11);
-        {
-          int dampingSpeed = (is->extramotion).x;
-          if (dampingSpeed < 0) {
-            (is->extramotion).x = dampingSpeed + 0x147;
-            if (0 < dampingSpeed + 0x147) {
-              (is->extramotion).x = 0;
-            }
-          }
-          else if ((0 < dampingSpeed) && ((is->extramotion).x = dampingSpeed + -0x147, dampingSpeed + -0x147 < 0)) {
-            (is->extramotion).x = 0;
+        (pSVar9->source).x = (pSVar9->source).x + (extramotion.x * iVar5 >> 0x11);
+        iVar6 = (pSVar9->extramotion).x;
+        (pSVar9->source).z = (pSVar9->source).z + (extramotion.z * iVar5 >> 0x11);
+        if (iVar6 < 0) {
+          (pSVar9->extramotion).x = iVar6 + 0x147;
+          if (0 < iVar6 + 0x147) {
+            (pSVar9->extramotion).x = 0;
           }
         }
-        {
-          int dampingSpeed = (is->extramotion).z;
-          if (dampingSpeed < 0) {
-            (is->extramotion).z = dampingSpeed + 0x147;
-            if (0 < dampingSpeed + 0x147) {
-              (is->extramotion).z = 0;
-            }
-          }
-          else if ((0 < dampingSpeed) && ((is->extramotion).z = dampingSpeed + -0x147, dampingSpeed + -0x147 < 0)) {
-            (is->extramotion).z = 0;
+        else if ((0 < iVar6) && ((pSVar9->extramotion).x = iVar6 + -0x147, iVar6 + -0x147 < 0)) {
+          (pSVar9->extramotion).x = 0;
+        }
+        iVar5 = (pSVar9->extramotion).z;
+        if (iVar5 < 0) {
+          (pSVar9->extramotion).z = iVar5 + 0x147;
+          if (0 < iVar5 + 0x147) {
+            (pSVar9->extramotion).z = 0;
           }
         }
-        if ((is->source).y <= is->ground) {
-          is->type = '\0';
+        else if ((0 < iVar5) && ((pSVar9->extramotion).z = iVar5 + -0x147, iVar5 + -0x147 < 0)) {
+          (pSVar9->extramotion).z = 0;
+        }
+        if (pSVar9->ground < (pSVar9->source).y) {
+          (pSVar9->motion).y = (pSVar9->motion).y + -0x147;
         }
         else {
-          (is->motion).y = (is->motion).y + -0x147;
+          pSVar9->type = '\0';
         }
       }
-      MoveAngleWind(is);
-      if (--is->cycle == '\0') {
-        is->type = '\0';
+      MoveAngleWind(pSVar9);
+      cVar1 = pSVar9->cycle + -1;
+      pSVar9->cycle = cVar1;
+      if (cVar1 == '\0') {
+        pSVar9->type = '\0';
       }
+      iVar2 = iVar2 + 0x44;
     }
-    for (i = 0; i < gCISouffle; i++) {
-      if (gISouffle[i].type == '\0') {
-        gISouffle[i] = gISouffle[gCISouffle - 1];
-        i--;
-        gCISouffle--;
-      }
+    iVar10 = 0;
+    if (0 < gCISouffle) {
+      iVar2 = 0;
+      do {
+        piVar7 = (int *)(&gISouffle->type + iVar2);
+        if ((char)*piVar7 == '\0') {
+          pSVar3 = gISouffle + gCISouffle + -1;
+          pSVar9 = gISouffle + gCISouffle + -1;
+          do {
+            iVar6 = pSVar3->aspeed;
+            iVar8 = pSVar3->angle;
+            iVar5 = (pSVar3->source).x;
+            *piVar7 = *(int *)pSVar3;
+            piVar7[1] = iVar6;
+            piVar7[2] = iVar8;
+            ((coorddef *)(piVar7 + 3))->x = iVar5;
+            pSVar3 = (Souffle_tISouffle *)&(pSVar3->source).y;
+            piVar7 = piVar7 + 4;
+          } while (pSVar3 != (Souffle_tISouffle *)&pSVar9->colour);
+          iVar2 = iVar2 + -0x44;
+          iVar10 = iVar10 + -1;
+          *piVar7 = *(int *)pSVar3;
+          gCISouffle = gCISouffle + -1;
+        }
+        iVar10 = iVar10 + 1;
+        iVar2 = iVar2 + 0x44;
+      } while (iVar10 < gCISouffle);
     }
   }
   return;
@@ -285,23 +323,26 @@ int Souffle_CircleClip(coorddef *pt1,coorddef *pt2,int r)
 {
   int dist;
   int dz;
+  int iVar1;
+  int iVar2;
   int dx;
-
-  dx = pt1->x - pt2->x;
-  if (dx < 1) {
-    dx = pt2->x - pt1->x;
+  
+  dz = pt1->x;
+  iVar2 = dz - pt2->x;
+  if (iVar2 < 1) {
+    iVar2 = pt2->x - dz;
   }
-  dz = pt1->z - pt2->z;
-  if (dz < 1) {
-    dz = pt2->z - pt1->z;
+  iVar1 = pt1->z - pt2->z;
+  if (iVar1 < 1) {
+    iVar1 = pt2->z - pt1->z;
   }
-  if (dz < dx) {
-    dist = dx + (dz >> 2);
+  if (iVar1 < iVar2) {
+    iVar2 = iVar2 + (iVar1 >> 2);
   }
   else {
-    dist = dz + (dx >> 2);
+    iVar2 = iVar1 + (iVar2 >> 2);
   }
-  return (u_int)(dist < r);
+  return (u_int)(iVar2 < r);
 }
 
 /* ---- Souffle_InsertFacet__FP13DRender_tView  [SOUFFLE.CPP:320-348] SLD-VERIFIED ---- */
@@ -309,30 +350,29 @@ void Souffle_InsertFacet(DRender_tView *Vi)
 
 {
   int inCircle;
-  int z;
   int iVar1;
   Souffle_tISouffle *is;
   Souffle_tISouffle *is_2;
   int off;
   int i;
   int i_2;
-  coorddef *translation;
   
   i_2 = 0;
-  translation = &(Vi->cview).translation;
-  off = i_2;
+  off = 0;
   do {
     if (gCISouffle <= i_2) {
       return;
     }
     is_2 = (Souffle_tISouffle *)(&gISouffle->type + off);
-    inCircle = Souffle_CircleClip(&is_2->source,translation,0x320000);
+    inCircle = Souffle_CircleClip(&is_2->source,&(Vi->cview).translation,0x320000);
     if (inCircle != 0) {
       if (is_2->type != '\n') {
-        Sfx_Transform(&is_2->source,&is_2->trans,translation);
-        iVar1 = __builtin_abs((int)(is_2->trans).vx);
-        z = (int)(is_2->trans).vz;
-        if ((z < iVar1) || (is_2->type == '\0')) goto SouffleInsert_iterAdvance;
+        Sfx_Transform(&is_2->source,&is_2->trans,&(Vi->cview).translation);
+        iVar1 = (int)(is_2->trans).vx;
+        if (iVar1 < 0) {
+          iVar1 = -iVar1;
+        }
+        if (((is_2->trans).vz < iVar1) || (is_2->type == '\0')) goto SouffleInsert_iterAdvance;
       }
       Sfx_BuildSouffleFacet(Vi,is_2);
     }
@@ -348,8 +388,8 @@ void Souffle_InitTrackSouffle(void)
 {
   gWindDir = 0;
   gCISouffle = 0;
-  gTMoveSouffle = SOUFFLE_GAME_TICKS;
-  gISouffle = reservememadr("souffle",0xff0,0);
+  gTMoveSouffle = simGlobal.gameTicks;
+  gISouffle = (Souffle_tISouffle *)reservememadr("souffle",0xff0,0);
   return;
 }
 
@@ -359,7 +399,7 @@ void Souffle_RestartTrackSouffle(void)
 {
   gWindDir = 0;
   gCISouffle = 0;
-  gTMoveSouffle = SOUFFLE_GAME_TICKS;
+  gTMoveSouffle = simGlobal.gameTicks;
   return;
 }
 
@@ -367,6 +407,19 @@ void Souffle_RestartTrackSouffle(void)
 void Souffle_KillTrackSouffle(void)
 
 {
+  int dist;
+  int dz;
+  int speed;
+  int wave;
+  int dx;
+  int i;
+  int maxc;
+  int inserti;
+  coorddef w;
+  coorddef motion;
+  coorddef extramotion;
+  coorddef vempty;
+  
   if (gISouffle != (Souffle_tISouffle *)0x0) {
     purgememadr(gISouffle);
   }

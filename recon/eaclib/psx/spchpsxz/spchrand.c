@@ -11,113 +11,91 @@
  *   new accumulator; Ghidra typed it void), EACseedrandom takes the seed (Ghidra's __thiscall `this`) and
  *   returns int* (the state base).
  */
+#include "../../../nfs4_types.h"
 
-/* ---- 6-word PRNG state @0x801235F4 (.data; runtime-seeded by iSPCH_EACseedrandom).  data-mat #75.
- *   Contiguous int[6]: [0]=seedX accumulator, [1]=..f8, [2]=..fc, [3]=..600, [4]=..604, [5]=..608. ---- */
-extern unsigned int seedX[];        /* @0x801235F4 : the 6-word state (word0 = accumulator) */
-#define DAT_801235f8  seedX[1]
-#define DAT_801235fc  seedX[2]
-#define DAT_80123600  seedX[3]
-#define DAT_80123604  seedX[4]
-#define DAT_80123608  seedX[5]
+/* ---- 6-word PRNG state @0x801235F4 (.data; runtime-seeded by iSPCH_EACseedrandom).  data-mat #75. ---- */
+extern "C" unsigned int seedX;          /* @0x801235F4 accumulator (word0) */
+extern "C" unsigned int DAT_801235f8;   /* @0x801235F8 word1 */
+extern "C" unsigned int DAT_801235fc;   /* @0x801235FC word2 */
+extern "C" unsigned int DAT_80123600;   /* @0x80123600 word3 */
+extern "C" unsigned int DAT_80123604;   /* @0x80123604 word4 */
+extern "C" unsigned int DAT_80123608;   /* @0x80123608 word5 */
 
-extern int  gEventDats[];           /* @0x80148048 : int[4] bound event-data pointers (shared w/ spchevnt) */
-extern void trap(unsigned int code);
+extern "C" intptr_t gEventDats[4];      /* @0x80148048 : four PSX pointer words; native pointers on host */
+extern "C" void trap(unsigned int code);
 
-extern int   iSPCH_EACrandom(void);                 /* @0x800EB9C4 */
-extern int  *iSPCH_EACseedrandom(unsigned int seed);/* @0x800EBAC4 */
-extern int   iSPCH_Rand(int n);                     /* @0x800EBB30 */
-extern int   iSPCH_BindData(unsigned short *dat);   /* @0x800EBB84 */
+extern "C" int   iSPCH_EACrandom(void);                 /* @0x800EB9C4 */
+extern "C" int  *iSPCH_EACseedrandom(unsigned int seed);/* @0x800EBAC4 */
+extern "C" int   iSPCH_Rand(int n);                     /* @0x800EBB30 */
+extern "C" int   iSPCH_BindData(unsigned short *dat);   /* @0x800EBB84 */
 
-/* iSPCH_EACrandom @0x800EB9C4 : step the additive generator (carry-propagated) and return the new seed.
- *   MATCH: ONE in-place running `sum` (oracle keeps it in $a2 end-to-end, incl. the return) + rollover as
- *   nested ifs incrementing the GLOBALS directly (oracle reloads each word: lw;addiu;bnez;sw-in-slot). */
-extern int iSPCH_EACrandom(void)
+/* iSPCH_EACrandom @0x800EB9C4 : step the additive generator (carry-propagated) and return the new seed. */
+extern "C" int iSPCH_EACrandom(void)
 {
-    unsigned int sum;
-    unsigned int carry;
-
-    sum = seedX[5] + seedX[4];
-    carry = 0;
-    if (sum < seedX[5] || sum < seedX[4])
+    unsigned int u1, u2, u3, u4;
+    int carry = 0;
+    u1 = DAT_80123608 + DAT_80123604;
+    if (u1 < DAT_80123608 || u1 < DAT_80123604)
         carry = 1;
-    seedX[4] = sum;
-    sum = sum + seedX[3] + carry;
-    carry = sum < seedX[3];
-    seedX[3] = sum;
-    sum = sum + seedX[2] + carry;
-    carry = sum < seedX[2];
-    seedX[2] = sum;
-    sum = sum + seedX[1] + carry;
-    carry = sum < seedX[1];
-    seedX[1] = sum;
-    sum = sum + seedX[0] + carry;
-    seedX[0] = sum;
-    seedX[5] = seedX[5] + 1;
-    if (seedX[5] == 0) {
-        seedX[4] = seedX[4] + 1;
-        if (seedX[4] == 0) {
-            seedX[3] = seedX[3] + 1;
-            if (seedX[3] == 0) {
-                seedX[2] = seedX[2] + 1;
-                if (seedX[2] == 0) {
-                    seedX[1] = seedX[1] + 1;
-                    if (seedX[1] == 0) {
-                        seedX[0] = sum + 1;   /* MATCH: temp v0 = sum+1 for the store ... */
-                        sum = sum + 1;        /* ... then CSE copies it back into sum ($a2) */
-                    }
-                }
-            }
-        }
-    }
-    return (int)sum;
+    u2 = u1 + DAT_80123600 + carry;
+    u3 = u2 + DAT_801235fc + (unsigned int)(u2 < DAT_80123600);
+    u4 = u3 + DAT_801235f8 + (unsigned int)(u3 < DAT_801235fc);
+    seedX = u4 + seedX + (unsigned int)(u4 < DAT_801235f8);
+    DAT_80123608 = DAT_80123608 + 1;
+    DAT_801235f8 = u4;
+    DAT_801235fc = u3;
+    DAT_80123600 = u2;
+    DAT_80123604 = u1;
+    if (DAT_80123608 == 0 && (DAT_80123604 = u1 + 1, DAT_80123604 == 0) &&
+        (DAT_80123600 = u2 + 1, DAT_80123600 == 0) &&
+        (DAT_801235fc = u3 + 1, DAT_801235fc == 0) &&
+        (DAT_801235f8 = u4 + 1, DAT_801235f8 == 0))
+        seedX = seedX + 1;
+    return (int)seedX;
 }
 
 /* iSPCH_EACseedrandom @0x800EBAC4 : seed all 6 state words from `seed` (each = seed + a fixed constant; the
- *   constants are eacpsxz srandom's default seeds, so seed==0 reproduces that default state).  Returns base.
- *   The original chains the constants (running += delta) and stores all 6 off the shared seedX[] base. */
-extern int *iSPCH_EACseedrandom(unsigned int seed)
+ *   constants are eacpsxz srandom's default seeds, so seed==0 reproduces that default state).  Returns base. */
+extern "C" int *iSPCH_EACseedrandom(unsigned int seed)
 {
-    unsigned int w = seed + 0xf22d0e56u;
-    seedX[0] = w;                    /* seed + 0xF22D0E56 */
-    w += 0x96041893u; seedX[1] = w;  /* seed + 0x883126E9 */
-    w += 0x3df3b646u; seedX[2] = w;  /* seed + 0xC624DD2F */
-    w += 0x40dde76du; seedX[3] = w;  /* seed + 0x0702C49C */
-    w += 0x97327ae1u; seedX[4] = w;  /* seed + 0x9E353F7D */
-    w += 0xd1a9fbe7u; seedX[5] = w;  /* seed + 0x6FDF3B64 */
-    return (int *)&seedX[0];
+    seedX        = seed + 0xf22d0e56u;
+    DAT_801235f8 = seed + 0x883126e9u;
+    DAT_801235fc = seed + 0xc624dd2fu;
+    DAT_80123600 = seed + 0x0702c49cu;
+    DAT_80123604 = seed + 0x9e353f7du;
+    DAT_80123608 = seed + 0x6fdf3b64u;
+    return (int *)&seedX;
 }
 
 /* iSPCH_Rand @0x800EBB30 : a uniform pseudo-random in [0, n) from the low 16 bits of EACrandom.  The n==-1 /
  *   INT_MIN guard is the compiler's signed-division-overflow trap (dead here: (r&0xffff) is never INT_MIN). */
-extern int iSPCH_Rand(int n)
+extern "C" int iSPCH_Rand(int n)
 {
     unsigned int r = (unsigned int)iSPCH_EACrandom();
-    /* signed % emits the div + break 0x1c00 (div0) + break 0x1800 (overflow)
-       guards itself under maspsx --expand-div; no manual trap() needed. */
+    if (n == 0)
+        trap(0x1c00);
+    if (n == -1 && (r & 0xffff) == 0x80000000u)
+        trap(0x1800);
     return (int)(r & 0xffff) % n;
 }
 
 /* iSPCH_BindData @0x800EBB84 : register a speech data blob (header word > 0x11d) into the first free
  *   gEventDats[0..3] slot.  Returns 1 on success, 0 if rejected or the table is full. */
-extern int iSPCH_BindData(unsigned short *dat)
+extern "C" int iSPCH_BindData(unsigned short *dat)
 {
-    int *p;
+    intptr_t *p;
     int  i;
-    int  result = 0;
     if (0x11d < *dat) {
         i = 0;
         p = gEventDats;
         do {
             i++;
             if (*p == 0) {
-                *p = (int)dat;
-                result = 1;
-                goto done;
+                *p = (intptr_t)dat;
+                return 1;
             }
             p++;
         } while (i < 4);
     }
-done:
-    return result;
+    return 0;
 }

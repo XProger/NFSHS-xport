@@ -9,29 +9,32 @@
  */
 
 /* owning-TU def (extern-declared, never defined; BSS) */
- int (*gTimerSubs[8])(void); 
+extern "C" { int (*gTimerSubs[8])(void); }
+extern "C" int tmrsub;
 
-extern int (*gTimerSubs[8])(void);   /* @0x8012360C (data-mat pass owns) */
+extern "C" int (*gTimerSubs[8])(void);   /* @0x8012360C (data-mat pass owns) */
 
-extern void addtimer(int (*fn)(void))   /* @0x800EAFE8 */
+extern "C" void addtimer(int (*fn)(void))   /* @0x800EAFE8 */
 {
+    int (**timerSubs)(void) = (int (**)(void))&tmrsub;
     int i;
     for (i = 0; i < 8; i++)              /* already registered? -> done */
-        if (gTimerSubs[i] == fn)
+        if (timerSubs[i] == fn)
             return;
     for (i = 0; i < 8; i++)             /* else first empty slot */
-        if (gTimerSubs[i] == 0) {
-            gTimerSubs[i] = fn;
+        if (timerSubs[i] == 0) {
+            timerSubs[i] = fn;
             return;
         }
 }
 
-extern void deltimer(int (*fn)(void))   /* @0x800EB048 */
+extern "C" void deltimer(int (*fn)(void))   /* @0x800EB048 */
 {
+    int (**timerSubs)(void) = (int (**)(void))&tmrsub;
     int i;
     for (i = 0; i < 8; i++)
-        if (gTimerSubs[i] == fn) {
-            gTimerSubs[i] = 0;
+        if (timerSubs[i] == fn) {
+            timerSubs[i] = 0;
             return;
         }
 }

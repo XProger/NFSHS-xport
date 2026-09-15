@@ -11,7 +11,7 @@
 
 /* ---- snd_sine_table @0x8013C348 : quarter-wave sine, 0x101 entries (read-only rodata).
  *      [0]=0x0000 .. [0x100]=0xffff.  Used by iSNDsin (ssine.cpp) for the pan-law crossfade. */
-extern const unsigned short snd_sine_table[0x101] = {   /* @0x8013C348 */
+extern "C" const unsigned short snd_sine_table[0x101] = {   /* @0x8013C348 */
     0x0000, 0x0192, 0x0324, 0x04b6, 0x0648, 0x07da, 0x096c, 0x0afe, 0x0c8f, 0x0e21, 0x0fb2, 0x1144,
     0x12d5, 0x1466, 0x15f6, 0x1787, 0x1917, 0x1aa7, 0x1c37, 0x1dc7, 0x1f56, 0x20e5, 0x2273, 0x2402,
     0x2590, 0x271d, 0x28aa, 0x2a37, 0x2bc4, 0x2d50, 0x2edb, 0x3066, 0x31f1, 0x337b, 0x3505, 0x368e,
@@ -35,22 +35,24 @@ extern const unsigned short snd_sine_table[0x101] = {   /* @0x8013C348 */
     0xfec4, 0xfeea, 0xff0e, 0xff2f, 0xff4e, 0xff6a, 0xff84, 0xff9c, 0xffb1, 0xffc3, 0xffd3, 0xffe1,
     0xffec, 0xfff4, 0xfffb, 0xfffe, 0xffff,};
 
-/* ---- additive PRNG state (srandom.c).  One real six-word object: the oracle materializes
- *      &sndseed once and reaches the five lagged words at fixed +4..+20 displacements. */
-extern unsigned int sndseed[6] = {
-    0xf22d0e56u, 0x883126e9u, 0xc624dd2fu,
-    0x0702c49cu, 0x9e353f7du, 0x6fdf3b64u
-};
+/* ---- additive PRNG state (srandom.cpp).  sndseed is the accumulator; the 5 lagged words follow.
+ *      Mutable: iSNDrandom rewrites all six every call.  Real seed constants from NFS4.EXE. */
+extern "C" unsigned int sndseed      = 0xf22d0e56u;   /* @0x8013C2F0 */
+extern "C" unsigned int DAT_8013c2f4 = 0x883126e9u;   /* @0x8013C2F4 */
+extern "C" unsigned int DAT_8013c2f8 = 0xc624dd2fu;   /* @0x8013C2F8 */
+extern "C" unsigned int DAT_8013c2fc = 0x0702c49cu;   /* @0x8013C2FC */
+extern "C" unsigned int DAT_8013c300 = 0x9e353f7du;   /* @0x8013C300 */
+extern "C" unsigned int DAT_8013c304 = 0x6fdf3b64u;   /* @0x8013C304 */
 
 /* ---- SPU memory/voice limit block (slimits.cpp).  Mutable: SNDsetlimits overwrites.
  *      sndpsxlimits, then the 4 DAT_ words; only DAT_801234e4 (SPU ctx size) is non-zero (0x2000). */
-extern int sndpsxlimits  = 0;        /* @0x801234D4 */
-extern int DAT_801234d8  = 0;        /* @0x801234D8 */
-extern int DAT_801234dc  = 0;        /* @0x801234DC */
-extern int DAT_801234e0  = 0;        /* @0x801234E0 */
-extern int DAT_801234e4  = 0x2000;   /* @0x801234E4 : default SPU context size */
+extern "C" int sndpsxlimits  = 0;        /* @0x801234D4 */
+extern "C" int DAT_801234d8  = 0;        /* @0x801234D8 */
+extern "C" int DAT_801234dc  = 0;        /* @0x801234DC */
+extern "C" int DAT_801234e0  = 0;        /* @0x801234E0 */
+extern "C" int DAT_801234e4  = 0x2000;   /* @0x801234E4 : default SPU context size */
 
 /* ---- small in-image runtime counters/flags (.data, initial 0; mutated at runtime). */
-extern int  DAT_80136dec = 0;   /* @0x80136DEC : rolling allocation id counter (salloc, +=0x20) */
-extern char DAT_801371cc = 0;   /* @0x801371CC : rolling key-group counter (stagpat)            */
-extern int  DAT_80134a68 = 0;   /* @0x80134A68 : output-caps init-once flag (ssysinit)          */
+extern "C" int  DAT_80136dec = 0;   /* @0x80136DEC : rolling allocation id counter (salloc, +=0x20) */
+extern "C" char DAT_801371cc = 0;   /* @0x801371CC : rolling key-group counter (stagpat)            */
+extern "C" int  DAT_80134a68 = 0;   /* @0x80134A68 : output-caps init-once flag (ssysinit)          */

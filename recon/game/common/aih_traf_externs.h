@@ -2,12 +2,13 @@
  * Harvested from sibling *_externs.h + *.cpp defs + disasm-v2 (AI/Control demangled). */
 #ifndef _GAME_COMMON_CAMERA_EXTERNS_H_
 #define _GAME_COMMON_CAMERA_EXTERNS_H_
-#include "aih_traf_types.h"
+#include "../../nfs4_types.h"
+#include "aiworld.h"
 
 /* ---- vtables: AIHigh_Traffic (this obj) + AIState_Idle (aistate.obj) ---- */
 extern __vtbl_ptr_type AIHigh_Traffic_vtable[], AIState_Idle_vtable[];
 
-extern AIHigh_Traffic *highLevelAIObjs[];
+extern "C" AIHigh_Traffic *highLevelAIObjs[];
 extern AITrigger_TriggerManager *triggerManagerTraffic;
 extern Car_tObj * AILife_IsSliceInAnyVisibleArea(int slice);
 extern Car_tObj *Cars_gCopCarList[];

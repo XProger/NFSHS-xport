@@ -3,7 +3,7 @@
  *   Force_Disable, Force_IsForceOn, Force_Pause, Force_UnPause, Force_HitSign, Force_HitWall.
  *   Full SYM-locals applied.
  */
-#include "force_types.h"
+#include "../../nfs4_types.h"
 #include "force_externs.h"
 
 /* ---- Force.obj-OWNED globals -- DEFINED here (self-contained; SYM-typed via gen_owned_defs:
@@ -27,216 +27,133 @@ void Force_HitSign(Car_tObj *car);
 void Force_HitWall(int impulse);
 
 
-/* ---- Force_Vbl__Fv  [FORCE.CPP:61-98] SLD-VERIFIED ----
- * w38-a9 full rewrite from the SLD line map + raw oracle.  SYM says the ONLY
- * locals are `i` ($s2, outer block) and, in the LOOP block, `padnum` ($s1) +
- * `padstate` ($v1) -- there is NO pointer local, so `Force_g[i]` is indexed and
- * the walking `$s0` is gcc's strength-reduced giv; `$s3` is the LICM-hoisted
- * `Force_rand_256` base.  SLD statement map: 66 PadGetState / 68 `!=6` test /
- * 70-71 the `<4` arm (FALL-THROUGH, hence the `!= 6` spelling: the ==6 block is
- * the oracle's BRANCH TARGET at .L800CA9F8) / 73-77 the ==6 arm / 79 fade<time /
- * 81-83 + 87-89 + 93-95 the three actuator arms / 97 loop increment /
- * 98 Force_gTick++ AFTER the loop.
- * All arithmetic is SIGNED int (u_char operands promote): oracle uses `slt`,
- * `mult`, `div` + the maspsx --expand-div `break 7`/`break 6` guards -- the old
- * u_int-cast recon emitted sltu/multu/divu.  The `jolt*time/fade` term is
- * written TWICE on purpose: the intervening `actuator[0]` store kills gcc's
- * memory CSE, which is exactly why the oracle has two mult/div sequences.
- *
- * w39-a7: 46 -> PASS 138/138.  FOUR cooperating fixes, in the order they paid:
- *  (1) -G8 (see tools/build.py PER_TU_FLAGS): 46 -> 40.
- *  (2) `Force_tGlobal *f = &Force_g[i];` + `f->` throughout.  The indexed `Force_g[i].x`
- *      form made loop.c build THREE induction/base pseudos -- a base `&Force_g`, an
- *      OFFSET giv `8*i` and a SECOND base `&Force_g+6` for the
- *      `PadSetAct(...,Force_g[i].actuator,...)` argument -- costing 2 extra callee-saved
- *      registers ($s4,$s5) and a 48-byte frame.  Retail has ONE +8 pointer walker in $s0,
- *      the actuator arg as a plain `addiu $a1,$s0,6` displacement, and a 40-byte frame
- *      (SYM fsize 40, mask $800F0000 = ra,s3,s2,s1,s0).  40 -> 8, count exact 138/138.
- *  (3) `padnum = i << 4` (NOT `i * 16`): the multiply spelling let gcc compute the product
- *      straight into the call-arg register and copy it BACK to padnum's home ($s1); retail
- *      does `sll $s1,$s2,4` into padnum's home in the loop guard's delay slot and copies
- *      to `$a0` in the `jal` delay slot.  8 -> 2.
- *  (4) `f->time > f->fade` (NOT `f->fade < f->time`): compare operand order IS load order
- *      for cc1plus (left to right) and retail loads `time` (+4) before `fade` (+5). 2 -> 0.
- * The 0xff clamp is spelled `actuator1 = 0xff; if (... < 0x100) actuator1 = ...;` rather
- * than the ternary `(... > 0xff) ? 0xff : ...`, which narrows the clamp constant against
- * the u_char destination and emits `li $a2,-1` where retail has `li $a2,0xFF`; the if-form
- * also lands the 255 default in the `beqz` delay slot and shares ONE clamp block between
- * the two arms, exactly like the oracle's .L800CAB3C.
- * HONESTY NOTE: the SYM lists only `i`/`padnum`/`padstate` as named locals, so retail's
- * source had NO `f` and no `actuator1`; both are matching devices standing in for the giv
- * retail's cc1 derived from the indexed form and for its anonymous clamp temp.  The
- * emitted instruction stream is byte-identical either way. */
+/* ---- Force_Vbl__Fv  [FORCE.CPP:61-98] SLD-VERIFIED ---- */
 void Force_Vbl(void)
 
 {
+  u_char uVar1;
+  u_char bVar2;
+  u_int uVar3;
+  int iVar4;
+  int padstate;
+  u_int uVar5;
+  u_int uVar6;
+  u_int uVar7;
+  Force_tGlobal *pFVar8;
+  int padnum;
+  int port;
   int i;
-
-  for (i = 0; i < 2; i = i + 1) {
-    Force_tGlobal *f; /* SYM-CODEGEN-CARRIER: f -- models retail's +8 loop walker */
-    int padnum;
-    int padstate;
-    int actuator1; /* SYM-CODEGEN-CARRIER: actuator1 -- preserves the shared 0xff clamp block */
-
-    f = &Force_g[i];
-    padnum = i << 4;
-    padstate = PadGetState(padnum);
-    if (padstate != 6) {
-      if (padstate < 4) {
-        f->active = 0;
+  int iVar9;
+  
+  iVar9 = 0;
+  pFVar8 = Force_g;
+  do {
+    port = iVar9 << 4;
+    if (1 < iVar9) {
+      Force_gTick = Force_gTick + 1;
+      return;
+    }
+    iVar4 = PadGetState(port);
+    if (iVar4 == 6) {
+      if (pFVar8->active == '\0') {
+        PadSetAct(port,pFVar8->actuator,2);
+        PadSetActAlign(port,Force_gActAlign);
+        pFVar8->active = '\x01';
       }
     }
-    else if (f->active == 0) {
-      PadSetAct(padnum,f->actuator,2);
-      PadSetActAlign(padnum,Force_gActAlign);
-      f->active = 1;
+    else if (iVar4 < 4) {
+      pFVar8->active = '\0';
     }
-    if (f->time > f->fade) {
-      f->actuator[0] =
-           Force_rand_256[Force_gTick >> 1 & 0xff] < f->high + f->jolt;
-      actuator1 = 0xff;
-      if (f->low + f->jolt < 0x100) {
-        actuator1 = f->low + f->jolt;
+    if (pFVar8->fade < pFVar8->time) {
+      uVar6 = (u_int)pFVar8->low + (u_int)pFVar8->jolt;
+      pFVar8->actuator[0] =
+           (u_int)Force_rand_256[Force_gTick >> 1 & 0xff] < (u_int)pFVar8->high + (u_int)pFVar8->jolt;
+MCCmd_cb_clampValue:
+      uVar5 = 0xff;
+      if (uVar6 < 0x100) {
+        uVar5 = uVar6;
       }
-      f->actuator[1] = actuator1;
-      f->time = f->time - 1;
-    }
-    else if (f->time != 0) {
-      f->actuator[0] =
-           Force_rand_256[Force_gTick >> 1 & 0xff] <
-           f->jolt * f->time / f->fade + f->high;
-      actuator1 = 0xff;
-      if (f->jolt * f->time / f->fade + f->low < 0x100) {
-        actuator1 = f->jolt * f->time / f->fade + f->low;
-      }
-      f->actuator[1] = actuator1;
-      f->time = f->time - 1;
+      uVar1 = pFVar8->time;
+      pFVar8->actuator[1] = (u_char)uVar5;
+      pFVar8->time = uVar1 + 0xff;
     }
     else {
-      f->jolt = 0;
-      f->actuator[0] = Force_rand_256[Force_gTick >> 1 & 0xff] < f->high;
-      f->actuator[1] = f->low;
+      if (pFVar8->time != 0) {
+        uVar6 = (u_int)pFVar8->jolt * (u_int)pFVar8->time;
+        uVar5 = (u_int)pFVar8->fade;
+        uVar3 = (u_int)pFVar8->jolt * (u_int)pFVar8->time;
+        uVar7 = (u_int)pFVar8->fade;
+        pFVar8->actuator[0] = (u_int)Force_rand_256[Force_gTick >> 1 & 0xff] < uVar6 / uVar5 + (u_int)pFVar8->high
+        ;
+        uVar6 = uVar3 / uVar7 + (u_int)pFVar8->low;
+        goto MCCmd_cb_clampValue;
+      }
+      pFVar8->jolt = '\0';
+      bVar2 = Force_rand_256[Force_gTick >> 1 & 0xff];
+      pFVar8->actuator[1] = pFVar8->low;
+      pFVar8->actuator[0] = bVar2 < pFVar8->high;
     }
-  }
-  Force_gTick = Force_gTick + 1;
+    pFVar8 = pFVar8 + 1;
+    iVar9 = iVar9 + 1;
+  } while( true );
 }
 
-/* ---- Force_Update__FP8Car_tObj  [FORCE.CPP:105-223] SLD-VERIFIED ----
- * w38-a9: 432 -> 326 diffs.  The SYM declares a real `Force_tGlobal *f` ($s6) which
- * the recon had declared but left UNWIRED (every access went through the indexed
- * `Force_g[carIndex]`, costing a re-materialized base + index at each site).  Wiring
- * `f = &Force_g[carIndex]` once and using `f->field` throughout dropped 12 insns.
- * w39-a7: 326 -> 223 diffs (271/278).  The rule-8 pass the old note called for, plus
- * three branch-polarity/operand-order fixes read off the raw oracle:
- *  (1) SYM locals WIRED: `skids` ($a1) and `impacts` ($a3) are the two
- *      GameSetup_gData.controllerData reads (shockMode@0xA8 / shockImpact@0xB0) -- they
- *      are CALLER-saved in retail because they are dead after the multiplier setup;
- *      Ghidra had fused them with later values (`iVar4`/`iVar5`), which forced them into
- *      callee-saved registers.  `impactmultiplier` ($s7), `v0` ($s4) / `v1` ($s3) (the
- *      two road-surface accumulators) and the loop's `c` ($s5) / `force` ($s2) /
- *      `shock` ($v1) / `time` ($s0) are named now too.
- *  (2) the front/rear multipliers are THREE separate `if (skids != 0)` / `if (skids != 0)`
- *      / `if (impacts != 0)` guards, not one fused if/else -- the oracle has three
- *      distinct `beqz $a1/$a1/$a3` tests, each with its own zero-store block, and the
- *      NON-zero body is the FALL-THROUGH (so the guard must be spelled `!= 0`).
- *  (3) the Ghidra `iVar8`/`iVar11` snapshot-and-restore dance around the impact block was
- *      an artifact of Ghidra reusing the accumulator variables inside it.  Retail uses
- *      three DIFFERENT locals there (force/shock/time), so v0/v1 are simply not touched;
- *      writing it that way deletes the whole save/restore pair.
- *  (4) the two surface-clamp arms must use a CALLER-saved temp for `|linearVel.z|` (the
- *      oracle holds it in $v0 in BOTH arms); Ghidra had the 10..0xF arm reusing `v1`.
- *
- * w40-a7: 223 -> PASS 278/278.  SIX cooperating fixes, in the order they paid:
- *  (1) 🔴 CORRECTNESS: five `(u_int)x >> 0x10` unsigned shifts (a10's w39 census hit
- *      `srl 5 vs 0`) were Ghidra's rendering of gcc's SIGNED divide-by-2^16 expansion.
- *      The oracle has ZERO `srl` and twelve `sra`, each guarded by `bgez x,L;
- *      addu x,x,$fp` with `$fp` holding 65535 (0xFFFF does not fit an addiu imm16, so
- *      gcc materializes it in a register and CSEs it across the loop).  Every site is a
- *      plain `/ 0x10000` in C -- writing the guard by hand emitted the unsigned shift and
- *      ROUNDED NEGATIVE VALUES THE WRONG WAY.  223 -> 205.
- *  (2) 🔴 the audio-event walk is `car->audio[c]` (Cars_tAudio[7] @+0x798, stride 24),
- *      NOT the Ghidra `(car->N).simRoadInfo.quadPts[c*2-4].z` + `piVar6[0x1e7]` int-index
- *      soup.  Index form keeps the member offsets (0x79C/0x7A0/0x7A8) as LOAD
- *      DISPLACEMENTS off a single `car + c*24` giv that loop.c walks by -24 -- exactly the
- *      oracle -- and deletes the fabricated `piVar6`/`iVar2` locals (the SYM lists NO
- *      pointer local for this loop).  Loop shape is exit-in-the-middle
- *      `while (1) { if (c < 0) break; ...; c = c - 1; }` = the oracle's top `bltz` + the
- *      unconditional `j` back-edge (a `for`/`while` rotates it).  SYM block scopes applied:
- *      `c` is local to the `audioCount != 0` body (Block start line 62) and
- *      `force`/`shock`/`time` to the impact arm (Block start line 77).  205 -> 185.
- *  (3) `(fixeddiv(...) << 5) / 0x10000`, NOT `... * 0x20 / 0x10000`: gcc-2.8 FOLDS
- *      `(x*32)/65536` into `x/2048` (`addiu 2047; sra 11`), which the oracle does not
- *      have.  The shift spelling survives fold, then cse turns it back into `sll 5`
- *      followed by the full `/0x10000` guard+`sra 16` the oracle shows.  185 -> 141.
- *  (4) the two post-loop results are the SYM locals `v0`/`v1` REUSED
- *      (`v0 = fixedmult(...)/0x10000;` ... `f->high = (u_char)v0;`), not fresh `u_char`
- *      temps: a u_char destination lets gcc narrow the divide's final shift to `srl`,
- *      and the oracle keeps both results in v0's/v1's own callee-saved regs across the
- *      second `fixedmult` call.  The pre-call clamp needs a block-local `clamped` copy
- *      (`clamped = v0; if (0xa0000 < clamped) clamped = 0xa0000;`) so the clamp happens
- *      on the arg-register copy (`addu $a0,$s4,$zero; lui $v0,10; slt; lui $a0,10`)
- *      instead of writing back into v0.  Guard polarity is `!= 0` (body = fall-through).
- *      141 -> 130.
- *  (5) the surface clamps ARE the both-arms-assign ternary
- *      `v1 = 0x78000 < X ? 0x78000 : X;` (the w39 note's "falsified" verdict was measured
- *      against the pre-(1)-(4) body and is WITHDRAWN); the default-then-override form
- *      costs 85 diffs here.  130 -> 45.
- *  (6) 🔑 the last 45 were the constant-materialization ORDER: retail emits
- *      `addu $s4,$zero,$zero; lui $v1,7; ori $v1; lui $s3,7` BEFORE the `lw 0x420`,
- *      with a `nop` in the load-delay slot.  That only happens when the |z| is a
- *      SUB-EXPRESSION of the ternary (so expand_expr materializes both 0x78000 copies
- *      while expanding the comparison, before it ever touches the operand's branches).
- *      Spelling it `__builtin_abs((car->linearVel_ch).z) >> 2` INSIDE both ternary arms
- *      does it -- a hand-rolled `if (t < 0) t = -t;` temp, or an `ABS()`-style macro that
- *      expands to a ternary, both put the load first and lose.  (methodology 5.0c:
- *      `__builtin_abs` inlines on BOTH cc1 2.7.2 and 2.8.0; bare `abs()` emits a `jal`.)
- *      45 -> PASS. */
+/* ---- Force_Update__FP8Car_tObj  [FORCE.CPP:105-223] SLD-VERIFIED ---- */
 void Force_Update(Car_tObj *car)
 
 {
-  Force_tGlobal *f;
+  int iVar1;
+  int shock;
+  int iVar2;
   int skids;
+  u_int uVar3;
+  int iVar4;
   int impacts;
-  GameSetup_tControllerData *controller; /* SYM-CODEGEN-CARRIER: controller -- direct casts are 11 diffs, 279/278 */
-  int impactmultiplier;
-  int v0;
+  int iVar5;
+  int time;
+  int *piVar6;
+  int force;
+  u_char uVar7;
   int v1;
+  int iVar8;
+  u_char uVar9;
+  int v0;
+  int iVar10;
+  int iVar11;
+  int c;
+  Force_tGlobal *f;
+  int impactmultiplier;
   int frontmultiplier;
   int rearmultiplier;
   
-  if (1U < (u_int)car->carIndex) {
+  uVar3 = car->carIndex;
+  if (1 < uVar3) {
     return;
   }
-  f = &Force_g[car->carIndex];
   if (1 < Replay_ReplayMode) {
-    f->high = '\0';
-    f->low = '\0';
-    f->time = '\0';
+    Force_g[uVar3].high = '\0';
+    Force_g[uVar3].low = '\0';
+    Force_g[uVar3].time = '\0';
     return;
   }
-  controller = (GameSetup_tControllerData *)Force_GameSetupWords;
-  skids = *(int *)((char *)&controller->shockMode[car->carIndex] + 96);
-  impacts = *(int *)((char *)&controller->shockImpact[car->carIndex] + 96);
-  if (skids != 0) {
-    frontmultiplier = (skids + 0x10) * 0x2da6;
-  }
-  else {
+  iVar4 = GameSetup_gData.controllerData.shockMode[uVar3];
+  iVar5 = GameSetup_gData.controllerData.shockImpact[uVar3];
+  if (iVar4 == 0) {
     frontmultiplier = 0;
-  }
-  if (skids != 0) {
-    rearmultiplier = (skids + 0x10) * 0x1e6e;
-  }
-  else {
     rearmultiplier = 0;
   }
-  if (impacts != 0) {
-    impactmultiplier = (impacts + 0x10) * 0xb699;
+  else {
+    frontmultiplier = (iVar4 + 0x10) * 0x2da6;
+    rearmultiplier = (iVar4 + 0x10) * 0x1e6e;
+  }
+  if (iVar5 == 0) {
+    iVar4 = 0;
   }
   else {
-    impactmultiplier = 0;
+    iVar4 = (iVar5 + 0x10) * 0xb699;
   }
-  v0 = 0;
-  v1 = v0;
+  iVar10 = 0;
+  iVar5 = 0;
   if ((car->N).flightTime == 0) {
     switch((car->N).driveSurfaceType) {
     case 2:
@@ -247,91 +164,124 @@ void Force_Update(Car_tObj *car)
     case 7:
     case 8:
     case 9:
-      v0 = 0;
-      v1 = 0x78000 < __builtin_abs((car->linearVel_ch).z) >> 2 ?
-           0x78000 : __builtin_abs((car->linearVel_ch).z) >> 2;
+      iVar10 = 0;
+      iVar1 = (car->linearVel_ch).z;
+      if (iVar1 < 0) {
+        iVar1 = -iVar1;
+      }
+      iVar5 = 0x78000;
+      if (iVar1 >> 2 < 0x78001) {
+        iVar5 = iVar1 >> 2;
+      }
       goto ForceUpd_audioRevLoop;
     case 10:
     case 0xb:
     case 0xc:
     case 0xd:
     case 0xf:
-      v0 = 0x58000 < __builtin_abs((car->linearVel_ch).z) >> 1 ?
-           0x58000 : __builtin_abs((car->linearVel_ch).z) >> 1;
+      iVar5 = (car->linearVel_ch).z;
+      if (iVar5 < 0) {
+        iVar5 = -iVar5;
+      }
+      iVar10 = 0x58000;
+      if (iVar5 >> 1 < 0x58001) {
+        iVar10 = iVar5 >> 1;
+      }
       break;
     case 0xe:
-      v0 = 0;
+      iVar10 = 0;
     }
-    v1 = 0;
+    iVar5 = 0;
   }
 ForceUpd_audioRevLoop:
-  if (car->audioCount != 0) {
-    int c = car->audioCount + -1;
-    while (1) {
-      if (c < 0) {
-        break;
+  iVar1 = car->audioCount;
+  if (iVar1 != 0) {
+    piVar6 = &(car->N).simRoadInfo.quadPts[iVar1 * 2 + -4].z;
+    while (iVar1 = iVar1 + -1, -1 < iVar1) {
+      iVar2 = piVar6[0x1e7];
+      iVar8 = iVar5;
+      iVar11 = iVar10;
+      if (iVar2 == 0x12) {
+        iVar11 = piVar6[0x1ea] << 1;
+        if (piVar6[0x1ea] << 1 < iVar10) {
+          iVar11 = iVar10;
+        }
       }
-      if (car->audio[c].channel == 0x12) {
-        v0 = v0 > car->audio[c].force * 2 ? v0 : car->audio[c].force * 2;
+      else if (iVar2 == 0x14) {
+        iVar8 = piVar6[0x1ea] << 1;
+        if (piVar6[0x1ea] << 1 < iVar5) {
+          iVar8 = iVar5;
+        }
       }
-      else if (car->audio[c].channel == 0x14) {
-        v1 = v1 > car->audio[c].force * 2 ? v1 : car->audio[c].force * 2;
-      }
-      else if ((((car->audio[c].channel < 0) && (impactmultiplier != 0)) &&
-                (car->audio[c].surface1 != 10)) && (car->audio[c].surface1 != 8)) {
-        int force;
-        int shock;
-        int time;
-
-        if (0x28000 < car->audio[c].force) {
-          force = 0x28000;
-          if ((fixeddiv(car->audio[c].force,0x28000) << 5) / 0x10000 < 0x61) {
-            time = (fixeddiv(car->audio[c].force,0x28000) << 5) / 0x10000;
-          }
-          else {
-            time = 0x60;
-          }
+      else if ((((iVar2 < 0) && (iVar4 != 0)) && (piVar6[0x1e8] != 10)) && (piVar6[0x1e8] != 8)) {
+        iVar5 = piVar6[0x1ea];
+        if (iVar5 < 0x28001) {
+          iVar10 = 0x20;
         }
         else {
-          force = car->audio[c].force;
-          time = 0x20;
+          iVar2 = 0x28000;
+          iVar10 = fixeddiv(iVar5,0x28000);
+          iVar10 = iVar10 * 0x20;
+          if (iVar10 < 0) {
+            iVar10 = iVar10 + 0xffff;
+          }
+          iVar5 = iVar2;
+          if (iVar10 >> 0x10 < 0x61) {
+            iVar2 = fixeddiv(piVar6[0x1ea],0x28000);
+            iVar2 = iVar2 * 0x20;
+            iVar10 = iVar2 >> 0x10;
+            if (iVar2 < 0) {
+              iVar10 = iVar2 + 0xffff >> 0x10;
+            }
+          }
+          else {
+            iVar10 = 0x60;
+          }
         }
-        shock = fixedmult(force,impactmultiplier) / 0x10000;
-        if (((int)(u_int)f->jolt < shock) || ((int)(u_int)f->time < time)) {
-          f->fade = (u_char)(time >> 1);
-          f->time = (u_char)time;
-          f->jolt = (u_char)shock;
+        iVar5 = fixedmult(iVar5,iVar4);
+        if (iVar5 < 0) {
+          iVar5 = iVar5 + 0xffff;
+        }
+        if (((int)(u_int)Force_g[uVar3].jolt < iVar5 >> 0x10) ||
+           ((int)(u_int)Force_g[uVar3].time < iVar10)) {
+          Force_g[uVar3].fade = (u_char)(iVar10 >> 1);
+          Force_g[uVar3].time = (u_char)iVar10;
+          Force_g[uVar3].jolt = (u_char)((u_int)iVar5 >> 0x10);
         }
       }
-      c = c + -1;
+      piVar6 = piVar6 + -6;
+      iVar5 = iVar8;
+      iVar10 = iVar11;
     }
   }
-  if (frontmultiplier != 0) {
-    int clamped; /* SYM-CODEGEN-CARRIER: clamped -- forces the clamp onto the call-argument copy */
-
-    clamped = v0;
-    if (0xa0000 < clamped) {
-      clamped = 0xa0000;
-    }
-    v0 = fixedmult(clamped,frontmultiplier) / 0x10000;
+  if (frontmultiplier == 0) {
+    uVar9 = '\0';
   }
   else {
-    v0 = 0;
-  }
-  if (rearmultiplier != 0) {
-    int clamped;
-
-    clamped = v1;
-    if (0xf0000 < clamped) {
-      clamped = 0xf0000;
+    if (0xa0000 < iVar10) {
+      iVar10 = 0xa0000;
     }
-    v1 = fixedmult(clamped,rearmultiplier) / 0x10000;
+    iVar4 = fixedmult(iVar10,frontmultiplier);
+    uVar9 = (u_char)((u_int)iVar4 >> 0x10);
+    if (iVar4 < 0) {
+      uVar9 = (u_char)((u_int)(iVar4 + 0xffff) >> 0x10);
+    }
+  }
+  if (rearmultiplier == 0) {
+    uVar7 = '\0';
   }
   else {
-    v1 = 0;
+    if (0xf0000 < iVar5) {
+      iVar5 = 0xf0000;
+    }
+    iVar4 = fixedmult(iVar5,rearmultiplier);
+    uVar7 = (u_char)((u_int)iVar4 >> 0x10);
+    if (iVar4 < 0) {
+      uVar7 = (u_char)((u_int)(iVar4 + 0xffff) >> 0x10);
+    }
   }
-  f->high = (u_char)v0;
-  f->low = (u_char)v1;
+  Force_g[uVar3].high = uVar9;
+  Force_g[uVar3].low = uVar7;
   return;
 }
 
@@ -339,52 +289,46 @@ ForceUpd_audioRevLoop:
 void Force_StartUp(void)
 
 {
+  u_char *actuator_walk;
+  Force_tGlobal *force_walk;
   Force_tGlobal *f;
-
-  f = Force_g;
-  if (f < Force_g + 2) {
-    do {
-      f->active = '\0';
-      f->high = '\0';
-      f->low = '\0';
-      f->time = '\0';
-      f->actuator[0] = '\0';
-      f->actuator[1] = '\0';
-      f = f + 1;
-    } while (f < Force_g + 2);
-  }
+  
+  force_walk = Force_g;
+  actuator_walk = Force_g[0].actuator + 1;
+  do {
+    force_walk->active = '\0';
+    actuator_walk[-6] = '\0';
+    actuator_walk[-5] = '\0';
+    actuator_walk[-3] = '\0';
+    actuator_walk[-1] = '\0';
+    *actuator_walk = '\0';
+    force_walk = force_walk + 1;
+    actuator_walk = actuator_walk + 8;
+  } while (force_walk < (Force_tGlobal *)colourRGB);
   VSyncCallback(Force_Vbl);
-  Sched_AddFunction((Sched_tSchedule *)Force_SimWords[4],Force_Update,Cars_gHumanRaceCarList[0],0x32);
-  if (Force_GameSetupWords[3] == 1) {
-    Sched_AddFunction((Sched_tSchedule *)Force_SimWords[4],Force_Update,Cars_gHumanRaceCarList[1],0x32);
+  Sched_AddFunction(simGlobal.schedule32Hz,Force_Update,Cars_gHumanRaceCarList[0],0x32);
+  if (GameSetup_gData.commMode == 1) {
+    Sched_AddFunction(simGlobal.schedule32Hz,Force_Update,Cars_gHumanRaceCarList[1],0x32);
   }
   return;
 }
 
 /* ---- Force_Disable__Fv  [FORCE.CPP:250-258] SLD-VERIFIED ---- */
-/* PASS 29/29 (w39-a7).  The loop body/guard was already exact after w38-a9's guarded
- * do-while + direct struct-member stores; the whole 17-diff residual was the POST-loop
- * tail -- the oracle REMATERIALIZES `Force_gOffAlign`'s address at each of the two
- * `PadSetActAlign` call sites (2x `lui a1;addiu a1`, no saved reg, smaller frame), while
- * our build GCSE-hoisted it into `$s0` across the intervening `jal`.  That was NOT a
- * compiler-internal profitability wall as the old comment claimed: force.obj is a **-G8
- * object** (see tools/build.py PER_TU_FLAGS), and under -G8 the 6-byte Force_gOffAlign is
- * small data, so cc1plus emits the `la` MACRO form instead of splitting %hi/%lo itself --
- * there is no split address expression left for GCSE to hoist.  Fixed by the per-TU
- * g_value=8 key, not by a source change. */
 void Force_Disable(void)
 
 {
+  u_char *puVar1;
+  Force_tGlobal *pFVar2;
   Force_tGlobal *f;
-
-  f = Force_g;
-  if (f < Force_g + 2) {
-    do {
-      f->actuator[0] = '\0';
-      f->actuator[1] = '\0';
-      f = f + 1;
-    } while (f < Force_g + 2);
-  }
+  
+  pFVar2 = Force_g;
+  puVar1 = Force_g[0].actuator + 1;
+  do {
+    puVar1[-1] = '\0';
+    *puVar1 = '\0';
+    pFVar2 = pFVar2 + 1;
+    puVar1 = puVar1 + 8;
+  } while (pFVar2 < (Force_tGlobal *)colourRGB);
   PadSetActAlign(0,Force_gOffAlign);
   PadSetActAlign(4,Force_gOffAlign);
   VSyncCallback((void *)0x0);
@@ -392,56 +336,37 @@ void Force_Disable(void)
 }
 
 /* ---- Force_IsForceOn__FP8Car_tObj  [FORCE.CPP:264-273] SLD-VERIFIED ---- */
-/* PASS 23/23 (w39-a7, was a "certified" 14-diff allocator floor -- the floor claim was
- * WRONG).  Two things had to be right:
- *   (1) branch polarity: the carIndex-range guard is an early-return `if(>=2) return 0;`
- *       (the oracle's fall-through IS the real body), not the inline-body `if(<2){...}`
- *       form -- that had cost 3 extra insns (w38-a9).
- *   (2) the last 14 diffs were NOT the "dead-param $a0 reuse" the old comment blamed.
- *       They are the COMMUTATIVE-addu / sll-vs-base SCHEDULING tie-break (methodology
- *       Sec.5.0c): the oracle computes the scaled index FIRST -- `sll $v0,$a0,3` sits in
- *       the guard's `beqz` delay slot -- then materializes the Force_g base into $v1 and
- *       does `addu $v0,$v0,$v1` (scaled index = addu operand 1).  A plain `Force_g[...]`
- *       subscript makes gcc emit `addu rd,BASE,scaled` and materialize the base first,
- *       which cascades the whole $v0/$v1 pair.  Writing the address as an explicit
- *       int-cast with the INDEX TERM FIRST, `(car->carIndex << 3) + (int)Force_g`, puts the
- *       just-computed shift in addu operand 1 and frees the schedule => byte-exact.
- * Falsified on the way (do not re-try): the single `&&` boolean form (IDA renders this fn
- * as `v1 < 2 && LOBYTE(...) == 1`) REGRESSES 14 -> 20; `u_int` vs `int` for the local is
- * neutral; the dead-param-reuse hack `car = (Car_tObj *)car->carIndex;` also reaches PASS
- * but is not needed once the addu operand order is right.  The named result pointer is
- * SYM's `Force_tGlobal *f` in $v0; GCC CSEs the repeated field read so the index remains
- * in $a0 exactly as IDA (`sub_800CB158`) shows. */
 int Force_IsForceOn(Car_tObj *car)
 
 {
   Force_tGlobal *f;
-
+  
   if (1 < Replay_ReplayMode) {
     return 0;
   }
-  if ((u_int)car->carIndex >= 2) {
-    return 0;
+  if ((u_int)car->carIndex < 2) {
+    return (u_int)(Force_g[car->carIndex].active == '\x01');
   }
-  f = (Force_tGlobal *)((car->carIndex << 3) + (int)Force_g);
-  return f->active == 1;
+  return 0;
 }
 
 /* ---- Force_Pause__Fv  [FORCE.CPP:279-285] SLD-VERIFIED ---- */
 void Force_Pause(void)
 
 {
+  u_char *puVar1;
+  Force_tGlobal *pFVar2;
   Force_tGlobal *f;
-
-  f = Force_g;
-  if (f < Force_g + 2) {
-    do {
-      f->high = '\0';
-      f->low = '\0';
-      f->time = '\0';
-      f = f + 1;
-    } while (f < Force_g + 2);
-  }
+  
+  pFVar2 = Force_g;
+  puVar1 = &Force_g[0].time;
+  do {
+    puVar1[-3] = '\0';
+    puVar1[-2] = '\0';
+    *puVar1 = '\0';
+    pFVar2 = pFVar2 + 1;
+    puVar1 = puVar1 + 8;
+  } while (pFVar2 < (Force_tGlobal *)colourRGB);
   return;
 }
 
@@ -463,6 +388,19 @@ void Force_HitSign(Car_tObj *car)
 void Force_HitWall(int impulse)
 
 {
+  int shock;
+  int skids;
+  int impacts;
+  int time;
+  int padnum;
+  int force;
+  int v1;
+  int v0;
+  int c;
+  int impactmultiplier;
+  int frontmultiplier;
+  int rearmultiplier;
+  
   return;
 }
 

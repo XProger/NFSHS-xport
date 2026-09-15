@@ -1,10 +1,14 @@
-/* eaclib/psx/sndpsxz/stagpat.c -- RECONSTRUCTED from nfs4-f.exe. NOT original source.  *** 8 PASS ***
+#include "../../../nfs4_types.h"
+#include "../../../lib/snd.h"
+#include "../../../mips_semantics.h"
+
+/* eaclib/psx/sndpsxz/stagpat.c -- RECONSTRUCTED from nfs4-f.exe. NOT original source.  *** 8/8 ***
  *   Source obj : nfs4\eaclib\psx\stagpat.obj ; archive C:\nfs4\EACLIB\PSX\SNDPSXZ.LIB (xlsx col11)
  *   8 fns @[0x80101ABC .. 0x801025C0].  The patch-trigger engine -- parse a sound bank's tag stream, build
  *   per-note "timbres", and launch the voices (cSNDplay's core).  Ghidra nfs4-f.exe.c (stagpat) + IDA sigs.
  *
- *   The two dense parsers (iSNDplaytaggedpatch 864B / iSNDplaytaggedtimbre 1280B) were reconstructed
- *   from Ghidra + disasm-v3 (7-arg timbre entry, range fields, and captured returns Ghidra lost).
+ *   ALL 8 fns SEALED.  The two dense parsers (iSNDplaytaggedpatch 864B / iSNDplaytaggedtimbre 1280B) were
+ *   reconstructed from Ghidra + disasm-v3 (7-arg timbre call, range fields, captured returns Ghidra lost).
  *   NEW leaf deps: sgettag(iSNDgettag), sdresolv(iSNDplatformresolve/remove), srrange(randrange),
  *   srandom(iSNDrandom), sdplapat(iSNDplatformplay).
  *
@@ -13,139 +17,166 @@
  *   BANK header: +0x03 flags (bit1 = 8-byte header, bit0 = resolved), +0x04/+0x08 tag stream start.
  */
 
-extern int          sndgs[];
-extern signed char  snddefaultenvelope;          /* default envelope table (sclcptch/data-mat) */
-/* Five-byte extern view keeps this byte out of -G4 small-data addressing without changing the
- * actual one-byte definition owned by snddata.c; only element zero exists and is accessed here. */
-extern unsigned char DAT_801371cc[5];            /* rolling key-group counter */
+extern "C" int          sndgs[];
+extern "C" signed char  snddefaultenvelope;          /* default envelope table (sclcptch/data-mat) */
+extern "C" char         DAT_801371cc;                /* rolling key-group counter */
 
-extern int  iSNDgettag(int *cursor, unsigned int *outId, int *outVal, int *outPtr);  /* sgettag (4-arg) */
-extern int  iSNDplatformresolve(int resolv, int patch_idx, int scratch);  /* sdresolv */
-extern int  iSNDplatformremove(int resolv, int *patch_idx);               /* sdresolv */
-extern int  randrange(int range);                                         /* srrange  */
-extern int  iSNDrandom(void);                                             /* srandom  */
-extern int  iSNDallocchan(unsigned int priority, int numChannels, int a2, unsigned int *out); /* salloc */
-extern void iSNDfreechan(int chan);                                       /* salloc   */
-extern int  iSNDcalcpitch(int note);                                      /* sclcptch */
-extern void iSNDcalcvol(int chan);                                /* spatkey  */
-extern int  iSNDplatformrate[];                                           /* spktplay/data */
-extern int  iSNDplatformplay(int chan, int voice, int level, int pitch, int a5,
-                             int fx, int volAngle, int pitchOffset);       /* sdplapat */
-extern void trap(unsigned int code);                                      /* compiler div-by-zero break */
+extern "C" int iSNDgettag(intptr_t *cursor, unsigned int *outId, int *outVal, intptr_t *outPtr); /* sgettag */
+extern "C" int iSNDplatformresolve(intptr_t resolv, intptr_t patchBase, int *scratch); /* sdresolv */
+extern "C" int iSNDplatformremove(intptr_t resolv, int *patch_idx);                    /* sdresolv */
+extern "C" int  randrange(int range);                                         /* srrange  */
+extern "C" int  iSNDrandom(void);                                             /* srandom  */
+extern "C" int  iSNDallocchan(unsigned int priority, int numChannels, int a2, unsigned int *out); /* salloc */
+extern "C" intptr_t iSNDfreechan(int chan);                                   /* salloc   */
+extern "C" int  iSNDcalcpitch(int note);                                      /* sclcptch */
+extern "C" void iSNDcalcvol(int chan);                                        /* spatkey  */
+extern "C" int  iSNDplatformplay(intptr_t stream, int voice, int level, int pitch,
+                                   int sampleArg, int fx, int volAngle, int volDelta); /* sdplapat */
+extern "C" void trap(unsigned int code);                                      /* compiler div-by-zero break */
 
-extern void iSNDresetpatch(int patch);                          /* @0x80101ABC */
-extern unsigned char *iSNDresettimbre(int *t, int buf);         /* @0x80101AC4 */
-extern void iSNDresolveheader(int *hdr, int *out);              /* @0x80101B7C */
-extern int  iSNDfindfreekey(void);                              /* @0x80101BFC */
-extern int  iSNDresolvetaggedpatch(int bank, int patch_idx, int scratch);  /* @0x801024EC */
-extern int  iSNDremovetaggedpatch(int bank, int *patch_idx);    /* @0x801025C0 */
-extern int  iSNDplaytaggedtimbre(int timbre, int tag, int vol, int header,
+extern "C" void iSNDresetpatch(SndTimbre *patch);                   /* @0x80101ABC */
+extern "C" unsigned char *iSNDresettimbre(SndTimbre *t, SndTimbre *buf); /* @0x80101AC4 */
+extern "C" intptr_t iSNDresolveheader(SndTimbre *hdr, const SndTimbre *out); /* @0x80101B7C */
+extern "C" void iSNDfindfreekey(void);                              /* @0x80101BFC */
+extern "C" int iSNDresolvetaggedpatch(unsigned char *bank, intptr_t patchBase,
+                                       int *scratch);                /* @0x801024EC */
+extern "C" int iSNDremovetaggedpatch(unsigned char *bank, int *patch_idx); /* @0x801025C0 */
+extern "C" int  iSNDplaytaggedtimbre(intptr_t timbre, const unsigned char *tag,
+                                     SndTimbre *vol, SndTimbre *header,
                                      int baseNote, int velScale, int pitchOff);  /* @0x80101C8C */
-extern int  iSNDplaytaggedpatch(int patch, int tag);            /* @0x8010218C */
-extern int  SNDstop(unsigned int tag);                          /* sstop  */
-extern int  iSNDgetchan(unsigned int tag);                      /* salloc */
-extern void iSNDenteraudio(void);                               /* sserver */
-extern void iSNDleaveaudio(void);
+extern "C" int iSNDplaytaggedpatch(unsigned char *patch, int *tag); /* @0x8010218C */
+extern "C" int  SNDstop(int tag);                                   /* sstop  */
+extern "C" int  iSNDgetchan(int tag);                               /* salloc */
+extern "C" void iSNDenteraudio(void);                               /* sserver */
+extern "C" void iSNDleaveaudio(void);
+
+/* Tag ids are PSX 32-bit word indices.  Route them explicitly so pointer
+ * fields may widen on a host without shifting every later tag field. */
+static void snd_timbre_set_tag(SndTimbre *t, unsigned int id, intptr_t value)
+{
+    switch (id) {
+    case 0: t->f00=(int)value; break; case 1: t->velMin=(int)value; break;
+    case 2: t->velMax=(int)value; break; case 3: t->noteMin=(int)value; break;
+    case 4: t->noteMax=(int)value; break; case 5: t->priority=(int)value; break;
+    case 6: t->allocFlags=(int)value; break; case 7: t->baseNote=(int)value; break;
+    case 8: t->noteLimit=(int)value; break; case 9: t->segmentCount=(int)value; break;
+    case 10: t->duration=(int)value; break; case 11: t->channels=(int)value; break;
+    case 12: t->detune=(int)value; break; case 13: t->detuneRandom=(int)value; break;
+    case 14: t->pan=(int)value; break; case 15: t->panRandom=(int)value; break;
+    case 16: t->pitchBase=(int)value; break; case 17: t->pitchRandom=(int)value; break;
+    case 18: t->finalCurve=value; break; case 19: t->volumeScale=(int)value; break;
+    case 20: t->f50=(int)value; break; case 21: t->panCurve=value; break;
+    case 22: t->f58=(int)value; break; case 23: t->f5C=value; break;
+    case 24: t->f60=(int)value; break; case 25: t->sweepTable=value; break;
+    case 26: t->f68=(int)value; break; case 27: t->f6C=(int)value; break;
+    case 28: t->sweepBase=(int)value; break; case 29: t->velocityEnvelope=value; break;
+    case 30: t->velocityPeriod=(int)value; break;
+    case 31: t->velocityRandomPhase=(int)value; break;
+    case 32: t->pitchLfo=value; break; case 33: t->pitchPeriod=(int)value; break;
+    case 34: t->pitchLfoStart=(int)value; break;
+    case 35: t->pitchRandomPhase=(int)value; break;
+    case 36: t->patchFlag=(int)value; break; case 37: t->active=(int)value; break;
+    }
+}
 
 /* iSNDresetpatch @0x80101ABC : clear a patch-play state's flag word (+0x90). */
-extern void iSNDresetpatch(int patch)
+extern "C" void iSNDresetpatch(SndTimbre *patch)
 {
-    *(int *)(patch + 0x90) = 0;
+    patch->patchFlag = 0;
 }
 
 /* iSNDresettimbre @0x80101AC4 : zero the 0x98-byte timbre `buf` then load the default timbre into `t`
  *   (note range 0..0x3c, full velocity, default envelope). */
-extern unsigned char *iSNDresettimbre(int *t, int buf)
+extern "C" unsigned char *iSNDresettimbre(SndTimbre *t, SndTimbre *buf)
 {
-    int i = 0x25;
-    int *p = (int *)(buf + 0x94);
-    do {                                              /* zero the whole timbre buffer */
-        *p = 0;
-        i--;
-        p--;
-    } while (-1 < i);
-    t[1] = 0;
-    t[2] = 0x7f;
-    t[3] = 0;
-    t[4] = 0x7f;
-    t[5] = -1;
-    t[6] = 0;
-    t[7] = 0x3c;
-    t[8] = -1;
-    t[9] = 1;
-    t[10] = 0;
-    t[11] = 1;
-    t[12] = 0x40;
-    t[13] = 0;
-    t[14] = 0x7f;
-    t[15] = 0;
-    t[16] = 0;
-    t[17] = 0;
-    t[18] = 0;
-    t[19] = 0;
-    t[21] = 0;
-    t[23] = 0;
-    t[28] = 0x7f;
-    t[29] = 0;
-    t[30] = 0;
-    t[31] = 0;
-    t[32] = 0;
-    t[33] = 0;
-    t[35] = 0;
-    t[34] = 0;
-    t[37] = 1;
-    t[25] = (int)&snddefaultenvelope;
+    SndTimbre zero = {};
+    *buf = zero;                                      /* retail clears all 0x98 Win32 bytes */
+    t->priority=-1; t->noteLimit=-1; t->baseNote=0x3c; t->detune=0x40;
+    t->velMin=0; t->velMax=0x7f; t->noteMin=0; t->noteMax=0x7f;
+    t->allocFlags=0; t->segmentCount=1; t->duration=0; t->channels=1;
+    t->detuneRandom=0; t->pan=0x7f; t->panRandom=0;
+    t->pitchBase=0; t->pitchRandom=0; t->finalCurve=0; t->volumeScale=0;
+    t->panCurve=0; t->f5C=0; t->sweepBase=0x7f;
+    t->velocityEnvelope=0; t->velocityPeriod=0; t->velocityRandomPhase=0;
+    t->pitchLfo=0; t->pitchPeriod=0; t->pitchRandomPhase=0; t->pitchLfoStart=0;
+    t->active=1; t->sweepTable=(intptr_t)&snddefaultenvelope;
     return (unsigned char *)&snddefaultenvelope;
 }
 
 /* iSNDresolveheader @0x80101B7C : fold an override header `out` into the running timbre header `hdr`
  *   (sum the envelope / volume / pitch fields). */
-extern void iSNDresolveheader(int *hdr, int *out)
+extern "C" intptr_t iSNDresolveheader(SndTimbre *hdr, const SndTimbre *out)
 {
-    *(int *)((int)hdr + 0x48) = *(int *)((int)out + 0x48) + *(int *)((int)hdr + 0x48);
-    *(int *)((int)hdr + 0x54) = *(int *)((int)out + 0x54) + *(int *)((int)hdr + 0x54);
-    *(int *)((int)hdr + 0x5c) = *(int *)((int)out + 0x5c) + *(int *)((int)hdr + 0x5c);
-    *(int *)((int)hdr + 0x74) = *(int *)((int)out + 0x74) + *(int *)((int)hdr + 0x74);
-    *(int *)((int)hdr + 0x80) = *(int *)((int)out + 0x80) + *(int *)((int)hdr + 0x80);
-    if (*(int *)((int)hdr + 100) != 0)
-        *(int *)((int)hdr + 100) = *(int *)((int)out + 100) + *(int *)((int)hdr + 100);
+    intptr_t r;
+    hdr->finalCurve += out->finalCurve;
+    hdr->panCurve += out->panCurve;
+    hdr->f5C += out->f5C;
+    hdr->velocityEnvelope += out->velocityEnvelope;
+    r = hdr->pitchLfo + out->pitchLfo;
+    hdr->pitchLfo = r;
+    if (hdr->sweepTable != 0) {
+        r = hdr->sweepTable + out->sweepTable;
+        hdr->sweepTable = r;
+    }
+    return r;
 }
 
 /* iSNDfindfreekey @0x80101BFC : advance the rolling key-group counter (DAT_801371cc) to a value not
- *   currently owned by any held channel; RETURNS the chosen key (oracle: `lbu v0,key; jr ra` --
- *   iSNDplaytaggedpatch captures it in $fp and stamps it into every started voice's +0x37). */
-extern int iSNDfindfreekey(void)
+ *   currently owned by any held channel. */
+extern "C" void iSNDfindfreekey(void)
 {
-    int   i, count, probe;
-    unsigned char key;
-    int *gs;
-    char *slot;
-top:
-    DAT_801371cc[0] = DAT_801371cc[0] + 1;        /* lbu/addiu/sb; the == 0 test reuses the CSE'd value */
-    if (DAT_801371cc[0] == 0)                     /* skip 0 (the "no group" sentinel) */
-        DAT_801371cc[0] = DAT_801371cc[0] + 1;
-    i = 0;
-    gs = sndgs;                                   /* one la base for the +0x11 / +0x94 displacements */
-    probe = ((unsigned char *)gs)[0x11];
-    if (probe == 0)
-        goto done;
-    count = ((unsigned char *)gs)[0x11];
-    key   = DAT_801371cc[0];
-    slot  = (char *)gs[0x25];
-loop:                                             /* goto-formed: no LOOP notes -> no giv anchoring */
-    if (*(signed char *)(slot + 0xb) != 0) {
-        if (*(unsigned char *)(slot + 0x37) == key)
-            goto top;                             /* key owned by a held channel -> try the next one */
+    char key;
+    int  i, slot;
+    while (1) {
+        key = DAT_801371cc + 1;
+        if ((char)(DAT_801371cc + 1) == 0)        /* skip 0 (the "no group" sentinel) */
+            key = DAT_801371cc + 2;
+        DAT_801371cc = key;
+        i = 0;
+        slot = sndgs[0x25];
+        if (((unsigned char *)sndgs)[0x11] == 0)
+            break;
+        while (*(char *)(slot + 0xb) == 0 || *(char *)(slot + 0x37) != DAT_801371cc) {
+            i++;
+            slot += 100;
+            if ((int)(unsigned)((unsigned char *)sndgs)[0x11] <= i)
+                return;                           /* nobody owns this key -> it is free */
+        }
     }
-    i++;
-    slot += 0x64;
-    if (i < count)
-        goto loop;
-done:
-    return DAT_801371cc[0];
-    /* MATCH: DAT_801371cc's five-byte extern VIEW suppresses -G4 gp-relative addressing while its
-     * real storage remains the one-byte snddata.c definition.  Keeping `probe` distinct from `count`
-     * then preserves the oracle's branch value in v1 and copies it to a2 for the loop bound. */
+}
+
+/* iSNDresolvetaggedpatch @0x801024EC : walk a bank's tag stream and resolve its SPU sample data (tag 0xfd
+ *   = platform resolve), marking the bank resolved (+3 |= 1).  Returns -1 / resolve result. */
+extern "C" int iSNDresolvetaggedpatch(unsigned char *bank, intptr_t patchBase, int *scratch)
+{
+    intptr_t cursor, tagPtr;
+    unsigned int tagId;
+    int tagValue;
+    int r = -1;
+    cursor = (intptr_t)(bank + ((bank[3] & 2) == 0 ? 4 : 8));
+    while (iSNDgettag(&cursor, &tagId, &tagValue, &tagPtr) != 0) {
+        if (tagId == 0xfd)
+            r = iSNDplatformresolve(cursor, patchBase, scratch);
+    }
+    if (-1 < r)
+        bank[3] |= 1;
+    return r;
+}
+
+/* iSNDremovetaggedpatch @0x801025C0 : walk a bank's tag stream and release its resolved SPU data (tag 0xfd
+ *   = platform remove), clearing the resolved flag (+3 &= ~1). */
+extern "C" int iSNDremovetaggedpatch(unsigned char *bank, int *patch_idx)
+{
+    intptr_t cursor, tagPtr;
+    unsigned int tagId;
+    int tagValue;
+    cursor = (intptr_t)(bank + ((bank[3] & 2) == 0 ? 4 : 8));
+    while (iSNDgettag(&cursor, &tagId, &tagValue, &tagPtr) != 0) {
+        if (tagId == 0xfd)
+            iSNDplatformremove(cursor, patch_idx);
+    }
+    bank[3] &= 0xfe;
+    return 0;
 }
 
 /* iSNDplaytaggedtimbre @0x80101C8C : launch ONE note's voice from a fully-resolved timbre.  Folds the
@@ -156,149 +187,134 @@ done:
  *     baseNote = the note being played (transposes pitch off the timbre's base note vol[0x1c])
  *     velScale = velocity (scales the pan curve)
  *     pitchOff = pitch-bend offset (applied when vol[0x90] is set)
- *   iSNDallocchan is 4-arg (vol[0x14] priority, vol[0x2c] numCh, vol[0x18] flag, &out). The final
- *   iSNDplatformplay call is 8-arg: the oracle stores args 5..8 at sp+0x10..0x1c. This reconstruction
- *   restores the detune table/scaling path, both PRNG return uses, all four stack arguments, and the
- *   success/failure return contract. MATCH (320/320): modeling the one-word platform-rate storage as
- *   an array element makes gcc split its address materialization around the independent byte load. */
-extern int iSNDplaytaggedtimbre(int timbre, int tag, int vol, int header,
+ *   iSNDallocchan is 4-arg (vol[0x14] priority, vol[0x2c] numCh, vol[0x18] flag, &out).  Retail passes
+ *   eight words to iSNDplatformplay; its body consumes the first seven while preserving the source ABI. */
+extern "C" int iSNDplaytaggedtimbre(intptr_t timbre, const unsigned char *tag,
+                                    SndTimbre *vol, SndTimbre *header,
                                     int baseNote, int velScale, int pitchOff)
 {
-    int b7  = *(signed char *)(tag + 7);
-    int b8  = *(signed char *)(tag + 8);
-    int b9  = *(signed char *)(tag + 9);
-    int b10 = *(signed char *)(tag + 10);
+    unsigned char b7  = tag[7];
+    signed char   b8  = (signed char)tag[8];
+    unsigned char b9  = tag[9];
+    unsigned char b10 = tag[10];
     unsigned int  out;
-    int           chan, slot, detune, pan, sw, s28, num, active, tmp;
-    int           field28, field4c, field54, field5c;
-    int           playOffset, playResult;
-    int           playLevel, playPitch, playTag;
-    unsigned int  sv;
+    int           chan, detune, pan, panc, sw, s28, num, volAngle, fxLevel;
+    short         sv;
 
-    iSNDresolveheader((int *)vol, (int *)header);
+    iSNDresolveheader(vol, header);
 
-    detune = *(int *)(vol + 0x30);
-    if (*(int *)(vol + 0x34) != 0)
-        detune += randrange(*(int *)(vol + 0x34));
-    if (detune < 0x80)
-        goto detune_low;
-    detune = 0x7f;
-    goto detune_done;
-detune_low:
-    if (detune < 0)
-        detune = 0;
-detune_done:
+    detune = vol->detune;
+    if (vol->detuneRandom != 0)
+        detune = nfs4_mips_addu_s32(detune, randrange(vol->detuneRandom));
+    if (detune < 0x80) { if (detune < 0) detune = 0; }
+    else                 detune = 0x7f;
 
-    chan = iSNDallocchan(*(unsigned int *)(vol + 0x14), *(int *)(vol + 0x2c), *(int *)(vol + 0x18), &out);
-    if (chan < 0)
-        return chan;
-    {
-        slot = sndgs[0x25] + chan * 100;
-        *(unsigned char *)(slot + 0x33) = *(unsigned char *)(vol + 0x94);
-        sv = *(unsigned short *)(vol + 0x40);
-        *(short *)(slot + 0x5c) = sv;
-        sv = sv - (*(int *)(vol + 0x1c) - baseNote) * 100;
-        *(short *)(slot + 0x5c) = sv;
-        if (*(int *)(vol + 0x90) != 0)
-            *(short *)(slot + 0x5c) = sv + pitchOff;
-        if (*(int *)(vol + 0x44) != 0)
-            *(short *)(slot + 0x5c) = *(unsigned short *)(slot + 0x5c) + randrange(*(int *)(vol + 0x44));
-        *(volatile int *)(slot + 0x44) = *(int *)(vol + 0x48);
-        field54 = *(int *)(vol + 0x54);
-        *(volatile int *)(slot + 0x48) = field54;
-        field5c = *(int *)(vol + 0x5c);
-        *(volatile int *)(slot + 0x1c) = (int)b8 << 0x10;
-        *(volatile int *)(slot + 0x4c) = field5c;
-        active = *(signed char *)(slot + 0x33);
-        *(int *)(slot + 0x14) = 0;
-        *(unsigned char *)(slot + 0x3d) = b7;
-        if (active != 1)
-            b7 = (b7 - 0x40) * active + 0x40;
-        b7 = detune + b7 - 0x40;
-        if (b7 < 0)
-            b7 = 0;
-        else if (0x7f < b7)
-            b7 = 0x7f;
-        if (*(int *)(slot + 0x48) != 0)
-            b7 = *(signed char *)(*(int *)(slot + 0x48) + b7);
-        pan = *(int *)(vol + 0x38);
-        if (*(int *)(vol + 0x3c) != 0)
-            pan += randrange(*(int *)(vol + 0x3c));
-        if (pan < 0x80)
-            goto pan_low;
-        pan = 0x7f;
-pan_low:
-        if (pan < -0x80)
-            pan = -0x80;
-        *(char *)(slot + 0x2e) = (char)detune;
-        *(char *)(slot + 0x2c) = (char)((pan * velScale) / 0x7f);
-        field28 = *(int *)(vol + 0x28);
-        *(unsigned char *)(slot + 0x2f) = b9;
-        *(short *)(slot + 0x5a) = (short)(field28 * 100);
-        *(int *)(slot + 0x40) = *(int *)(vol + 100);
-        *(int *)(slot + 0x24) = *(int *)(vol + 0x70) << 0x10;
-        *(unsigned char *)(slot + 0x31) = 0;
-        *(unsigned char *)(slot + 0x30) = *(unsigned char *)(vol + 0x24);
-        *(unsigned char *)(slot + 0x32) = *(unsigned char *)(vol + 0x20);
-        sw = **(int **)(slot + 0x40);
-        *(int *)(slot + 0x28) = sw;
+    chan = iSNDallocchan((unsigned int)vol->priority, vol->channels, vol->allocFlags, &out);
+    if (-1 < chan) {
+        SndVoice *voice = &SND->voices[chan];
+        voice->f33 = (signed char)vol->active;
+        sv = *(short *)&vol->pitchBase;
+        voice->f5C = sv;
+        sv = (short)(sv - nfs4_mips_mult_s32(vol->baseNote - baseNote, 100));
+        voice->f5C = sv;
+        if (vol->patchFlag != 0)
+            voice->f5C = (short)(sv + (short)pitchOff);
+        if (vol->pitchRandom != 0)
+            voice->f5C = (short)(voice->f5C + (short)randrange(vol->pitchRandom));
+        voice->f44 = vol->finalCurve;
+        voice->pancurve = vol->panCurve;
+        voice->f1C = nfs4_mips_sll_s32((int)b8, 16);
+        voice->f4C = vol->f5C;
+        voice->f14 = 0;
+        voice->pan_cur = (signed char)b7;
+
+        volAngle = (int)b7;
+        if (voice->f33 != 1)
+            volAngle = nfs4_mips_addu_s32(nfs4_mips_mult_s32(volAngle - 0x40,
+                                                              (int)voice->f33), 0x40);
+        volAngle = nfs4_mips_addu_s32(detune, volAngle) - 0x40;
+        if (volAngle < 0) volAngle = 0;
+        else if (volAngle >= 0x80) volAngle = 0x7f;
+        if (voice->pancurve != 0)
+            volAngle = ((signed char *)voice->pancurve)[volAngle];
+
+        pan = vol->pan;
+        if (vol->panRandom != 0)
+            pan = nfs4_mips_addu_s32(pan, randrange(vol->panRandom));
+        panc = pan;
+        if (0x7f < pan)   panc = 0x7f;
+        if (pan < -0x80)  panc = -0x80;
+        voice->f2C = (signed char)((nfs4_mips_mult_s32(panc, velScale)) / 0x7f);
+        voice->pan = (signed char)detune;
+        voice->f2F = (signed char)b9;
+        voice->f5A = (short)nfs4_mips_mult_s32(vol->duration, 100);
+        voice->f40 = vol->sweepTable;
+        voice->f31 = 0;
+        voice->f24 = nfs4_mips_sll_s32(vol->sweepBase, 16);
+        voice->f30 = (signed char)vol->segmentCount;
+        voice->f32 = (signed char)vol->noteLimit;
+        sw = *(int *)voice->f40;
+        voice->f28 = sw;
         if (sw < 0)
-            *(int *)(slot + 0x28) = 0x7fffffff;
-        s28 = *(int *)(slot + 0x28);
-        num = *(int *)(*(int *)(slot + 0x40) + 4) * 0x10000 - *(int *)(slot + 0x24);
-        *(int *)(slot + 0x20) = num / s28;
-        *(int *)(slot + 0x50) = *(int *)(vol + 0x74);
-        *(int *)(slot + 0x54) = *(int *)(vol + 0x80);
-        *(unsigned char *)(slot + 0x38) = *(unsigned char *)(vol + 0x78);
-        *(unsigned char *)(slot + 0x39) = *(unsigned char *)(vol + 0x84);
-        *(unsigned short *)(slot + 0x58) = (unsigned short)*(unsigned char *)(vol + 0x88);
+            voice->f28 = 0x7fffffff;
+        s28 = voice->f28;
+        num = nfs4_mips_subu_s32(nfs4_mips_sll_s32(((int *)voice->f40)[1], 16), voice->f24);
+        if (s28 == 0)  trap(0x1c00);
+        if (s28 == -1 && num == (int)0x80000000)  trap(0x1800);
+        voice->f20 = num / s28;
+        voice->f50 = vol->velocityEnvelope;
+        voice->f54 = vol->pitchLfo;
+        voice->f38 = (unsigned char)vol->velocityPeriod;
+        voice->f39 = (unsigned char)vol->pitchPeriod;
+        *(unsigned short *)&voice->_g58[0] = (unsigned short)(unsigned char)vol->pitchLfoStart;
         {
-            unsigned int rv = *(unsigned int *)(vol + 0x7c);
-            if (rv != 0) {
-                rv = (unsigned int)iSNDrandom();
-                *(char *)(slot + 0x3a) = (char)(rv % *(unsigned int *)(vol + 0x78));
-            } else
-                *(unsigned char *)(slot + 0x3a) = 0;
-            rv = *(unsigned int *)(vol + 0x8c);
-            if (rv != 0) {
-                rv = (unsigned int)iSNDrandom();
-                *(char *)(slot + 0x3b) = (char)(rv % *(unsigned int *)(vol + 0x84));
-            } else
-                *(unsigned char *)(slot + 0x3b) = 0;
+            unsigned int rv = (unsigned int)vol->velocityRandomPhase;
+            if (rv == 0) {
+                voice->f3A = 0;
+            } else {
+                unsigned int randomValue = (unsigned int)iSNDrandom();
+                if ((unsigned int)vol->velocityPeriod == 0) trap(0x1c00);
+                voice->f3A = (unsigned char)(randomValue % (unsigned int)vol->velocityPeriod);
+            }
+            rv = (unsigned int)vol->pitchRandomPhase;
+            if (rv == 0) {
+                voice->f3B = 0;
+            } else {
+                unsigned int randomValue = (unsigned int)iSNDrandom();
+                if ((unsigned int)vol->pitchPeriod == 0) trap(0x1c00);
+                voice->f3B = (unsigned char)(randomValue % (unsigned int)vol->pitchPeriod);
+            }
         }
-        *(short *)(slot + 0x3e) = *(short *)(tag + 0xe);
-        *(short *)(slot + 0x60) = *(short *)(tag + 0xc);
-        *(short *)(slot + 0x5e) = 0;
+        *(short *)&voice->_g3E[0] = *(const short *)(tag + 0xe);
+        voice->f5E = 0;
+        voice->f60 = *(const unsigned short *)(tag + 0xc);
         iSNDcalcpitch(chan);
-        field4c = *(unsigned char *)(vol + 0x4c);
-        *(unsigned char *)(slot + 0x35) = b10;
-        *(unsigned char *)(slot + 0x34) = field4c;
-        *(unsigned char *)(slot + 10)   = *(unsigned char *)(tag + 4);
-        *(short *)(slot + 8) = *(short *)tag;
+        voice->f35 = (signed char)b10;
+        voice->f34 = (signed char)vol->volumeScale;
+        voice->bank = (signed char)tag[4];
+        *(short *)&voice->_g08[0] = *(const short *)tag;
         iSNDcalcvol(chan);
-        if (*(signed char *)(tag + 0xb) != 0) {
-            tmp = *(unsigned short *)(tag + 0x10);
-            playOffset = *(short *)(tag + 0x12);
-        } else {
-            tmp = b7;
-            tmp = tmp - 0x40;
-            tmp = tmp << 8;
-            tmp = (unsigned short)tmp;
-            playOffset = 0;
+        fxLevel = nfs4_mips_mult_s32(sndgs[0x28], (int)voice->f34);
+        fxLevel = nfs4_mips_mult_s32(fxLevel, (int)voice->f35) / 0x7f;
+        {
+            int volParam = nfs4_mips_sll_s32(volAngle - 0x40, 8) & 0xffff;
+            int volDelta = 0;
+            if (tag[0xb] != 0) {
+                volParam = *(const unsigned short *)(tag + 0x10);
+                volDelta = *(const short *)(tag + 0x12);
+            }
+            int playResult = iSNDplatformplay(timbre, chan, (int)voice->vol_l,
+                                              (int)(unsigned)voice->f62,
+                                              *(const unsigned short *)(tag + 0xe), fxLevel,
+                                              volParam, volDelta);
+            if (playResult < 0) {
+                iSNDfreechan(chan);
+                return playResult;
+            }
         }
-        playTag = *(unsigned short *)(tag + 0xe);
-        playLevel = *(signed char *)(slot + 0x2d);
-        playPitch = *(unsigned short *)(slot + 0x62);
-        playResult = iSNDplatformplay(timbre, chan, playLevel, playPitch, playTag,
-                                      (iSNDplatformrate[0] * *(signed char *)(slot + 0x34) *
-                                       *(signed char *)(slot + 0x35)) / 16129,
-                                      tmp, playOffset);
-        if (playResult < 0)
-            iSNDfreechan(chan);
-        else
-            return (int)out;
-        return playResult;
+        return nfs4_mips_bits_to_s32(out);
     }
+    return chan;
 }
 
 /* iSNDplaytaggedpatch @0x8010218C : THE cSNDplay entry -- parse a patch's tag stream into per-note timbres
@@ -309,143 +325,97 @@ pan_low:
  *   The started voices are collected and joined into a key group; on any failure all are SNDstop'd.
  *   Ghidra body + disasm: range fields are builtTimbre +4/+8 (vel min/max), +0xc/+0x10 (note min/max);
  *   the iSNDplaytaggedtimbre return (Ghidra lost it to void-typing) is the started voice tag.
- *     7-arg call: (timbreData, tag, &builtTimbre, &header, note, vel, pitchOff). pitchOff ($s6) is the
- *     CAPTURED randrange() result of the last 0x24 field tag (0 until one is seen); the group key ($fp)
- *     is the CAPTURED iSNDfindfreekey() return.  BYTE-MATCHES the oracle (verify_asm PASS, 216 insns). */
-extern int iSNDplaytaggedpatch(int bank, int tag)
+ *     7-arg call: (timbreData, tag, &builtTimbre, &header, note, vel, pitchOff). pitchOff is best-effort 0
+ *     (it is only used when the patch flag builtTimbre[0x90] is set, which iSNDresetpatch clears). */
+extern "C" int iSNDplaytaggedpatch(unsigned char *bank, int *tag)
 {
-    int           bt[0x26];                /* built timbre    @sp+0x20  */
-    int           hdr[0x26];               /* override header @sp+0xB8  */
-    int           started[12];             /* started voices  @sp+0x150 */
-    int           cursor;                  /* tag-stream cursor @sp+0x180 (&cursor -> gettag) */
-    unsigned int  g0;                      /* gettag out: tag id  @sp+0x184 (3 SCALARS, not an array */
-    int           g1;                      /*             value 1 @sp+0x188  -- an array would land   */
-    int           g2;                      /*             value 2 @sp+0x18C  BELOW cursor, +8 frame)  */
-    int           timbreData = 0;          /* s5: last 0xfd sample-data ptr */
-    int           ret        = -9;         /* s4: launch result / return value */
-    int           nStarted   = 0;          /* s2 */
-    int           slot       = 0;          /* s3: last written voice slot (shared single/multi) */
-    int           pitchOff   = 0;          /* s6: the CAPTURED randrange() of the last 0x24 tag */
-    int           vel, note;               /* s0 / s1 (lb: signed; vel FIRST -> vel=s0/note=s1) */
-    int           key;                     /* fp: the CAPTURED iSNDfindfreekey() return */
-    int           id, val;                 /* a1 / a2 one-shot copies of g0/g1 */
-    int           i, ch;                   /* ch: getchan result, BOTH branches (a0, never crosses a call) */
+    int           note, vel;
+    intptr_t      cursor, timbreData, prevTimbre;
+    int           nStarted = 0, nAtFail = 0;
+    unsigned int  ret = 0xfffffff7;
+    unsigned int  tagId;
+    int           tagValue;
+    intptr_t      tagPointer;
+    SndTimbre     bt;                       /* built timbre   (anStack_198) */
+    SndTimbre     hdr;                      /* override header (auStack_100) */
+    unsigned int  started[12];
+    int           i, slot, lastSlot = 0, r;
 
     if (bank == 0)
         return -8;
-    note = *(signed char *)(tag + 5);
-    vel  = *(signed char *)(tag + 6);
-    cursor = bank;                         /* stored (addressable) then overwritten -- both sw in oracle */
-    cursor = (*(unsigned char *)(bank + 3) & 2) ? bank + 8 : bank + 4;
+    note = (int)*((signed char *)tag + 5);
+    vel  = (int)*((signed char *)tag + 6);
+    cursor = (intptr_t)(bank + ((bank[3] & 2) == 0 ? 4 : 8));
 
-    iSNDresetpatch((int)bt);
-    iSNDresettimbre(bt, (int)hdr);
+    iSNDresetpatch(&bt);
+    iSNDresettimbre(&bt, &hdr);
     iSNDenteraudio();
-    key = iSNDfindfreekey();
+    iSNDfindfreekey();
 
+    prevTimbre = 0;
     for (;;) {
-        if (iSNDgettag(&cursor, &g0, &g1, &g2) == 0)
+        timbreData = prevTimbre;
+        nAtFail = nStarted;                /* iVar10 = iVar9 captured at iteration start */
+        if (iSNDgettag(&cursor, &tagId, &tagValue, &tagPointer) == 0)
             break;
-        id = g0;                           /* ONE lw; kept in a1 for all the tag tests */
-        if (id == 0xfd) {                  /* after a 0xfd tag the cursor IS the sample data */
-            timbreData = cursor;
+        prevTimbre = cursor;               /* after a 0xfd tag the cursor IS the sample data */
+        if (tagId == 0xfd)
             continue;
-        }
-        if (id == 0xfe) {                  /* note-region complete -> launch if in range */
-            if (bt[1] <= vel && vel <= bt[2] && bt[3] <= note && note <= bt[4]) {
-                ret = iSNDplaytaggedtimbre(timbreData, tag, (int)bt, (int)hdr, note, vel, pitchOff);
-                if (ret < 0)
+        prevTimbre = timbreData;           /* non-0xfd: keep the last sample ptr */
+        if (tagId == 0xfe) {               /* note-region complete -> launch if in range */
+            if (bt.velMin <= vel && vel <= bt.velMax && bt.noteMin <= note && note <= bt.noteMax) {
+                r = iSNDplaytaggedtimbre(timbreData, (const unsigned char *)tag,
+                                         &bt, &hdr, note, vel, 0);
+                if (r < 0)
                     goto fail;
-                started[nStarted] = ret;
-                nStarted++;
+                started[nStarted++] = (unsigned int)r;
+                ret = (unsigned int)r;
             }
-            iSNDresettimbre(bt, (int)hdr);
-            continue;
-        }
-        if (id < 0x26) {                   /* field tag -> set timbre[idx] + parallel header[idx] */
-            val = g1;
-            bt[id]  = val;
-            hdr[id] = g2;
-            if (id == 0x24)
-                pitchOff = randrange(val); /* s6: fed to every later launch as arg 7 */
+            iSNDresettimbre(&bt, &hdr);
+        } else if (tagId < 0x26) {         /* field tag -> set timbre[idx] + parallel header[idx] */
+            snd_timbre_set_tag(&bt, tagId, (intptr_t)tagValue);
+            snd_timbre_set_tag(&hdr, tagId, tagPointer);
+            if (tagId == 0x24)
+                randrange(tagValue);
         }
     }
     /* the final note-region (no trailing 0xfe) */
-    if (bt[1] <= vel && vel <= bt[2] && bt[3] <= note && note <= bt[4]) {
-        ret = iSNDplaytaggedtimbre(timbreData, tag, (int)bt, (int)hdr, note, vel, pitchOff);
-        if (ret < 0)
+    if (bt.velMin <= vel && vel <= bt.velMax && bt.noteMin <= note && note <= bt.noteMax) {
+        r = iSNDplaytaggedtimbre(timbreData, (const unsigned char *)tag,
+                                 &bt, &hdr, note, vel, 0);
+        if (r < 0)
             goto fail;
-        started[nStarted] = ret;
-        nStarted++;
+        started[nStarted++] = (unsigned int)r;
+        ret = (unsigned int)r;
     }
 
-    if (nStarted == 0)
-        goto fail;                         /* nothing started: leaveaudio + return ret (-9 or the fail) */
-    if (nStarted == 1) {                   /* single voice: no key group */
-        ch = iSNDgetchan(started[0]);
-        if (-1 < ch) {
-            slot = sndgs[0x25] + ch * 100;
-            *(unsigned char *)(slot + 0x37) = 0;
-            *(unsigned char *)(slot + 0x36) = 0;
-        }
-    } else {                               /* join the started voices into the key group */
-        for (i = 0; i < nStarted; i++) {
-            char *gs = (char *)sndgs;      /* in-body: loop-invariant-HOISTED after the entry blez,
-                                            * into a callee-saved reg (held ACROSS the getchan calls) */
-            ch = iSNDgetchan(started[i]);
-            if (-1 < ch) {
-                slot = *(int *)(gs + 0x94) + ch * 100;
-                *(unsigned char *)(slot + 0x37) = (unsigned char)key;
+    nAtFail = 0;
+    if (nStarted != 0) {                   /* join the started voices into a key group */
+        if (nStarted == 1) {
+            i = iSNDgetchan(started[0]);
+            if (-1 < i) {
+                slot = sndgs[0x25] + i * 100;
+                *(unsigned char *)(slot + 0x37) = 0;
                 *(unsigned char *)(slot + 0x36) = 0;
             }
+        } else {
+            for (i = 0; i < nStarted; i++) {
+                int ch = iSNDgetchan(started[i]);
+                if (-1 < ch) {
+                    lastSlot = sndgs[0x25] + ch * 100;
+                    *(unsigned char *)(lastSlot + 0x37) = (unsigned char)DAT_801371cc;
+                    *(unsigned char *)(lastSlot + 0x36) = 0;
+                }
+            }
+            *(unsigned char *)(lastSlot + 0x36) = 1;     /* mark the last voice as the group end */
         }
-        *(unsigned char *)(slot + 0x36) = 1;   /* mark the last voice as the group end */
+        iSNDleaveaudio();
+        return (int)ret;
     }
-    iSNDleaveaudio();
-    return ret;
 
 fail:
     iSNDleaveaudio();
-    for (i = 0; i < nStarted; i++)         /* roll back every voice started before the failure */
+    for (i = 0; i < nAtFail; i++)          /* roll back every voice started before the failure */
         SNDstop(started[i]);
-    return ret;
+    return (int)ret;
 }
-
-/* iSNDresolvetaggedpatch @0x801024EC : walk a bank's tag stream and resolve its SPU sample data (tag 0xfd
- *   = platform resolve), marking the bank resolved (+3 |= 1).  Returns -1 / resolve result. */
-extern int iSNDresolvetaggedpatch(int bank, int patch_idx, int scratch)
-{
-    unsigned int state[4];
-    int r = -1;
-    state[0] = (unsigned int)bank;
-    if ((*(unsigned char *)(bank + 3) & 2) != 0)
-        state[0] = (unsigned int)(bank + 8);
-    else
-        state[0] = (unsigned int)(bank + 4);
-    while (iSNDgettag((int *)&state[0], &state[1], (int *)&state[2], (int *)&state[3]) != 0) {
-        if (state[1] == 0xfd)
-            r = iSNDplatformresolve((int)state[0], patch_idx, scratch);
-    }
-    if (-1 < r)
-        *(unsigned char *)(bank + 3) = *(unsigned char *)(bank + 3) | 1;
-    return r;
-}
-
-/* iSNDremovetaggedpatch @0x801025C0 : walk a bank's tag stream and release its resolved SPU data (tag 0xfd
- *   = platform remove), clearing the resolved flag (+3 &= ~1). */
-extern int iSNDremovetaggedpatch(int bank, int *patch_idx)
-{
-    unsigned int state[4];
-    state[0] = (unsigned int)bank;
-    if ((*(unsigned char *)(bank + 3) & 2) != 0)
-        state[0] = (unsigned int)(bank + 8);
-    else
-        state[0] = (unsigned int)(bank + 4);
-    while (iSNDgettag((int *)&state[0], &state[1], (int *)&state[2], (int *)&state[3]) != 0) {
-        if (state[1] == 0xfd)
-            iSNDplatformremove((int)state[0], patch_idx);
-    }
-    *(unsigned char *)(bank + 3) = *(unsigned char *)(bank + 3) & 0xfe;
-    return 0;
-}
-

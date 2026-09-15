@@ -3,34 +3,21 @@
  *   menus, tUserNameMenuItem, tMemoryCardMenuItem) + 7 free helpers (flares, boxes, stick-range,
  *   cheat-check) + data. Member defs; deep tMenuItem/tMenu inheritance; manual _vf dispatch.
  */
-#include "../../lib/nfs4_new.h"
 #include "femenuoptions.h"
+#include <stdarg.h>
 
 /* EXT/STAT data owned by FeMenuOptions.obj (byte-exact from retail binary) */
-int PulsateYellow = 0;   /* @0x800515ac; SYM EXT INT */
-int fHelpText = 0;       /* @0x800515b0; SYM EXT INT */
+int PulsateYellow = 0;        /* @0x800515ac */
+int fHelpText = 0;            /* @0x800515b0 */
+static int flareextra = 0;     /* file-static */
 
-typedef struct tPsyQPrimTag {
-  unsigned int addr : 24;
-  unsigned int len : 8;
-} tPsyQPrimTag;
-
-
-/* permuter-found register-materialization lever (score-0, iter 289): routing the
- * ticks[0] read through an inline pointer-arg helper (vs a direct array index)
- * changes how gcc schedules the two live copies of `ticks` needed by the signed
- * %128 idiom below -- verified byte-exact via verify_asm, not just permuter score. */
-static inline int inline_fn(int *arg0)
-{
-  return arg0[0];
-}
 
 /* ---- CalcPulsateYellow  [FEMENUOPTIONS.CPP:77-82] SLD-VERIFIED ---- */
 void CalcPulsateYellow(void)
 {
   int pulsateval;
 
-  pulsateval = inline_fn(ticks) % 0x80;
+  pulsateval = ticks % 0x80;
   if (0x40 < pulsateval) {
     pulsateval = 0x80 - pulsateval;
   }
@@ -43,53 +30,47 @@ void CalcPulsateYellow(void)
 void DrawLeftFlare(int y,int fSelFade,int fFadeVal,int &flareextra)
 
 {
+  int iVar1;
+  int iVar2;
   int x;
+  int index;
   int flare_intensity;
   int glintFade;
   
-  /* MATCH: write through the reference directly (oracle keeps the value in $v0:
-     `lw v0; addiu v0,v0,1|5; sw v0`), no held temp -- the `+5` store is gated on
-     `flareextra != 0` exactly as the oracle's `beqz v0,skip-the-store`. */
   if (fSelFade == 0x80) {
-    flareextra = flareextra + 1;
+    iVar2 = flareextra + 1;
   }
-  else if (flareextra != 0) {
-    flareextra = flareextra + 5;
+  else {
+    iVar2 = flareextra + 5;
+    if (flareextra == 0) goto DrawLeftFlare_clampFlareExtra;
   }
+  flareextra = iVar2;
+DrawLeftFlare_clampFlareExtra:
   if (0x3c < flareextra) {
     flareextra = 0;
   }
-  /* MATCH: 74 -> 26 -> PASS (87/87).  W56-A5 landed FOUR fixes:
-     (1) the triangle-clamp arms do a SIGNED /2 each (`srl;addu;sra`) laid out as
-     an if/else with the constant-on-left test `0x1e < flareextra` -> the oracle's
-     `slti;bnez` polarity (else=flareextra/2 out-of-line, 0x3c-flareextra inline);
-     (2) DrawShapeExtended arg5/6 are `glintFade` + `(glintFade!=0)` (REAL bug: the
-     old code passed flare_intensity + (flare_intensity!=0) and left glintFade dead
-     -> `sw s3,0x10(sp)`, unsigned `sltu`); (3) the Flare arg3 half is a signed
-     `/2` (`srl;addu;sra`, with GCC reusing the biased numerator's sign bit);
-     (4) the increment writes through the reference directly (oracle keeps it in
-     $v0).  The final 26 vanished by following the SYM/SLD literally: retail names
-     only `flare_intensity=$s1`, and lines 93-96 update it in place through /2,
-     +20, and the first multiply.  Expressing the final multiply as part of the
-     signed /128 assignment lets GCC keep its biased numerator in unnamed $s2,
-     write the quotient back to $s1, and reuse $s2's sign for the later signed /2. */
-  if (0x1e < flareextra) {
-    flare_intensity = (0x3c - flareextra) / 2;
+  iVar2 = flareextra;
+  if (iVar2 < 0x1f) {
+    iVar2 = iVar2 - (iVar2 >> 0x1f);
   }
   else {
-    flare_intensity = flareextra / 2;
+    iVar2 = (0x3c - iVar2) - (0x3c - iVar2 >> 0x1f);
   }
-  flare_intensity = flare_intensity + 0x14;
-  flare_intensity = flare_intensity * fSelFade;
-  flare_intensity = (flare_intensity * (0x80 - fFadeVal)) / 0x80;
+  iVar2 = ((iVar2 >> 1) + 0x14) * fSelFade * (0x80 - fFadeVal);
+  if (iVar2 < 0) {
+    iVar2 = iVar2 + 0x7f;
+  }
+  flare_intensity = iVar2 >> 7;
   glintFade = 0x80 - fSelFade;
   if (0x80 - fSelFade < fFadeVal) {
     glintFade = fFadeVal;
   }
   if (0 < flare_intensity) {
     x = TextSys_WordX(0x1de);
-    Flare_2DHalo(x,y + 5,flare_intensity / 2,(flare_intensity << 1) / 3,0x17);
-    DrawShapeExtended(0,0,x - 3,y - 1,glintFade,(u_int)(glintFade != 0),(tDrawShapeExtended *)0x0);
+    iVar1 = (flare_intensity << 1) >> 0x1f;
+    index = (flare_intensity << 1) / 3 + iVar1;
+    Flare_2DHalo(x,y + 5,flare_intensity - (iVar2 >> 0x1f) >> 1,index - iVar1,0x17);
+    DrawShapeExtended(0,0,x - 3,y - 1,flare_intensity,(u_int)(flare_intensity != 0),(tDrawShapeExtended *)0x0);
   }
   return;
 }
@@ -101,46 +82,50 @@ void DrawLeftFlare(int y,int fSelFade,int fFadeVal,int &flareextra)
 void SubtractiveBox(int x,int y,int w,int h,int col1,int col2,int col3,int col4)
 
 {
-  /* MATCH (W59): 124 -> 40 by restoring the SYM budget (only dr_mode/prim)
-     and the PsyQ 24-bit addPrim/setXYWH shapes; 40 -> 24 by exposing the
-     compiler-generated 0x1f800004 address pseudo as packetCell.  The tail
-     fences are zero-insn local-alloc dials: packetCell stays live in $s2,
-     while two identity uses lift x across the refs=8 boundary into $s1.
-     Removing either identity use leaves the otherwise exact 88-insn body
-     with the sole $s1/$s2 permutation (24 diffs). */
+  u_short tpage;
+  int pkt_addr24;
+  int pkt_addr24_drm;
   DR_MODE *dr_mode;
-  /* SYM-CODEGEN-CARRIER: packetCell -- the W59 oracle receipt above proves
-     this source-only address pseudo is required for retail register allocation. */
-  u_char **packetCell;
-  POLY_G4 *prim;
-
-  packetCell = (u_char **)0x1f800004;
-  prim = (POLY_G4 *)*packetCell;
-  ((tPsyQPrimTag *)prim)->addr = ((tPsyQPrimTag *)Render_gPalettePtr)->addr;
-  *packetCell = (u_char *)prim + 0x24;
-  ((tPsyQPrimTag *)Render_gPalettePtr)->addr = (u_int)prim;
-  ((u_char *)prim)[3] = 8;
-  *(int *)&prim->r0 = col1;
-  *(int *)&prim->r1 = col2;
-  *(int *)&prim->r2 = col3;
-  *(int *)&prim->r3 = col4;
-  prim->code = 0x3a;
-  (prim->x0 = x,
-   prim->y0 = y,
-   prim->x1 = x + w,
-   prim->y1 = y,
-   prim->x2 = x,
-   prim->y2 = y + h,
-   prim->x3 = x + w,
-   prim->y3 = y + h);
-  dr_mode = (DR_MODE *)*packetCell;
-  ((tPsyQPrimTag *)dr_mode)->addr = ((tPsyQPrimTag *)Render_gPalettePtr)->addr;
-  *packetCell = (u_char *)dr_mode + 0xc;
-  ((tPsyQPrimTag *)Render_gPalettePtr)->addr = (u_int)dr_mode;
-  SetDrawMode(dr_mode,0,0,(u_short)GetTPage(2,2,0,0x100),(RECT *)0x0);
-  __asm__("" : : "r"(packetCell));
-  __asm__("" : "=r"(x) : "0"(x));
-  __asm__("" : "=r"(x) : "0"(x));
+  short y_plus_h;
+  short x_plus_w;
+  short x_s;
+  short ts2;
+  u_char *prim;
+  u_char *prev_pkt;
+  
+  prim = Render_gPacketPtr;
+  prev_pkt = Render_gPalettePtr;
+  x_s = (short)x;
+  x_plus_w = x_s + (short)w;
+  y_plus_h = y + (short)h;
+  *(u_int *)Render_gPacketPtr =
+       *(u_int *)Render_gPacketPtr & 0xff000000 | *(u_int *)Render_gPalettePtr & 0xffffff;
+  pkt_addr24 = (u_int)Render_gPacketPtr & 0xffffff;
+  Render_gPacketPtr = Render_gPacketPtr + 0x24;
+  *(u_int *)prev_pkt = *(u_int *)prev_pkt & 0xff000000 | pkt_addr24;
+  prim[3] = 8;
+  *(int *)(prim + 4) = col1;
+  *(int *)(prim + 0xc) = col2;
+  *(int *)(prim + 0x14) = col3;
+  *(int *)(prim + 0x1c) = col4;
+  prim[7] = 0x3a;
+  *(short *)(prim + 8) = x_s;
+  *(short *)(prim + 10) = y;
+  *(short *)(prim + 0x10) = x_plus_w;
+  *(short *)(prim + 0x12) = y;
+  *(short *)(prim + 0x18) = x_s;
+  *(short *)(prim + 0x1a) = y_plus_h;
+  *(short *)(prim + 0x20) = x_plus_w;
+  *(short *)(prim + 0x22) = y_plus_h;
+  dr_mode = (DR_MODE *)Render_gPacketPtr;
+  prev_pkt = Render_gPalettePtr;
+  *(u_int *)Render_gPacketPtr =
+       *(u_int *)Render_gPacketPtr & 0xff000000 | *(u_int *)Render_gPalettePtr & 0xffffff;
+  pkt_addr24_drm = (u_int)Render_gPacketPtr & 0xffffff;
+  Render_gPacketPtr = Render_gPacketPtr + 0xc;
+  *(u_int *)prev_pkt = *(u_int *)prev_pkt & 0xff000000 | pkt_addr24_drm;
+  tpage = GetTPage(2,2,0,0x100);
+  SetDrawMode(dr_mode,0,0,(u_int)tpage,(RECT *)0x0);
   return;
 }
 
@@ -164,7 +149,7 @@ void tMenuItemGoToMenuButtonFade::TransitionOn()
 {
   this->fFadeVal = 0x80;
   this->fFadeDir = -0x1e;
-  this->fSelFade = 0;
+  (this->_base_tMenuItemGoToMenuButton)._base_tMenuItemInteractive._base_tMenuItem.fSelFade = 0;
   this->fEnableVal = 0;
   return;
 }
@@ -173,23 +158,15 @@ void tMenuItemGoToMenuButtonFade::TransitionOn()
 
 /* ---- tMenuItemGoToMenuButtonFade::TransitionIsFinished  [FEMENUOPTIONS.CPP:183-191] SLD-VERIFIED ---- */
 
-bool tMenuItemGoToMenuButtonFade::TransitionIsFinished()
+void * tMenuItemGoToMenuButtonFade::TransitionIsFinished()
 
 {
   this->fInTransition = 0;
-  if (this->fFadeDir < 0) {
-    if (0 < this->fFadeVal) {
-      this->fInTransition = 1;
-      goto done;
-    }
+  if (((this->fFadeDir < 0) && (0 < this->fFadeVal)) ||
+     ((0 < this->fFadeDir && (this->fFadeVal < 0x80)))) {
+    this->fInTransition = 1;
   }
-  if (0 < this->fFadeDir) {
-    if (this->fFadeVal < 0x80) {
-      this->fInTransition = 1;
-    }
-  }
-done:
-  return !this->fInTransition;
+  return (void *)(this->fInTransition ^ 1);
 }
 
 
@@ -199,9 +176,7 @@ done:
 void tMenuItemGoToMenuButtonFade::UpdateTransition(bool selected)
 
 {
-  /* SYM-CODEGEN-CARRIER: iVar2
-   * The no-local SYM block and one-line SLD clamp identify this as the
-   * compiler-created result of EA's nested MIN/MAX expression. */
+  __vtbl_ptr_type (*pa_Var1) [11];
   int iVar2;
   
   iVar2 = (int)this->fFadeVal + (int)this->fFadeDir;
@@ -211,10 +186,10 @@ void tMenuItemGoToMenuButtonFade::UpdateTransition(bool selected)
   if (iVar2 < 0) {
     iVar2 = 0;
   }
+  pa_Var1 = (this->_base_tMenuItemGoToMenuButton)._base_tMenuItemInteractive._base_tMenuItem._vf;
   this->fFadeVal = (short)iVar2;
-  (*(*this->_vf)[9].pfn)
-            ((int)&this->fFlags +
-             (int)(*this->_vf)[9].delta);
+  NFS4_VCALL_AUTO((*pa_Var1)[9].pfn, (int)&(this->_base_tMenuItemGoToMenuButton)._base_tMenuItemInteractive._base_tMenuItem.fFlags +
+             (int)(*pa_Var1)[9].delta);
   ((tMenuItem *)this)->UpdateTransition(selected);
   return;
 }
@@ -223,12 +198,12 @@ void tMenuItemGoToMenuButtonFade::UpdateTransition(bool selected)
 
 /* ---- tMenuItemLeftRightFade::ctor  [FEMENUOPTIONS.CPP:204-210] SLD-VERIFIED ---- */
 tMenuItemLeftRightFade::tMenuItemLeftRightFade(u_int textDescription,tListIterator *dataPtr)
-  : tMenuItemLeftRightChoice(textDescription,dataPtr)
+  : _base_tMenuItemLeftRightChoice(textDescription,dataPtr)
 {
   
-  *(void **)&(this->_vf) = (void *)tMenuItemLeftRightFade_vtable;
+  *(void **)&((this->_base_tMenuItemLeftRightChoice)._base_tMenuItemInteractive._base_tMenuItem._vf) = (void *)tMenuItemLeftRightFade_vtable;
   this->flareextra = 0;
-  this->fSelFade = 0;
+  (this->_base_tMenuItemLeftRightChoice)._base_tMenuItemInteractive._base_tMenuItem.fSelFade = 0;
   return;
 }
 
@@ -255,7 +230,7 @@ void tMenuItemLeftRightFade::TransitionOn()
   this->fInTransition = 1;
   this->fFadeDir = -0x1e;
   this->flareextra = 0;
-  this->fSelFade = 0;
+  (this->_base_tMenuItemLeftRightChoice)._base_tMenuItemInteractive._base_tMenuItem.fSelFade = 0;
   this->fFadeVal = 0x80;
   return;
 }
@@ -264,24 +239,26 @@ void tMenuItemLeftRightFade::TransitionOn()
 
 /* ---- tMenuItemLeftRightFade::TransitionIsFinished  [FEMENUOPTIONS.CPP:231-241] SLD-VERIFIED ---- */
 
-bool tMenuItemLeftRightFade::TransitionIsFinished()
+void * tMenuItemLeftRightFade::TransitionIsFinished()
 
 {
-  /* MATCH: plain if/else-if chain of &&-guards.  The `fFadeDir` reload the oracle
-     emits at 8001C3F8 is NOT a cache-invalidation trick — it falls out for free:
-     the first `&&` clobbers $v0 with fFadeVal, so the second guard's re-read of
-     fFadeDir must reload on THAT path only, while the `fFadeDir >= 0` edge jumps
-     straight to the shared blez (gcc places the reload inside the outer if). */
-  if (this->fFadeDir == 0) {
-    this->fInTransition = 0;
-  } else if ((this->fFadeDir < 0) && (this->fFadeVal <= 0)) {
-    this->fInTransition = 0;
-  } else if ((this->fFadeDir > 0) && (this->fFadeVal >= 0x80)) {
-    this->fInTransition = 0;
-  } else {
-    this->fInTransition = 1;
+  short sVar1;
+  
+  sVar1 = this->fFadeDir;
+  if (sVar1 != 0) {
+    if (sVar1 < 0) {
+      if (this->fFadeVal < 1) goto LRFadeTrans_resetTrans;
+      sVar1 = this->fFadeDir;
+    }
+    if ((sVar1 < 1) || (this->fFadeVal < 0x80)) {
+      this->fInTransition = 1;
+      goto LRFadeTrans_returnInv;
+    }
   }
-  return !this->fInTransition;
+LRFadeTrans_resetTrans:
+  this->fInTransition = 0;
+LRFadeTrans_returnInv:
+  return (void *)(this->fInTransition ^ 1);
 }
 
 
@@ -291,8 +268,7 @@ bool tMenuItemLeftRightFade::TransitionIsFinished()
 void tMenuItemLeftRightFade::UpdateTransition(bool selected)
 
 {
-  /* SYM-CODEGEN-CARRIER: iVar2
-   * Compiler-created destination of the one-line nested MIN/MAX clamp. */
+  __vtbl_ptr_type (*pa_Var1) [11];
   int iVar2;
   
   iVar2 = (int)this->fFadeVal + (int)this->fFadeDir;
@@ -302,10 +278,10 @@ void tMenuItemLeftRightFade::UpdateTransition(bool selected)
   if (iVar2 < 0) {
     iVar2 = 0;
   }
+  pa_Var1 = (this->_base_tMenuItemLeftRightChoice)._base_tMenuItemInteractive._base_tMenuItem._vf;
   this->fFadeVal = (short)iVar2;
-  (*(*this->_vf)[9].pfn)
-            ((int)&this->fFlags +
-             (int)(*this->_vf)[9].delta);
+  NFS4_VCALL_AUTO((*pa_Var1)[9].pfn, (int)&(this->_base_tMenuItemLeftRightChoice)._base_tMenuItemInteractive._base_tMenuItem.fFlags +
+             (int)(*pa_Var1)[9].delta);
   ((tMenuItem *)this)->UpdateTransition(selected);
   return;
 }
@@ -317,11 +293,14 @@ void tMenuItemLeftRightFade::UpdateTransition(bool selected)
 tOptionsMenu::tOptionsMenu(u_int flags,tScreen *screenHandler,tMenu *nextMenu,
               tMenu *optionsMenu,void (*OnButtonPress)(tMenuCommand&),short title,int firstframe,int numframes,
               tMenuItem *firstItem,...)
-  : tMenu(flags,screenHandler,nextMenu,optionsMenu,OnButtonPress,title)
+  : _base_tMenu(flags,screenHandler,nextMenu,optionsMenu,OnButtonPress,title)
 {
-  
-  this->_vf = (__vtbl_ptr_type (*)[11])tOptionsMenu_vtable;
-  this->tMenuConstructor(firstItem,(&firstItem + 1));
+  va_list ap;
+
+  *(void **)&((this->_base_tMenu)._vf) = (void *)tOptionsMenu_vtable;
+  va_start(ap,firstItem);
+  this->_base_tMenu.tMenuConstructor(firstItem,ap);
+  va_end(ap);
   this->fScreenFade = 0;
   this->fPrevItem = 0;
   this->fFirstFrame = firstframe;
@@ -336,7 +315,7 @@ tOptionsMenu::tOptionsMenu(u_int flags,tScreen *screenHandler,tMenu *nextMenu,
 tOptionsMenu::~tOptionsMenu()
 
 {
-  *(void **)&(this->_vf) = (void *)tOptionsMenu_vtable;
+  *(void **)&((this->_base_tMenu)._vf) = (void *)tOptionsMenu_vtable;
   return;
 }
 
@@ -347,13 +326,15 @@ tOptionsMenu::~tOptionsMenu()
 long tOptionsMenu::DebounceKeys()
 
 {
-  if ((this->fItemList[this->fCurrentItem] != (tMenuItem *)0x0) &&
-      (((this->fItemList[this->fCurrentItem]->fFlags & 1) ^ 1) != 0)) {
-    return (*(*this->fItemList[this->fCurrentItem]->_vf)[2].pfn)
-        ((int)this->fItemList[this->fCurrentItem] +
-         (int)(*this->fItemList[this->fCurrentItem]->_vf)[2].delta);
+  long lVar1;
+  tMenuItem *ptVar2;
+  
+  ptVar2 = (this->_base_tMenu).fItemList[(this->_base_tMenu).fCurrentItem];
+  lVar1 = 0;
+  if ((ptVar2 != (tMenuItem *)0x0) && (lVar1 = 0, (ptVar2->fFlags & 1) != 1)) {
+    lVar1 = NFS4_VCALL_AUTO((*ptVar2->_vf)[2].pfn, (char *)ptVar2 + (int)(*ptVar2->_vf)[2].delta);
   }
-  return 0;
+  return lVar1;
 }
 
 
@@ -363,16 +344,21 @@ long tOptionsMenu::DebounceKeys()
 void tOptionsMenu::TransitionOff()
 
 {
-  /* MATCH: SYM says the only local is `short i`; `fItemList[i]` on a SHORT counter
-     gives the oracle's per-use `sll 16; sra 14` rematerialization (the hand-rolled
-     `(i<<16)>>14` on an `int` made gcc strength-reduce i to a 0x10000 stride). */
-  short i;
-
+  int iVar1;
+  tMenuItem *ptVar2;
+  int iVar3;
+  int i;
+  
+  i = 0;
+  ptVar2 = (this->_base_tMenu).fItemList[0];
   this->fTransitionDirection = '(';
   this->fScreenFade = 0;
-  for (i = 0; this->fItemList[i] != (tMenuItem *)0x0; i++) {
-    (*(*this->fItemList[i]->_vf)[7].pfn)
-      ((char *)this->fItemList[i] + (int)(*this->fItemList[i]->_vf)[7].delta);
+  while (ptVar2 != (tMenuItem *)0x0) {
+    iVar3 = *(int *)((int)(this->_base_tMenu).fItemList + ((i << 0x10) >> 0xe));
+    iVar1 = *(int *)(iVar3 + 0x18);
+    (**(int (**)(...))(iVar1 + 0x3c))(iVar3 + *(short *)(iVar1 + 0x38));
+    i = i + 1;
+    ptVar2 = *(tMenuItem **)((int)(this->_base_tMenu).fItemList + (i * 0x10000 >> 0xe));
   }
   this->fInMenuTransition = 1;
   return;
@@ -385,17 +371,22 @@ void tOptionsMenu::TransitionOff()
 void tOptionsMenu::TransitionOn()
 
 {
-  /* MATCH: see TransitionOff — `short i` + `fItemList[i]`. */
-  short i;
-
-  /* MATCH: plain `char` is UNSIGNED here -> `= -0x28` emits `li 216`; the signed
-     view restores the oracle's `li -40`. */
-  *(signed char *)&this->fTransitionDirection = -0x28;
+  int iVar1;
+  tMenuItem *ptVar2;
+  int iVar3;
+  int i;
+  
+  i = 0;
+  ptVar2 = (this->_base_tMenu).fItemList[0];
+  this->fTransitionDirection = -0x28;
   this->fInMenuTransition = 1;
   this->fScreenFade = 0x228;
-  for (i = 0; this->fItemList[i] != (tMenuItem *)0x0; i++) {
-    (*(*this->fItemList[i]->_vf)[8].pfn)
-      ((char *)this->fItemList[i] + (int)(*this->fItemList[i]->_vf)[8].delta);
+  while (ptVar2 != (tMenuItem *)0x0) {
+    iVar3 = *(int *)((int)(this->_base_tMenu).fItemList + ((i << 0x10) >> 0xe));
+    iVar1 = *(int *)(iVar3 + 0x18);
+    (**(int (**)(...))(iVar1 + 0x44))(iVar3 + *(short *)(iVar1 + 0x40));
+    i = i + 1;
+    ptVar2 = *(tMenuItem **)((int)(this->_base_tMenu).fItemList + (i * 0x10000 >> 0xe));
   }
   return;
 }
@@ -404,45 +395,43 @@ void tOptionsMenu::TransitionOn()
 
 /* ---- tOptionsMenu::TransitionIsFinished  [FEMENUOPTIONS.CPP:325-358] SLD-VERIFIED ---- */
 
-bool tOptionsMenu::TransitionIsFinished()
+void * tOptionsMenu::TransitionIsFinished()
 
 {
-  /* SYM 8c block: the ONLY local is `short i` (REG $s0); the fn returns BOOL.  The
-     nested `Block start line=24` carrying a `tFEApplication *this` is an INLINED
-     tFEApplication accessor — i.e. the tail reads FEApp->fCurrentScreen inline. */
-  short i;
-
-  /* MATCH: if/else-if chain of &&-guards (the oracle reloads fScreenFade for the
-     2nd guard because the 1st guard's `lb` clobbered $v0).  fTransitionDirection
-     is a SIGNED byte in retail — this build's plain `char` is UNSIGNED, so the
-     (signed char) casts are what produce the oracle's `lb`/`bgtz`/`bgez`. */
-  if ((0x228 <= this->fScreenFade) && (0 < (signed char)this->fTransitionDirection)) {
-    this->fInMenuTransition = 0;
-  }
-  else if ((this->fScreenFade <= 0) && ((signed char)this->fTransitionDirection < 0)) {
-    this->fInMenuTransition = 0;
+  tMenuItem *ptVar1;
+  int iVar2;
+  __vtbl_ptr_type (*pa_Var3) [10];
+  int iVar4;
+  int i;
+  
+  if (((this->fScreenFade < 0x228) || (this->fTransitionDirection < '\x01')) &&
+     ((0 < this->fScreenFade || (-1 < this->fTransitionDirection)))) {
+    this->fInMenuTransition = 1;
   }
   else {
-    this->fInMenuTransition = 1;
+    this->fInMenuTransition = 0;
   }
-  /* MATCH: the virtual returns `bool`, so `!ret` is gcc's bool-negate `xori v0,v0,1`
-     (an `int` compare would emit li+bne instead) -> cast the vtable pfn to a
-     bool-returning fn-ptr at the call site.  `short i` + `fItemList[i]` gives the
-     oracle's per-use `sll 16; sra 14` index rematerialization. */
   if (this->fInMenuTransition == 0) {
-    for (i = 0; this->fItemList[i] != (tMenuItem *)0x0; i++) {
-      if (!(*(bool (*)(...))(*this->fItemList[i]->_vf)[9].pfn)
-             ((char *)this->fItemList[i] + (int)(*this->fItemList[i]->_vf)[9].delta)) {
+    i = 0;
+    ptVar1 = (this->_base_tMenu).fItemList[0];
+    while (ptVar1 != (tMenuItem *)0x0) {
+      iVar4 = *(int *)((int)(this->_base_tMenu).fItemList + ((i << 0x10) >> 0xe));
+      iVar2 = *(int *)(iVar4 + 0x18);
+      iVar2 = (**(int (**)(...))(iVar2 + 0x4c))(iVar4 + *(short *)(iVar2 + 0x48));
+      i = i + 1;
+      if (iVar2 != 1) {
         this->fInMenuTransition = 1;
       }
+      ptVar1 = *(tMenuItem **)((int)(this->_base_tMenu).fItemList + (i * 0x10000 >> 0xe));
     }
   }
-  if (!(*(bool (*)(...))(*FEApp->fCurrentScreen[0]->_vf)[8].pfn)
-         ((char *)FEApp->fCurrentScreen[0] +
-          (int)(*FEApp->fCurrentScreen[0]->_vf)[8].delta)) {
+  pa_Var3 = FEApp->fCurrentScreen[0]->_vf;
+  i = NFS4_VCALL_AUTO((*pa_Var3)[8].pfn, (FEApp->fCurrentScreen[0]->fPermShapes).fFilename + (*pa_Var3)[8].delta + -0x14
+                    );
+  if (i != 1) {
     this->fInMenuTransition = 1;
   }
-  return !this->fInMenuTransition;
+  return (void *)(this->fInMenuTransition ^ 1);
 }
 
 
@@ -452,101 +441,86 @@ bool tOptionsMenu::TransitionIsFinished()
 void tOptionsMenu::UpdateTransition()
 
 {
-  /* SYM-CODEGEN-CARRIER: citem
-   * SYM-CODEGEN-CARRIER: item
-   * SYM-CODEGEN-CARRIER: entry
-   * SYM-CODEGEN-CARRIER: adjusted
-   * SYM 8c block: the ONLY source local is `short i` (REG $s0); every other Ghidra temp
-     (iVar2/pa_Var3/iVar4/ptVar5/bVar6/sVar7) was a fabrication.  SLD segmentation:
-     367 fInMenuTransition / 369 fTransitionDirection / 371 fScreenFade>0 /
-     374 clamp-to-0 / 379-380 forward TransitionIsFinished scan / 383-385 goto the
-     shared UpdateTransition call / 393-395 count items / 397-400 backward scan /
-     403-405 shared call / 407-411 fade-in clamp / 418-419 the not-transitioning
-     item loop / 422 the menu's own vtable[7] call. */
-  short i;
-  tMenuItem *citem;
-  tMenuItem *item;
-  __vtbl_ptr_type *entry;
-  char *adjusted;
-
-  if (this->fInMenuTransition != 0) {
-    /* MATCH: `char` is UNSIGNED on this build -> a plain `< 0` folds to false and
-       gcc DELETES this entire arm (46 insns).  (signed char) restores the lb. */
-    if (*(signed char *)&this->fTransitionDirection < 0) {
-      if (0 < this->fScreenFade) {
-        this->fScreenFade = this->fScreenFade + *(signed char *)&this->fTransitionDirection;
-        if (this->fScreenFade < 0) {
-          this->fScreenFade = 0;
-        }
+  int i;
+  int iVar2;
+  __vtbl_ptr_type (*pa_Var3) [11];
+  int iVar4;
+  tMenuItem *ptVar5;
+  bool bVar6;
+  short sVar7;
+  
+  if (this->fInMenuTransition == 0) {
+    i = 0;
+    ptVar5 = (this->_base_tMenu).fItemList[0];
+    while (ptVar5 != (tMenuItem *)0x0) {
+      ptVar5 = (this->_base_tMenu).fItemList[(short)i];
+      pa_Var3 = ptVar5->_vf;
+      bVar6 = false;
+      if (this->fInMenuTransition == 0) {
+        bVar6 = (int)(short)i == (this->_base_tMenu).fCurrentItem;
       }
-      else {
-        /* MATCH/CFG (w65-a1, 04Q class): retail's forward scan is the SAME shape as
-           the backward scan below — an explicit head guard, an exit-in-the-middle
-           `while`, then a post-test.  With the plain `for`, gcc routes the ZERO-TRIP
-           guard to the loop-exit block (which then re-tests the same null item and
-           falls through to feo_done); retail's guard branches STRAIGHT to feo_done
-           (branch word 5: ours +23 vs retail +135).  Same 172 instructions either
-           way — only the routing differs.  Falsified alternatives (both also clean
-           + PASS 172, less 1998-natural): guard + do{}while; an explicit
-           `if (fItemList[0]==0) goto feo_done;` in front of the untouched `for`. */
-        i = 0;
-        if (this->fItemList[i] != 0) {
-          while ((*(*this->fItemList[i]->_vf)[9].pfn)
-                   ((char *)this->fItemList[i] + (int)(*this->fItemList[i]->_vf)[9].delta) != 0) {
-            i++;
-            if (this->fItemList[i] == 0) break;
-          }
-          citem = this->fItemList[i];
-          if (citem == 0) goto feo_done;
-          goto feo_callUpdate;
-        }
-        goto feo_done;
-      }
+      NFS4_VCALL_AUTO((*pa_Var3)[10].pfn, (char *)ptVar5 + (int)(*pa_Var3)[10].delta,bVar6);
+      i = i + 1;
+      ptVar5 = *(tMenuItem **)((int)(this->_base_tMenu).fItemList + (i * 0x10000 >> 0xe));
     }
-    else {
-      for (i = 0; this->fItemList[i] != 0; i++) {
+    goto UpdTrans_callVT7;
+  }
+  if (this->fTransitionDirection < 0) {
+    i = this->fScreenFade + (int)this->fTransitionDirection;
+    if (0 < this->fScreenFade) {
+      this->fScreenFade = i;
+      if (i < 0) {
+        this->fScreenFade = 0;
       }
-      i = i - 1;
-      if (i != -1) {
-        while ((*(*this->fItemList[i]->_vf)[9].pfn)
-                 ((char *)this->fItemList[i] + (int)(*this->fItemList[i]->_vf)[9].delta) != 0) {
-          i = i - 1;
-          if (i == -1) break;
-        }
-        if (i != -1) {
-          /* MATCH: BOTH paths that reach the shared UpdateTransition call load the
-             item into the SAME variable first, so gcc cross-jump-merges from the
-             `lw _vf` (oracle .L8001C9E8) instead of from the index computation —
-             which also lets the backward path reuse the `(short)i` extend the
-             `i != -1` guard already produced (`sra v1,..` / `sll v0,v1,2`). */
-          citem = this->fItemList[i];
-feo_callUpdate:
-          (*(*citem->_vf)[10].pfn)
-            ((char *)citem + (int)(*citem->_vf)[10].delta, 0);
-          goto feo_done;
-        }
-      }
-      if (this->fScreenFade < 0x228) {
-        this->fScreenFade = this->fScreenFade + *(signed char *)&this->fTransitionDirection;
-        if (0x228 < this->fScreenFade) {
-          this->fScreenFade = 0x228;
-        }
-      }
+      goto UpdTrans_callVT7;
     }
+    i = 0;
+    if ((this->_base_tMenu).fItemList[0] == (tMenuItem *)0x0) goto UpdTrans_callVT7;
+    do {
+      iVar4 = *(int *)((int)(this->_base_tMenu).fItemList + ((i << 0x10) >> 0xe));
+      iVar2 = *(int *)(iVar4 + 0x18);
+      iVar2 = (**(int (**)(...))(iVar2 + 0x4c))(iVar4 + *(short *)(iVar2 + 0x48));
+      iVar4 = i + 1;
+      if (iVar2 == 0) break;
+      i = iVar4;
+    } while (*(int *)((int)(this->_base_tMenu).fItemList + (iVar4 * 0x10000 >> 0xe)) != 0);
+    ptVar5 = *(tMenuItem **)((int)(this->_base_tMenu).fItemList + ((i << 0x10) >> 0xe));
+    if (ptVar5 == (tMenuItem *)0x0) goto UpdTrans_callVT7;
+feo_gotItem:
+    NFS4_VCALL_AUTO((*ptVar5->_vf)[10].pfn, (char *)ptVar5 + (int)(*ptVar5->_vf)[10].delta,0);
   }
   else {
-    /* MATCH: g++ old-ABI virtual-call spelling — ENTRY pointer for the pfn fetch
-       (`lw 4(a3)`), delta off the vtable base as a displacement (`lh 80(v0)`). */
-    for (i = 0; this->fItemList[i] != 0; i++) {
-      item = this->fItemList[i];
-      entry = &(*item->_vf)[10];
-      adjusted = (char *)item + (int)entry->delta;
-      (*entry->pfn)(adjusted,
-         this->fInMenuTransition == 0 && (int)i == this->fCurrentItem);
+    i = 0;
+    ptVar5 = (this->_base_tMenu).fItemList[0];
+    while (ptVar5 != (tMenuItem *)0x0) {
+      i = i + 1;
+      ptVar5 = *(tMenuItem **)((int)(this->_base_tMenu).fItemList + (i * 0x10000 >> 0xe));
+    }
+    i = i + -1;
+    if (i * 0x10000 >> 0x10 != -1) {
+      do {
+        sVar7 = (short)i;
+        iVar4 = *(int *)((int)(this->_base_tMenu).fItemList + ((i << 0x10) >> 0xe));
+        iVar2 = *(int *)(iVar4 + 0x18);
+        iVar2 = (**(int (**)(...))(iVar2 + 0x4c))(iVar4 + *(short *)(iVar2 + 0x48));
+        i = i + -1;
+        if (iVar2 == 0) break;
+        sVar7 = (short)i;
+      } while (i * 0x10000 >> 0x10 != -1);
+      if (sVar7 != -1) {
+        ptVar5 = (this->_base_tMenu).fItemList[sVar7];
+        goto feo_gotItem;
+      }
+    }
+    if ((this->fScreenFade < 0x228) &&
+       (i = this->fScreenFade + (int)this->fTransitionDirection, this->fScreenFade = i,
+       0x228 < i)) {
+      this->fScreenFade = 0x228;
     }
   }
-feo_done:
-  (*(*this->_vf)[7].pfn)((char *)this + (int)(*this->_vf)[7].delta);
+UpdTrans_callVT7:
+  pa_Var3 = (this->_base_tMenu)._vf;
+  NFS4_VCALL_AUTO((*pa_Var3)[7].pfn, (int)(this->_base_tMenu).fItemList + (*pa_Var3)[7].delta + -0x10);
   return;
 }
 
@@ -557,57 +531,41 @@ feo_done:
 void tOptionsMenu::Draw()
 
 {
-  /* SYM 8c block: locals are `short i` (REG $s1) + the AUTO `tDrawShapeExtended
-     drawFlags`; the nested `tMenuItem *this` blocks are INLINED accessors. */
-  /* SYM-CODEGEN-CARRIER: entry -- manual representation of the compiler's
-     old-ABI virtual-dispatch row; flattening row 5 is FAIL 7 (128/129). */
-  __vtbl_ptr_type *entry;
-  /* SYM-CODEGEN-CARRIER: adjusted -- preserves retail's dead receiver
-     mutation before the indirect call; inlining it is FAIL 25 (128/129). */
-  char *adjusted;
-  short i;
+  tMenuItem *ptVar1;
+  __vtbl_ptr_type (*pa_Var2) [11];
+  int i;
+  bool bVar4;
   tDrawShapeExtended drawFlags;
-
+  
   CalcPulsateYellow();
-  /* MATCH: no local for the head test either — the oracle reuses $v0 for both the
-     null test and the flags load (a named ptVar1 parks it in $v1). */
-  if ((this->fItemList[this->fCurrentItem] == (tMenuItem *)0x0) ||
-      ((this->fItemList[this->fCurrentItem]->fFlags & 1) != 0)) {
-    this->fCurrentItem = 0;
+  ptVar1 = (this->_base_tMenu).fItemList[(this->_base_tMenu).fCurrentItem];
+  if ((ptVar1 == (tMenuItem *)0x0) || ((ptVar1->fFlags & 1) != 0)) {
+    (this->_base_tMenu).fCurrentItem = 0;
   }
-  /* MATCH: the skip-disabled scans walk `fCurrentItem` (an int field) DIRECTLY —
-     no local.  The comma-expression `(i = fCurrentItem, A && B)` form both narrowed
-     the load to `lh` (i is short) and forced the `&&` to be materialized as a VALUE
-     (`addu v1,zero,zero; sltu/slt; beqz`) instead of the oracle's plain branch;
-     it also inflated `i`'s ref count, stealing $s0 from `this`. */
-  /* MATCH: EXIT-IN-THE-MIDDLE keeps the oracle's TOP-TEST + unconditional `j`
-     back-edge (a plain `while (A && B)` gets loop-ROTATED: peeled entry test +
-     bottom-test back-edge, +7 insns). */
-  while (1) {
-    if ((this->fItemList[this->fCurrentItem]->fFlags & 1) == 0) break;
-    if (this->fItemList[this->fCurrentItem + 1] == (tMenuItem *)0x0) break;
-    this->fCurrentItem = this->fCurrentItem + 1;
+  while ((i = (this->_base_tMenu).fCurrentItem, ((this->_base_tMenu).fItemList[i]->fFlags & 1) != 0 &&
+         ((this->_base_tMenu).fItemList[i + 1] != (tMenuItem *)0x0))) {
+    (this->_base_tMenu).fCurrentItem = i + 1;
   }
-  while (1) {
-    if ((this->fItemList[this->fCurrentItem]->fFlags & 1) == 0) break;
-    if (this->fCurrentItem <= 0) break;
-    this->fCurrentItem = this->fCurrentItem + -1;
+  while ((i = (this->_base_tMenu).fCurrentItem, ((this->_base_tMenu).fItemList[i]->fFlags & 1) != 0 &&
+         (0 < i))) {
+    (this->_base_tMenu).fCurrentItem = i + -1;
   }
   if ((-1 < this->fFirstFrame) && (0 < this->fNumFrames)) {
     drawFlags.tint[0] = 0xcec844;
-    DrawShapeExtended(this->fFirstFrame + ((int)(ticks[0] >> 4) % this->fNumFrames),0x410,0x10,0x10,0,0,&drawFlags);
+    DrawShapeExtended(this->fFirstFrame + ((int)(*(int *)&ticks >> 4) % this->fNumFrames),0x410,0x10,0x10,0,0,&drawFlags);
   }
-  /* MATCH: `short i` + `fItemList[i]` (per-use sll16/sra14 remat). */
-  for (i = 0; this->fItemList[i] != (tMenuItem *)0x0; i++) {
-    /* MATCH: the dispatch is spelled the way g++'s own old-ABI virtual call is —
-       an ENTRY POINTER for the pfn fetch (`lw 4(t0)`), the delta read off the
-       vtable base as a displacement (`lh 40(v0)`), and the this-adjust MUTATING
-       the (now dead) receiver register in place (`addu a0,a0,v0`).  Same spelling
-       as tMenuItemSlidingMenu::Draw's matched dispatches. */
-    entry = &(*this->fItemList[i]->_vf)[5];
-    adjusted = (char *)this->fItemList[i] + (int)entry->delta;
-    (*entry->pfn)(adjusted,0,0,
-        this->fInMenuTransition == 0 && (int)i == this->fCurrentItem);
+  i = 0;
+  ptVar1 = (this->_base_tMenu).fItemList[0];
+  while (ptVar1 != (tMenuItem *)0x0) {
+    ptVar1 = (this->_base_tMenu).fItemList[(short)i];
+    pa_Var2 = ptVar1->_vf;
+    bVar4 = false;
+    if (this->fInMenuTransition == 0) {
+      bVar4 = (int)(short)i == (this->_base_tMenu).fCurrentItem;
+    }
+    NFS4_VCALL_AUTO((*pa_Var2)[5].pfn, (char *)ptVar1 + (int)(*pa_Var2)[5].delta,0,0,bVar4);
+    i = i + 1;
+    ptVar1 = *(tMenuItem **)((int)(this->_base_tMenu).fItemList + (i * 0x10000 >> 0xe));
   }
   return;
 }
@@ -619,13 +577,16 @@ void tOptionsMenu::Draw()
 void tOptionsMenu::ProcessInput(tPlayer fromPlayer,tInputKeyType &keyval,tMenuCommand &command)
 
 {
-  if (this->GetNumberEnabledItems() == 0) {
-    this->fCurrentItem = 0;
+  short sVar1;
+  
+  sVar1 = this->_base_tMenu.GetNumberEnabledItems();
+  if (sVar1 == 0) {
+    (this->_base_tMenu).fCurrentItem = 0;
     if ((keyval != kInput_KeyType_Triangle) && (keyval != kInput_KeyType_Circle)) {
       keyval = kInput_KeyType_AlreadyProcessed;
     }
   }
-  this->tMenu::ProcessInput(fromPlayer,keyval,command);
+  this->_base_tMenu.ProcessInput(fromPlayer,keyval,command);
   return;
 }
 
@@ -635,11 +596,14 @@ void tOptionsMenu::ProcessInput(tPlayer fromPlayer,tInputKeyType &keyval,tMenuCo
 
 tInsideBoxMenu::tInsideBoxMenu(u_int flags,tScreen *screenHandler,tMenu *nextMenu,
               tMenu *optionsMenu,void (*OnButtonPress)(tMenuCommand&),short title,tMenuItem *firstItem,...)
-  : tMenu(flags,screenHandler,nextMenu,optionsMenu,OnButtonPress,title)
+  : _base_tMenu(flags,screenHandler,nextMenu,optionsMenu,OnButtonPress,title)
 {
-  
-  this->_vf = (__vtbl_ptr_type (*)[11])tInsideBoxMenu_vtable;
-  this->tMenuConstructor(firstItem,(&firstItem + 1));
+  va_list ap;
+
+  *(void **)&((this->_base_tMenu)._vf) = (void *)tInsideBoxMenu_vtable;
+  va_start(ap,firstItem);
+  this->_base_tMenu.tMenuConstructor(firstItem,ap);
+  va_end(ap);
   this->fPrevItem = 0;
   this->fMoving = 0;
   this->fMovingDir = 0;
@@ -653,7 +617,7 @@ tInsideBoxMenu::tInsideBoxMenu(u_int flags,tScreen *screenHandler,tMenu *nextMen
 tInsideBoxMenu::~tInsideBoxMenu()
 
 {
-  *(void **)&(this->_vf) = (void *)tInsideBoxMenu_vtable;
+  *(void **)&((this->_base_tMenu)._vf) = (void *)tInsideBoxMenu_vtable;
   return;
 }
 
@@ -664,10 +628,9 @@ tInsideBoxMenu::~tInsideBoxMenu()
 void tInsideBoxMenu::ProcessInput(tPlayer fromPlayer,tInputKeyType &keyval,tMenuCommand &command)
 
 {
-  /* SYM-CODEGEN-CARRIER: tVar2
-   * The no-local SYM block still requires the original key value to survive
-   * the AlreadyProcessed write; this is the compiler's cached reference load. */
+  __vtbl_ptr_type (*pa_Var1) [11];
   tInputKeyType tVar2;
+  tMenuItem *ptVar3;
   
   if (this->fMoving != 0) {
     tVar2 = keyval;
@@ -677,13 +640,14 @@ void tInsideBoxMenu::ProcessInput(tPlayer fromPlayer,tInputKeyType &keyval,tMenu
   }
   tVar2 = keyval;
 ProcInpFE_keyUpItemZero:
-  if ((tVar2 == kInput_KeyType_Up) && (this->fCurrentItem == 0)) {
-    (*(*this->fItemList[0]->_vf)[3].pfn)
-      ((char *)this->fItemList[0] + (int)(*this->fItemList[0]->_vf)[3].delta);
+  if ((tVar2 == kInput_KeyType_Up) && ((this->_base_tMenu).fCurrentItem == 0)) {
+    ptVar3 = (this->_base_tMenu).fItemList[0];
+    pa_Var1 = ptVar3->_vf;
+    NFS4_VCALL_AUTO((*pa_Var1)[3].pfn, (char *)ptVar3 + (int)(*pa_Var1)[3].delta);
   }
   else if ((keyval != kInput_KeyType_Down) ||
-          (this->fItemList[this->fCurrentItem + 1] != (tMenuItem *)0x0)) {
-    this->tMenu::ProcessInput(fromPlayer,keyval,command);
+          ((this->_base_tMenu).fItemList[(this->_base_tMenu).fCurrentItem + 1] != (tMenuItem *)0x0)) {
+    this->_base_tMenu.ProcessInput(fromPlayer,keyval,command);
   }
   return;
 }
@@ -692,104 +656,95 @@ ProcInpFE_keyUpItemZero:
 
 /* ---- tInsideBoxMenu::Draw  [FEMENUOPTIONS.CPP:558-605] SLD-VERIFIED ---- */
 
-void tInsideBoxMenu::Draw(short x,short y,short w,short slideOffset,short)
+int tInsideBoxMenu::Draw(short x,short y,short w,short slideOffset,short arg5)
 
 {
-  /* SYM-CODEGEN-CARRIER: entry10 -- the original virtual dispatch created
-     this row-10 compiler temporary without a source local; flattening the
-     ABI-neutral manual `_vf` form is FAIL 7 (152/153). */
-  __vtbl_ptr_type *entry10;
-  /* SYM-CODEGEN-CARRIER: entry6 -- distinct row-6 dispatch lifetime required
-     by retail allocation; flattening it is FAIL 18 (153/153). */
-  __vtbl_ptr_type *entry6;
-  short i;
-  short j;
+  short sVar1;
+  u_short uVar2;
+  __vtbl_ptr_type (*pa_Var3) [11];
+  int i;
+  int j;
+  tMenuItem *ptVar6;
+  bool bVar7;
   
-  if (this->fCurrentItem != this->fPrevItem) {
-    if (this->fPrevItem < this->fCurrentItem) {
+  i = (this->_base_tMenu).fCurrentItem;
+  if (i != this->fPrevItem) {
+    if (this->fPrevItem < i) {
       this->fMoving = 0x18;
-      this->fMovingDir = -4;
+      sVar1 = -4;
     }
     else {
       this->fMoving = -0x18;
-      this->fMovingDir = 4;
+      sVar1 = 4;
     }
-    this->fPrevItem = (short)this->fCurrentItem;
+    this->fMovingDir = sVar1;
+    this->fPrevItem = (short)(this->_base_tMenu).fCurrentItem;
   }
   if (this->fMoving != 0) {
-    this->fMoving = this->fMoving + this->fMovingDir;
-    if ((this->fMovingDir < 0) && (this->fMoving < 0)) {
+    uVar2 = this->fMoving + this->fMovingDir;
+    this->fMoving = uVar2;
+    if ((this->fMovingDir < 0) && ((int)((u_int)uVar2 << 0x10) < 0)) {
       this->fMoving = 0;
     }
     if ((0 < this->fMovingDir) && (0 < this->fMoving)) {
       this->fMoving = 0;
     }
   }
-  j = 0;
+  i = 0;
   do {
-    /* MATCH: the two-step narrow index plus subtract-negative spelling selects
-       retail's `lhu v1; addiu v0; addu v1,v1,v0` operand order. */
-    i = (short)(j - 2);
-    i = (short)(this->fCurrentItem - -i);
-    if ((3 < j) && (this->fItemList[i - 1] == (tMenuItem *)0x0)) {
-      return;
+    j = (u_int)(u_short)(this->_base_tMenu).fCurrentItem + i + -2;
+    if ((3 < (short)i) &&
+       (*(int *)((int)(this->_base_tMenu).fItemList + (j * 0x10000 >> 0xe) + -4) == 0)) {
+      return 0;
     }
-    if ((-1 < i) && (this->fItemList[i] != (tMenuItem *)0x0)) {
-      entry10 = &(*this->fItemList[i]->_vf)[10];
-      (*entry10->pfn)((char *)this->fItemList[i] + (int)entry10->delta,
-                    this->fMoving == 0 ? i == this->fCurrentItem : false);
-      entry6 = &(*this->fItemList[i]->_vf)[6];
-      (*entry6->pfn)
-                ((char *)this->fItemList[i] + (int)entry6->delta,x,
-                 /* SLD line 599: form the base offset first, add fMoving last. */
-                 ((int)this->fMoving + (y + slideOffset + ((short)j + -1) * 0x18)) + 5,
-                 w,this->fMoving == 0 ? (short)i == this->fCurrentItem : false);
+    j = j * 0x10000 >> 0x10;
+    if ((-1 < j) && (ptVar6 = (this->_base_tMenu).fItemList[j], ptVar6 != (tMenuItem *)0x0)) {
+      if (this->fMoving == 0) {
+        bVar7 = j == (this->_base_tMenu).fCurrentItem;
+      }
+      else {
+        bVar7 = false;
+      }
+      NFS4_VCALL_AUTO((*ptVar6->_vf)[10].pfn, (char *)ptVar6 + (int)(*ptVar6->_vf)[10].delta,bVar7);
+      ptVar6 = (this->_base_tMenu).fItemList[(short)j];
+      pa_Var3 = ptVar6->_vf;
+      if (this->fMoving == 0) {
+        bVar7 = (int)(short)j == (this->_base_tMenu).fCurrentItem;
+      }
+      else {
+        bVar7 = false;
+      }
+      NFS4_VCALL_AUTO((*pa_Var3)[6].pfn, (char *)ptVar6 + (int)(*pa_Var3)[6].delta,(int)x,
+                 (int)this->fMoving + (int)y + (int)slideOffset + ((short)i + -1) * 0x18 + 5,
+                 (int)w,bVar7);
     }
-    j = j + 1;
-  } while (j * 0x10000 >> 0x10 < 5);
-  return;
+    i = i + 1;
+  } while (i * 0x10000 >> 0x10 < 5);
+  return 0;
 }
 
 
 
 /* ---- tMenuItemSlidingMenu::ctor  [FEMENUOPTIONS.CPP:612-624] SLD-VERIFIED ---- */
-tMenuItemSlidingMenu::tMenuItemSlidingMenu(u_int textDescription,short width,short height,int diffx,
-          int diffy,bool fillback)
-  : tMenuItem(textDescription),
-    currMenu(({ __asm__("" : "+r"(diffx), "+r"(diffy)
-                            : "r"(diffx), "r"(diffy), "r"(fillback));
-                (tInsideBoxMenu *)0x0; }))
+tMenuItemSlidingMenu::tMenuItemSlidingMenu(u_int textDescription,short width,short height,short diffx,
+          short diffy,bool fillback)
+  : _base_tMenuItem(textDescription)
 {
-  /* MATCH (LAW 05A — the SLD IS the statement order): retail's body is
-     614 fFlags|=0x80 / 615 currMenu / 616 nextMenu / 617 fWidth / 618 fHeight /
-     619 fDiffX / 620 fDiffY / 621 fFillback / 622 fSelFade — ONE fFlags OR (the
-     recon had it twice), and a TYPED vtable store so gcc can schedule the `sw`.
-     [SOURCE PASS 2026-08-26, 4->0, 42/42] The two stack-argument halfword stores
-     otherwise schedule above the first flags update and vtable write.  A volatile
-     lvalue on exactly the vtable word and those two halfwords preserves retail's
-     `flags -> vtable -> fDiffX -> fDiffY` phase without adding an instruction,
-     local, register pin, or post-compilation move.  Canonical comma chaining,
-     relocating the existing zero-byte parameter fence, and volatile halfwords
-     with a nonvolatile vtable word were each measured neutral at FAIL 4; a
-     memory-tied fence reached the phase but changed the `this` copy web and was
-     FAIL 19 at 43/42. */
+  u_int uVar1;
+  
+  uVar1 = (this->_base_tMenuItem).fFlags;
+  this->currMenu = (tInsideBoxMenu *)0x0;
   this->nextMenu = (tInsideBoxMenu *)0x0;
   this->fWidth = width;
   this->fHeight = height;
-  this->fSelFade = 0;
-  this->fFlags = this->fFlags | 0x80;
-  *(void * volatile *)&this->_vf =
-      (void *)tMenuItemSlidingMenu_vtable;
-  *(volatile short *)&this->fDiffX = (short)diffx;
-  *(volatile short *)&this->fDiffY = (short)diffy;
+  (this->_base_tMenuItem).fSelFade = 0;
+  (this->_base_tMenuItem).fFlags = uVar1 | 0x80;
+  uVar1 = (this->_base_tMenuItem).fFlags;
+  *(void **)&((this->_base_tMenuItem)._vf) = (void *)tMenuItemSlidingMenu_vtable;
+  this->fDiffX = diffx;
+  this->fDiffY = diffy;
   this->fFillback = fillback;
-  /* MATCH (LAW 05A): the SLD attributes a SECOND `fFlags |= 0x80`
-     (`lw a0,0(v0); ori a0,a0,128; sw a0,0(v0)`) to line 624 — the ctor's closing
-     line — i.e. retail really ORs the bit in twice. */
-  this->fFlags = this->fFlags | 0x80;
-  /* MATCH: the ABI passes the stack arguments as full words.  The public asm
-     label preserves the retail short-parameter symbol while SI-mode locals
-     reproduce its lw/sh lowering and saved-register order. */
+  (this->_base_tMenuItem).fFlags = uVar1 | 0x80;
   return;
 }
 
@@ -800,7 +755,7 @@ tMenuItemSlidingMenu::tMenuItemSlidingMenu(u_int textDescription,short width,sho
 tMenuItemSlidingMenu::~tMenuItemSlidingMenu()
 
 {
-  *(void **)&(this->_vf) = (void *)tMenuItemSlidingMenu_vtable;
+  *(void **)&((this->_base_tMenuItem)._vf) = (void *)tMenuItemSlidingMenu_vtable;
   return;
 }
 
@@ -841,25 +796,31 @@ void tMenuItemSlidingMenu::TransitionOn()
 
 /* ---- tMenuItemSlidingMenu::TransitionIsFinished  [FEMENUOPTIONS.CPP:661-676] SLD-VERIFIED ---- */
 
-bool tMenuItemSlidingMenu::TransitionIsFinished()
+void * tMenuItemSlidingMenu::TransitionIsFinished()
 
 {
-  /* MATCH: plain if/else-if chain (same shape as tMenuItemLeftRightFade's).  The
-     fFadeDir reload at 8001D2E8 is free: the preceding `&&` clobbered $v0 with
-     fFadeVal, so only that path reloads while the bgez edge enters mid-block. */
+  short sVar1;
+  
   if ((this->currMenu == (tInsideBoxMenu *)0x0) || (this->nextMenu == (tInsideBoxMenu *)0x0)) {
     this->fFadeDir = 0;
-    this->fInTransition = 0;
-  } else if (this->fFadeDir == 0) {
-    this->fInTransition = 0;
-  } else if ((this->fFadeDir < 0) && (this->fFadeVal <= 0)) {
-    this->fInTransition = 0;
-  } else if ((this->fFadeDir > 0) && (this->fFadeVal >= 0x80)) {
-    this->fInTransition = 0;
-  } else {
-    this->fInTransition = 1;
   }
-  return !this->fInTransition;
+  else {
+    sVar1 = this->fFadeDir;
+    if (sVar1 != 0) {
+      if (sVar1 < 0) {
+        if (this->fFadeVal < 1) goto SlideMenuTrans_resetTrans;
+        sVar1 = this->fFadeDir;
+      }
+      if ((sVar1 < 1) || (this->fFadeVal < 0x80)) {
+        this->fInTransition = 1;
+        goto SlideMenuTrans_returnInv;
+      }
+    }
+  }
+SlideMenuTrans_resetTrans:
+  this->fInTransition = 0;
+SlideMenuTrans_returnInv:
+  return (void *)(this->fInTransition ^ 1);
 }
 
 
@@ -869,8 +830,7 @@ bool tMenuItemSlidingMenu::TransitionIsFinished()
 void tMenuItemSlidingMenu::UpdateTransition(bool selected)
 
 {
-  /* SYM-CODEGEN-CARRIER: iVar2
-   * Compiler-created destination of the one-line nested MIN/MAX clamp. */
+  __vtbl_ptr_type (*pa_Var1) [11];
   int iVar2;
   
   iVar2 = (int)this->fFadeVal + (int)this->fFadeDir;
@@ -880,10 +840,10 @@ void tMenuItemSlidingMenu::UpdateTransition(bool selected)
   if (iVar2 < 0) {
     iVar2 = 0;
   }
+  pa_Var1 = (this->_base_tMenuItem)._vf;
   this->fFadeVal = (short)iVar2;
-  (*(*this->_vf)[9].pfn)
-    ((int)&this->fFlags + (int)(*this->_vf)[9].delta);
-  this->tMenuItem::UpdateTransition(selected);
+  NFS4_VCALL_AUTO((*pa_Var1)[9].pfn, (int)&(this->_base_tMenuItem).fFlags + (int)(*pa_Var1)[9].delta);
+  this->_base_tMenuItem.UpdateTransition(selected);
   return;
 }
 
@@ -894,11 +854,18 @@ void tMenuItemSlidingMenu::UpdateTransition(bool selected)
 long tMenuItemSlidingMenu::DebounceKeys()
 
 {
-  if (this->currMenu != (tInsideBoxMenu *)0x0) {
-    return (*(*this->currMenu->_vf)[4].pfn)
-      ((int)this->currMenu + (*this->currMenu->_vf)[4].delta) | 0x600;
+  u_int uVar1;
+  __vtbl_ptr_type (*pa_Var2) [11];
+  tInsideBoxMenu *ptVar3;
+  
+  ptVar3 = this->currMenu;
+  uVar1 = 0x600;
+  if (ptVar3 != (tInsideBoxMenu *)0x0) {
+    pa_Var2 = (ptVar3->_base_tMenu)._vf;
+    uVar1 = NFS4_VCALL_AUTO((*pa_Var2)[4].pfn, (int)(ptVar3->_base_tMenu).fItemList + (*pa_Var2)[4].delta + -0x10);
+    uVar1 = uVar1 | 0x600;
   }
-  return 0x600;
+  return uVar1;
 }
 
 
@@ -908,8 +875,10 @@ long tMenuItemSlidingMenu::DebounceKeys()
 void tMenuItemSlidingMenu::Draw(bool selected)
 
 {
-  (*(*this->_vf)[5].pfn)(
-      (int)&this->fFlags + (int)(*this->_vf)[5].delta,0,0,selected);
+  __vtbl_ptr_type (*pa_Var1) [11];
+  
+  pa_Var1 = (this->_base_tMenuItem)._vf;
+  NFS4_VCALL_AUTO((*pa_Var1)[5].pfn, (int)&(this->_base_tMenuItem).fFlags + (int)(*pa_Var1)[5].delta,0,0);
   return;
 }
 
@@ -920,62 +889,38 @@ void tMenuItemSlidingMenu::Draw(bool selected)
 void tMenuItemSlidingMenu::UpdatefOpenHeight(bool selected)
 
 {
-  /* SYM-CODEGEN-CARRIER: closeH
-   * SYM-CODEGEN-CARRIER: cur
-   * SYM-CODEGEN-CARRIER: fade
-   * SYM-CODEGEN-CARRIER: fadeOut
-   * SYM-CODEGEN-CARRIER: lim
-   * SYM-CODEGEN-CARRIER: newFade
-   * SYM-CODEGEN-CARRIER: shrinkH
-   * SYM-CODEGEN-CARRIER: slide
-   * The no-local SYM block and the per-path allocation receipts below prove
-   * these are compiler expression destinations, not source-scope locals. */
-  /* MATCH: PASS 136/136.  SYM: fsize 0 / mask 0 / no named locals.  Retail's
-     two fade-in paths feed one shared clamp with two compiler temporaries:
-     the first computes newFade from the existing fade value in $v1, while the
-     second reloads fFadeVal into $v0 and forms newFade in $v1.  The explicit
-     feo_fadeInClamp join preserves that asymmetric allocation and the retail
-     delay-slot fills.  The guarded fadeOut scope and four read-only lim refs
-     independently recover the other two clamp allocations. */
-  int fade;
-  int newFade;
-
+  int iVar1;
+  short sVar2;
+  
   this->fClosing = 0;
   if (this->fOpenHeight == 0) {
     this->fSlideOffset = this->fHeight + (this->fHeight >> 1);
   }
-  /* MATCH: the subtraction lives INSIDE the guard (oracle `blez v0` with the
-     `addiu v0,v0,-4` IN its delay slot, IN PLACE on the loaded field); hoisting
-     it above the test — a comma-expression condition — keeps the loaded value
-     live and forces every clamp onto a second register. */
-  if ((this->nextMenu != this->currMenu) && (0 < this->fOpenHeight))
+  if ((this->nextMenu != this->currMenu) && (iVar1 = this->fOpenHeight + -4, 0 < this->fOpenHeight))
   {
-    int closeH = this->fOpenHeight + -4;
-    if (closeH < 0) {
-      closeH = 0;
+    if (iVar1 < 0) {
+      iVar1 = 0;
     }
-    this->fOpenHeight = (short)closeH;
+    this->fOpenHeight = (short)iVar1;
     this->fClosing = 1;
     goto UpdfOpenH_currMenuCheck;
   }
   if (this->nextMenu == (tInsideBoxMenu *)0x0) {
-    fade = (int)this->fFadeVal;
-    if (0x7f < fade) goto feo_fadeCheck;
+    iVar1 = (int)this->fFadeVal;
+    if (0x7f < iVar1) goto feo_fadeCheck;
     if (this->fInTransition != 0) goto UpdfOpenH_currMenuCheck;
-    newFade = fade + 0x28;
-    goto feo_fadeInClamp;
   }
   else {
-    fade = (int)this->fFadeVal;
+    iVar1 = (int)this->fFadeVal;
 feo_fadeCheck:
-    if (((0 < fade) && (this->currMenu == (tInsideBoxMenu *)0x0)) &&
+    if (((0 < iVar1) && (this->currMenu == (tInsideBoxMenu *)0x0)) &&
        (this->nextMenu != (tInsideBoxMenu *)0x0)) {
+      iVar1 = iVar1 + -0x28;
       if (this->fInTransition == 0) {
-        int fadeOut = fade + -0x28;
-        if (fadeOut < 0) {
-          fadeOut = 0;
+        if (iVar1 < 0) {
+          iVar1 = 0;
         }
-        this->fFadeVal = (short)fadeOut;
+        this->fFadeVal = (short)iVar1;
       }
       if (this->fTransitioningOut == 0) {
         this->currMenu = this->nextMenu;
@@ -984,67 +929,51 @@ feo_fadeCheck:
     }
     this->currMenu = this->nextMenu;
     if ((this->fTransitioningOut != 0) || (this->fInTransition != 0)) goto UpdfOpenH_currMenuCheck;
-    /* MATCH: test the JUST-STORED `currMenu` (identical value here) — gcc
-       store-forwards it (`beqz v1`), where re-reading `nextMenu` across the
-       may-aliasing store costs a reload. */
-    if (this->currMenu != (tInsideBoxMenu *)0x0) {
-      int fadeOut = this->fFadeVal + -0x28;
-      if (fadeOut < 0) {
-        fadeOut = 0;
+    if (this->nextMenu != (tInsideBoxMenu *)0x0) {
+      iVar1 = this->fFadeVal + -0x28;
+      if (iVar1 < 0) {
+        iVar1 = 0;
       }
-      this->fFadeVal = (short)fadeOut;
+      this->fFadeVal = (short)iVar1;
       goto UpdfOpenH_currMenuCheck;
     }
+    iVar1 = (int)this->fFadeVal;
   }
-  /* MATCH: this second path must omit the otherwise redundant `fade` reload.
-     Assigning the member expression directly to newFade gives oracle
-     `lh v0,44; addiu v1,v0,40`; the explicit join above keeps the first path's
-     `addiu v1,v1,40` and shared clamp rather than inverting its branch. */
-  newFade = (int)this->fFadeVal + 0x28;
-feo_fadeInClamp:
-  if (0x80 < newFade) {
-    newFade = 0x80;
+  sVar2 = (short)(iVar1 + 0x28);
+  if (0x80 < iVar1 + 0x28) {
+    sVar2 = 0x80;
   }
-  this->fFadeVal = (short)newFade;
+  this->fFadeVal = sVar2;
 UpdfOpenH_currMenuCheck:
   if (this->currMenu != (tInsideBoxMenu *)0x0) {
     if (selected != 0) {
       if (this->fClosing == 0) {
-        /* MATCH: plain if/else with the store in BOTH arms — gcc cross-jump-merges
-           them into the oracle's single `sh v1,40(a0)` and lets `fHeight` load
-           STRAIGHT into the merge register (a `short lim` pre-read forces an
-           `addu v1,a3,zero` copy and flips the two loads' order). */
-        /* MATCH: cur/lim as two int temps, the clamp merged into `lim` so both arms
-           share ONE `sh` (oracle `addu v1,a2,zero; sh v1,40`).  Four read-only
-           lim refs buy the exact local-allocation handout: cur=$a2, lim=$v1. */
-        int cur = this->fOpenHeight;
-        int lim = this->fHeight;
-        if (cur < lim) {
-          cur = cur + 4;
-          if (cur < lim) {
-            lim = cur;
+        sVar2 = this->fHeight;
+        iVar1 = this->fOpenHeight + 4;
+        if ((int)this->fOpenHeight < (int)sVar2) {
+          if (iVar1 < sVar2) {
+            sVar2 = (short)iVar1;
           }
-          __asm__("" : : "r"(lim), "r"(lim), "r"(lim), "r"(lim));
-          this->fOpenHeight = (short)lim;
+          this->fOpenHeight = sVar2;
         }
         else {
-          int slide = this->fSlideOffset + -6;
-          if (slide < 0) {
-            slide = 0;
+          iVar1 = this->fSlideOffset + -6;
+          if (iVar1 < 0) {
+            iVar1 = 0;
           }
-          this->fSlideOffset = (short)slide;
+          this->fSlideOffset = (short)iVar1;
         }
       }
       if (selected != 0) {
         return;
       }
     }
+    iVar1 = this->fOpenHeight + -4;
     if (0 < this->fOpenHeight) {
-      int shrinkH = this->fOpenHeight + -4;
-      if (shrinkH < 0) {
-        shrinkH = 0;
+      if (iVar1 < 0) {
+        iVar1 = 0;
       }
-      this->fOpenHeight = (short)shrinkH;
+      this->fOpenHeight = (short)iVar1;
     }
   }
   return;
@@ -1057,136 +986,142 @@ UpdfOpenH_currMenuCheck:
 void tMenuItemSlidingMenu::Draw(int offx,int offy,bool selected)
 
 {
-  int ColText;
-  int x;
-  int y;
-  tTexture_ShapeInfo *shape;
-  static int flareextra;
+  short sVar1;
+  u_short uVar2;
   bool fPlayList;
-
-  /* SYM: fn-scope locals are ONLY ColText/x/y/shape/fPlayList; drawFlags+
-     width are scoped to the "if (currMenu!=0||fPlayList)" block; xx/yy/ww/
-     hh/drenv/daprim/full/temp/gray/shapetop/shapebottom to the big
-     "if (currMenu!=0)" block. The virtual DebounceKeys-flags call, the
-     TextSys_WordX/WordY->x/y fusion, `shape` as the ALREADY-OFFSET
-     &gHelpShapes[0x1e] pointer (not a base ptr re-indexed each use), the
-     shared boxWidth_d (0xdc for a playlist submenu, else fWidth -- computed
-     ONCE, reused by the two flare-arrow DrawShapeExtended calls only), and
-     the two independent currMenu/fPlayList tests (not one cached flag) are
-     all read directly off the raw oracle (asm/nonmatchings/front/
-     Draw__20tMenuItemSlidingMenuiib.s). */
-  (**(int (**)(...))((int)this->_vf + 0x5c))
-            ((int)&this->fFlags + (int)*(short *)((int)this->_vf + 0x58),
+  tTexture_ShapeInfo *shape;
+  tTexture_ShapeInfo *ptVar6;
+  int vtable_ptr;
+  int ColText;
+  int boxHeight;
+  int x;
+  int topShapeY;
+  int y;
+  int ptVar8;
+  int tstr10;
+  int iVar7;
+  int iVar8;
+  int sMenuText;
+  int pkt_addr24;
+  int ti1;
+  int tu1;
+  int boxWidth_d;
+  int drawX;
+  tInsideBoxMenu *index;
+  int pa_Var3;
+  int rowSpacing;
+  int hh;
+  int itemColor;
+  tTexture_ShapeInfo *shapebottom;
+  int xx;
+  int yy;
+  tTexture_ShapeInfo *shapetop;
+  int ww;
+  RECT full;
+  RECT temp;
+  tDrawShapeExtended drawFlags;
+  int width;
+  int gray;
+  DRAWENV *drenv;
+  u_char bVar1;
+  int ptVar3;
+  int ptVar4;
+  u_char *cur_pkt;
+  u_char *daprim;
+  
+  vtable_ptr = (int)(this->_base_tMenuItem)._vf;
+  (**(int (**)(...))(vtable_ptr + 0x5c))
+            ((int)&(this->_base_tMenuItem).fFlags + (int)*(short *)(vtable_ptr + 0x58),
              selected);
-  ColText = CalcTextFadeSelToHi(textType_Options,this->fSelFade,this->fFadeVal);
-  x = TextSys_WordX(this->fTextDescription) + offx;
-  y = TextSys_WordY(this->fTextDescription) + offy;
-  shape = &gHelpShapes[0x1e];
+  ColText = CalcTextFadeSelToHi(textType_Options,(this->_base_tMenuItem).fSelFade,this->fFadeVal);
+  boxHeight = TextSys_WordX((this->_base_tMenuItem).fTextDescription);
+  x = boxHeight + offx;
+  topShapeY = TextSys_WordY((this->_base_tMenuItem).fTextDescription);
+  shape = gHelpShapes;
   fHelpText = -1;
+  y = topShapeY + offy;
   fPlayList = (tInsideBoxSongMenu *)this->currMenu == &menuDefs->menuPlayListMenu;
   if ((this->fFadeVal != 0x80) && (fPlayList)) {
-    DrawLeftFlare(y,(int)this->fSelFade,(int)this->fFadeVal,
+    DrawLeftFlare(y,(int)(this->_base_tMenuItem).fSelFade,(int)this->fFadeVal,
                flareextra);
   }
-  if ((this->currMenu != (tInsideBoxMenu *)0x0) || (fPlayList)) {
-    tDrawShapeExtended drawFlags;
-    int width;
-    int drawX;
-    int drawY;
-
-    /* SYM-CODEGEN-CARRIER: drawX
-       SYM-CODEGEN-CARRIER: drawY
-       MATCH: these two merged call arguments expose compiler-managed values
-       visible in retail SSA without changing the SYM source-local contract.
-       Direct drawX spelling is 63 diffs and one instruction short; a ternary
-       drawY spelling is 47 diffs and five instructions long.  The read-only
-       address fence crosses p127's 3->4 ref step so GCC hands &drawFlags and
-       the shared x+width value to $s0/$s1, as recorded by retail.  Former
-       aliases `right`, `draw`, and `drawFlagsPtr` were independently removed
-       with the function remaining PASS. */
-    width = fPlayList ? 0xdc : (int)this->fWidth;
-    drawFlags.tint[0] = CalcFadeVal(0,0xbebe,(int)this->fSelFade,(int)this->fFadeVal);
-    drawY = y + -2;
-    drawX = ((x + width) - (int)shape->width) - 0xa;
-    if (fPlayList) {
-      drawY = y + -3;
-    }
-    DrawShapeExtended(0x39,0x18,drawX,drawY,0,1,&drawFlags);
-    __asm__("" : : "r"(&drawFlags));
-    drawY = y + 4;
-    drawX = ((x + width) - (int)shape->width) - 0xa;
-    if (fPlayList) {
-      drawY = y + 3;
-    }
-    DrawShapeExtended(0x3a,0x18,drawX,drawY,0,1,&drawFlags);
+  if ((this->currMenu != (tInsideBoxMenu *)0x0) || (ptVar8 = 0, fPlayList)) {
+    drawFlags.tint[0] = CalcFadeVal(0,0xbebe,(int)(this->_base_tMenuItem).fSelFade,(int)this->fFadeVal);
+    DrawShapeExtended(0x39,0x18,((x + (fPlayList ? 0xdc : (int)this->fWidth)) - (int)shape[0x1e].width) - 0xa,(fPlayList ? y + -3 : y + -2),0,1,&drawFlags);
+    DrawShapeExtended(0x3a,0x18,((x + (fPlayList ? 0xdc : (int)this->fWidth)) - (int)shape[0x1e].width) - 0xa,(fPlayList ? y + 3 : y + 4),0,1,&drawFlags);
+    ptVar8 = (int)this->currMenu;
   }
-  if (this->currMenu != (tInsideBoxMenu *)0x0) {
-    int xx;
-    int yy;
-    int ww;
-    int hh;
-    DRAWENV *drenv;
-    DR_AREA *daprim;
-    RECT full;
-    RECT temp;
-    int gray;
-    tTexture_ShapeInfo *shapetop;
-    tTexture_ShapeInfo *shapebottom;
-
+  if (ptVar8 != 0) {
+    uVar2 = this->fOpenHeight;
+    sVar1 = this->fWidth;
+    ww = (int)sVar1;
     xx = x + this->fDiffX;
+    hh = (u_int)uVar2 << 0x10;
     yy = y + this->fDiffY;
-    ww = this->fWidth;
-    hh = this->fOpenHeight;
     drenv = (DRAWENV *)Draw_GetDRAWENV(Draw_gPlayer1View,gFlip);
+    daprim = Render_gPacketPtr;
+    cur_pkt = Render_gPalettePtr;
     full.x = 0;
     full.y = *(short *)((char *)drenv + 2);
     full.h = (short)screenheight;
     full.w = 0x200;
-    daprim = (DR_AREA *)Render_gPacketPtr;
-    ((tPsyQPrimTag *)daprim)->addr = ((tPsyQPrimTag *)Render_gPalettePtr)->addr;
-    ((tPsyQPrimTag *)Render_gPalettePtr)->addr = (u_int)daprim;
+    *(u_int *)Render_gPacketPtr =
+         *(u_int *)Render_gPacketPtr & 0xff000000 | *(u_int *)Render_gPalettePtr & 0xffffff;
+    pkt_addr24 = (u_int)Render_gPacketPtr & 0xffffff;
     Render_gPacketPtr = Render_gPacketPtr + 0xc;
-    SetDrawArea(daprim,&full);
+    *(u_int *)cur_pkt = *(u_int *)cur_pkt & 0xff000000 | pkt_addr24;
+    SetDrawArea((DR_AREA *)daprim,&full);
+    width = hh >> 0x11;
     gray = 0x505050;
-    SubtractiveBox(xx,yy,ww,hh >> 1,gray,gray,0,0);
-    SubtractiveBox(xx,yy + (hh >> 1),ww,hh >> 1,0,0,gray,gray);
-    shapetop = gHelpShapes + 0x1f;
-    shapebottom = gHelpShapes + 0x20;
-    (**(int (**)(...))((int)this->currMenu->_vf + 0x5c))
-              (((int)this->currMenu->fItemList + -0x10) + *(short *)((int)this->currMenu->_vf + 0x58),
+    SubtractiveBox(xx,yy,ww,width,gray,gray,0,0);
+    SubtractiveBox(xx,yy + width,ww,width,0,0,gray,gray);
+    ptVar6 = gHelpShapes;
+    shapetop = ptVar6 + 0x1f;
+    shapebottom = ptVar6 + 0x20;
+    index = this->currMenu;
+    pa_Var3 = (int)(index->_base_tMenu)._vf;
+    (**(int (**)(...))(pa_Var3 + 0x5c))
+              ((int)(index->_base_tMenu).fItemList + *(short *)(pa_Var3 + 0x58) + -0x10,
                xx * 0x10000 >> 0x10,yy * 0x10000 >> 0x10,ww,
                (int)((u_int)(u_short)this->fSlideOffset << 0x11) >> 0x10,(int)this->fHeight);
-    if ((this->fFillback != 0) && (shapetop->height < hh)) {
+    itemColor = hh >> 0x10;
+    if ((this->fFillback != 0) && (shapetop->height < itemColor)) {
       DrawShapeExtended(0x1f,0xc,xx,yy,0,0,(tDrawShapeExtended *)0x0);
       DrawShapeExtended(0x1f,8,(xx + ww) - (int)shapetop->width,yy,0,0,(tDrawShapeExtended *)0x0);
-      DrawShapeExtended(0x20,0xc,xx,(yy + hh) - (int)shapebottom->height,0,0,(tDrawShapeExtended *)0x0);
-      DrawShapeExtended(0x20,8,(xx + ww) - (int)shapebottom->width,(yy + hh) - (int)shapebottom->height,0,0,(tDrawShapeExtended *)0x0);
+      DrawShapeExtended(0x20,0xc,xx,(yy + itemColor) - (int)shapebottom->height,0,0,(tDrawShapeExtended *)0x0);
+      DrawShapeExtended(0x20,8,(xx + ww) - (int)shapebottom->width,(yy + itemColor) - (int)shapebottom->height,0,0,(tDrawShapeExtended *)0x0);
     }
     PSXDrawSquare(0,xx + shapetop->width + 5,yy,
-               ((ww - shapetop->width) - (int)shapebottom->width) + -10,hh);
-    if (shapetop->height + shapebottom->height < hh) {
-      PSXDrawSquare(0,xx,yy + shapetop->height,ww,
-                    (hh - shapetop->height) - (int)shapebottom->height);
+               ((ww - shapetop->width) - (int)shapebottom->width) + -10,itemColor);
+    ti1 = (int)shapetop->height;
+    if (ti1 + shapebottom->height < itemColor) {
+      PSXDrawSquare(0,xx,yy + ti1,ww,(itemColor - ti1) - (int)shapebottom->height);
     }
+    daprim = Render_gPacketPtr;
+    cur_pkt = Render_gPalettePtr;
     temp.x = (short)xx;
+    ti1 = -0x1000000;
     temp.y = *(short *)((char *)drenv + 2) + (short)yy;
-    temp.w = (short)ww;
-    temp.h = (short)hh;
-    daprim = (DR_AREA *)Render_gPacketPtr;
-    ((tPsyQPrimTag *)daprim)->addr = ((tPsyQPrimTag *)Render_gPalettePtr)->addr;
-    ((tPsyQPrimTag *)Render_gPalettePtr)->addr = (u_int)daprim;
+    *(u_int *)Render_gPacketPtr =
+         *(u_int *)Render_gPacketPtr & 0xff000000 | *(u_int *)Render_gPalettePtr & 0xffffff;
+    tu1 = (u_int)Render_gPacketPtr & 0xffffff;
     Render_gPacketPtr = Render_gPacketPtr + 0xc;
-    SetDrawArea(daprim,&temp);
+    *(u_int *)cur_pkt = *(u_int *)cur_pkt & 0xff000000 | tu1;
+    temp.w = sVar1;
+    temp.h = uVar2;
+    SetDrawArea((DR_AREA *)daprim,&temp);
     if (fHelpText != -1) {
-      FETextRender_FullTextRGB(TextSys_Word(fHelpText),TextSys_WordX(fHelpText),
-                               TextSys_WordY(fHelpText),PulsateYellow,'\0',2);
+      tstr10 = (int)TextSys_Word(fHelpText);
+      iVar7 = TextSys_WordX(fHelpText);
+      iVar8 = TextSys_WordY(fHelpText);
+      FETextRender_FullTextRGB((char *)tstr10,(short)iVar7,(short)iVar8,PulsateYellow,'\0',2);
     }
-    FETextRender_FullTextRGB((char *)TextSys_Word(this->fTextDescription),(short)x,(short)y,ColText,'\0',
-                             fPlayList ? 1 : 0);
-    DrawShapeExtended(0x1e,8,(x + (int)this->fWidth) - (int)shape->width,y + -2,(int)this->fFadeVal,0,(tDrawShapeExtended *)0x0);
+    sMenuText = (int)TextSys_Word((this->_base_tMenuItem).fTextDescription);
+    FETextRender_FullTextRGB((char *)sMenuText,(short)x,(short)y,ColText,'\0',(u_short)fPlayList);
+    DrawShapeExtended(0x1e,8,(x + (fPlayList ? 0xdc : (int)this->fWidth)) - (int)shape[0x1e].width,y + -2,(int)this->fFadeVal,0,(tDrawShapeExtended *)0x0);
     if (this->fFillback != 0) {
-      PSXDrawSquare(0,x,y + -2,(int)this->fWidth - (int)shape->width,
-                 (int)shape->height);
+      PSXDrawSquare(0,x,y + -2,(int)this->fWidth - (int)shape[0x1e].width,
+                 (int)shape[0x1e].height);
     }
   }
   return;
@@ -1200,15 +1135,18 @@ void tMenuItemSlidingMenu::ProcessInput(tPlayer fromPlayer,tInputKeyType &keyval
                tMenuCommand &command)
 
 {
+  __vtbl_ptr_type (*pa_Var1) [11];
+  tInsideBoxMenu *ptVar2;
+  
   if ((this->fOpenHeight == this->fHeight) &&
-      (this->currMenu != (tInsideBoxMenu *)0x0)) {
-    (*(*this->currMenu->_vf)[3].pfn)
-      ((int)this->currMenu + (*this->currMenu->_vf)[3].delta);
+     (ptVar2 = this->currMenu, ptVar2 != (tInsideBoxMenu *)0x0)) {
+    pa_Var1 = (ptVar2->_base_tMenu)._vf;
+    NFS4_VCALL_AUTO((*pa_Var1)[3].pfn, (int)(ptVar2->_base_tMenu).fItemList + (*pa_Var1)[3].delta + -0x10);
   }
   if (keyval == kInput_KeyType_Down) {
     keyval = kInput_KeyType_AlreadyProcessed;
   }
-  this->tMenuItem::ProcessInput(fromPlayer,keyval,command);
+  this->_base_tMenuItem.ProcessInput(fromPlayer,keyval,command);
   return;
 }
 
@@ -1225,10 +1163,10 @@ void tMenuItemSlidingMenu::SetMenu(bool bothmenus,tInsideBoxMenu *menu)
     this->currMenu = menu;
   }
   if (this->nextMenu == (tInsideBoxMenu *)0x0) {
-    this->fFlags = this->fFlags | 1;
+    (this->_base_tMenuItem).fFlags = (this->_base_tMenuItem).fFlags | 1;
     return;
   }
-  this->fFlags = this->fFlags & 0xfffffffe;
+  (this->_base_tMenuItem).fFlags = (this->_base_tMenuItem).fFlags & 0xfffffffe;
   return;
 }
 
@@ -1236,44 +1174,33 @@ void tMenuItemSlidingMenu::SetMenu(bool bothmenus,tInsideBoxMenu *menu)
 
 /* ---- tMenuItemSlidingActivated::UpdatefOpenHeight  [FEMENUOPTIONS.CPP:925-931] SLD-VERIFIED ---- */
 
-void tMenuItemSlidingActivated::UpdatefOpenHeight(bool arg1)
+int tMenuItemSlidingActivated::UpdatefOpenHeight(bool arg1)
 
 {
-  /* SYM-CODEGEN-CARRIER: arg1 -- retained by the mangled ABI signature. */
-  /* SYM-CODEGEN-CARRIER: iVar2
-   * SYM-CODEGEN-CARRIER: iVar4
-   * Compiler-created destinations for the ordered MIN/MAX expression whose
-   * exact load order and no-return behavior are receipted below. */
+  short sVar1;
   int iVar2;
+  u_int uVar3;
   int iVar4;
-
-  /* MATCH: store IN each branch (gcc cross-jump-merges the two `sh`s back into
-     the oracle's single join store); a shared `sVar1` temp costs an extra reg
-     + copy. */
-  if (this->fActive != 0) {
-    this->fSlideOffset = this->fSlideOffset + -3;
+  
+  if (this->fActive == 0) {
+    sVar1 = (this->_base_tMenuItemSlidingMenu).fSlideOffset + 3;
   }
   else {
-    this->fSlideOffset = this->fSlideOffset + 3;
+    sVar1 = (this->_base_tMenuItemSlidingMenu).fSlideOffset + -3;
   }
-  /* MATCH: the fHeight limit is computed BEFORE the fSlideOffset read (oracle
-     `lhu 0x26` then `lh 0x2A`) — the reversed order swaps their registers.
-     The limit is ONE natural expression (same spelling as TransitionOn): the
-     hand-split `<<0x10` intermediate minted an extra named pseudo, which pushed
-     the sum off `$v1` and forced a return funnel for uVar3. */
-  iVar2 = (int)this->fHeight + ((int)this->fHeight >> 1);
-  iVar4 = (int)this->fSlideOffset;
-  if (iVar4 < iVar2) {
+  (this->_base_tMenuItemSlidingMenu).fSlideOffset = sVar1;
+  iVar4 = (int)(this->_base_tMenuItemSlidingMenu).fSlideOffset;
+  iVar2 = (u_int)(u_short)(this->_base_tMenuItemSlidingMenu).fHeight << 0x10;
+  iVar2 = (iVar2 >> 0x10) + (iVar2 >> 0x11);
+  uVar3 = (u_int)(iVar4 < iVar2);
+  if (uVar3 != 0) {
     iVar2 = iVar4;
   }
   if (iVar2 < 0) {
     iVar2 = 0;
   }
-  /* MATCH (06A): retail DROPS the result — there is no `return`; $v0 is left
-     holding the `slt` of the clamp test incidentally.  An explicit
-     `return uVar3;` funnels it through a second register (`addu a2,v0,zero`
-     + `addu v0,a2,zero`). */
-  this->fSlideOffset = (short)iVar2;
+  (this->_base_tMenuItemSlidingMenu).fSlideOffset = (short)iVar2;
+  return uVar3;
 }
 
 
@@ -1283,12 +1210,12 @@ void tMenuItemSlidingActivated::UpdatefOpenHeight(bool arg1)
 void tMenuItemSlidingActivated::TransitionOff()
 
 {
-  this->fFadeDir = 0;
-  this->fTransitioningOut = 1;
-  if (this->currMenu != (tInsideBoxMenu *)0x0) {
-    this->fInTransition = 1;
-    this->fFadeDir = 0x1e;
-    this->fFadeVal = 0;
+  (this->_base_tMenuItemSlidingMenu).fFadeDir = 0;
+  (this->_base_tMenuItemSlidingMenu).fTransitioningOut = 1;
+  if ((this->_base_tMenuItemSlidingMenu).currMenu != (tInsideBoxMenu *)0x0) {
+    (this->_base_tMenuItemSlidingMenu).fInTransition = 1;
+    (this->_base_tMenuItemSlidingMenu).fFadeDir = 0x1e;
+    (this->_base_tMenuItemSlidingMenu).fFadeVal = 0;
   }
   return;
 }
@@ -1300,15 +1227,16 @@ void tMenuItemSlidingActivated::TransitionOff()
 void tMenuItemSlidingActivated::TransitionOn()
 
 {
-  /* MATCH: SYM = no locals; direct member exprs, fSlideOffset BEFORE fOpenHeight
-     (oracle keeps pre-sum fHeight copied to a1, stores 0x2A then 0x28-in-jr-slot) */
-  this->fFadeDir = -0x1e;
-  this->fInTransition = 1;
+  short sVar1;
+  
+  sVar1 = (this->_base_tMenuItemSlidingMenu).fHeight;
+  (this->_base_tMenuItemSlidingMenu).fFadeDir = -0x1e;
+  (this->_base_tMenuItemSlidingMenu).fInTransition = 1;
   this->fActive = 0;
-  this->fTransitioningOut = 0;
-  this->fFadeVal = 0x80;
-  this->fSlideOffset = this->fHeight + (this->fHeight >> 1);
-  this->fOpenHeight = this->fHeight;
+  (this->_base_tMenuItemSlidingMenu).fTransitioningOut = 0;
+  (this->_base_tMenuItemSlidingMenu).fFadeVal = 0x80;
+  (this->_base_tMenuItemSlidingMenu).fSlideOffset = sVar1 + (sVar1 >> 1);
+  (this->_base_tMenuItemSlidingMenu).fOpenHeight = sVar1;
   return;
 }
 
@@ -1316,23 +1244,32 @@ void tMenuItemSlidingActivated::TransitionOn()
 
 /* ---- tMenuItemSlidingActivated::TransitionIsFinished  [FEMENUOPTIONS.CPP:964-979] SLD-VERIFIED ---- */
 
-bool tMenuItemSlidingActivated::TransitionIsFinished()
+void * tMenuItemSlidingActivated::TransitionIsFinished()
 
 {
-  /* MATCH: same if/else-if chain as tMenuItemSlidingMenu::TransitionIsFinished. */
-  if ((this->currMenu == (tInsideBoxMenu *)0x0) || (this->nextMenu == (tInsideBoxMenu *)0x0)) {
-    this->fFadeDir = 0;
-    this->fInTransition = 0;
-  } else if (this->fFadeDir == 0) {
-    this->fInTransition = 0;
-  } else if ((this->fFadeDir < 0) && (this->fFadeVal <= 0)) {
-    this->fInTransition = 0;
-  } else if ((this->fFadeDir > 0) && (this->fFadeVal >= 0x80)) {
-    this->fInTransition = 0;
-  } else {
-    this->fInTransition = 1;
+  short sVar1;
+  
+  if (((this->_base_tMenuItemSlidingMenu).currMenu == (tInsideBoxMenu *)0x0) ||
+     ((this->_base_tMenuItemSlidingMenu).nextMenu == (tInsideBoxMenu *)0x0)) {
+    (this->_base_tMenuItemSlidingMenu).fFadeDir = 0;
   }
-  return !this->fInTransition;
+  else {
+    sVar1 = (this->_base_tMenuItemSlidingMenu).fFadeDir;
+    if (sVar1 != 0) {
+      if (sVar1 < 0) {
+        if ((this->_base_tMenuItemSlidingMenu).fFadeVal < 1) goto SlideActvTrans_resetTrans;
+        sVar1 = (this->_base_tMenuItemSlidingMenu).fFadeDir;
+      }
+      if ((sVar1 < 1) || ((this->_base_tMenuItemSlidingMenu).fFadeVal < 0x80)) {
+        (this->_base_tMenuItemSlidingMenu).fInTransition = 1;
+        goto SlideActvTrans_returnInv;
+      }
+    }
+  }
+SlideActvTrans_resetTrans:
+  (this->_base_tMenuItemSlidingMenu).fInTransition = 0;
+SlideActvTrans_returnInv:
+  return (void *)((this->_base_tMenuItemSlidingMenu).fInTransition ^ 1);
 }
 
 
@@ -1342,20 +1279,19 @@ bool tMenuItemSlidingActivated::TransitionIsFinished()
 void tMenuItemSlidingActivated::UpdateTransition(bool selected)
 
 {
-  /* SYM-CODEGEN-CARRIER: iVar2
-   * Compiler-created destination of the one-line nested MIN/MAX clamp. */
+  __vtbl_ptr_type (*pa_Var1) [11];
   int iVar2;
   
-  iVar2 = (int)this->fFadeVal + (int)this->fFadeDir;
+  iVar2 = (int)(this->_base_tMenuItemSlidingMenu).fFadeVal + (int)(this->_base_tMenuItemSlidingMenu).fFadeDir;
   if (0x80 < iVar2) {
     iVar2 = 0x80;
   }
   if (iVar2 < 0) {
     iVar2 = 0;
   }
-  this->fFadeVal = (short)iVar2;
-  (*(*this->_vf)[9].pfn)
-            ((int)&this->fFlags + (int)(*this->_vf)[9].delta);
+  pa_Var1 = (this->_base_tMenuItemSlidingMenu)._base_tMenuItem._vf;
+  (this->_base_tMenuItemSlidingMenu).fFadeVal = (short)iVar2;
+  NFS4_VCALL_AUTO((*pa_Var1)[9].pfn, (int)&(this->_base_tMenuItemSlidingMenu)._base_tMenuItem.fFlags + (int)(*pa_Var1)[9].delta);
   ((tMenuItem *)this)->UpdateTransition(selected);
   return;
 }
@@ -1368,53 +1304,53 @@ void tMenuItemSlidingActivated::ProcessInput(tPlayer fromPlayer,tInputKeyType &k
                tMenuCommand &command)
 
 {
+  AudioMus_tSongList *pAVar1;
+  int iVar2;
+  __vtbl_ptr_type (*pa_Var3) [11];
+  tInsideBoxMenu *ptVar4;
   
-  /* MATCH (catalog §B arm-order): the oracle branches AWAY on `== Cross`
-     (`beq v1,v0`) and lays the Cross body OUT-OF-LINE at the end, falling
-     through into the Triangle test.  The `!=`-first spelling reproduces that
-     polarity + block layout; the natural `== Cross` first inlines it. */
-  if (keyval != kInput_KeyType_Cross) {
-    if ((keyval == kInput_KeyType_Triangle) && (this->fActive != 0)) {
-      AudioCmn_PlayFESFX(1);
-      this->fActive = 0;
+  if (keyval == kInput_KeyType_Cross) {
+    if (this->fActive == 0) {
+      AudioCmn_PlayFESFX(0);
+      this->fActive = 1;
       keyval = kInput_KeyType_AlreadyProcessed;
       AudioMus_StopSong(0x14);
-      if (screenAudio->songlist != (AudioMus_tSongList *)0x0) {
-        purgememadr(screenAudio->songlist);
-      }
-      screenAudio->songlist = (AudioMus_tSongList *)0x0;
       AudioMus_SysCleanUp();
-      AudioMus_SysStartUp(0xd800,0x18000,"amus");
-      AudioMus_PlaySong("zmenu*");
+      AudioMus_SysStartUp(0xc000,0x18000,"ymus");
+      AudioMus_PlaySong("game*");
+      pAVar1 = (AudioMus_tSongList *)(intptr_t)AudioMus_GetSongList("*",0);
+      screenAudio->songlist = pAVar1;
     }
   }
-  else if (this->fActive == 0) {
-    AudioCmn_PlayFESFX(0);
-    this->fActive = 1;
+  else if ((keyval == kInput_KeyType_Triangle) && (this->fActive != 0)) {
+    AudioCmn_PlayFESFX(1);
+    this->fActive = 0;
     keyval = kInput_KeyType_AlreadyProcessed;
     AudioMus_StopSong(0x14);
+    if (screenAudio->songlist != (AudioMus_tSongList *)0x0) {
+      purgememadr(screenAudio->songlist);
+    }
+    screenAudio->songlist = (AudioMus_tSongList *)0x0;
     AudioMus_SysCleanUp();
-    AudioMus_SysStartUp(0xc000,0x18000,"ymus");
-    AudioMus_PlaySong("game*");
-    screenAudio->songlist = AudioMus_GetSongList("*",0);
+    AudioMus_SysStartUp(0xd800,0x18000,"amus");
+    AudioMus_PlaySong("zmenu*");
   }
-  if (this->fSlideOffset == 0) {
-    if (this->fActive == 0) goto SlideActivProc_callBaseProcess;
-    if (this->currMenu != (tInsideBoxMenu *)0x0) {
-      /* MATCH (methodology #11): the vtable `pfn` is `int(*)(...)`, so passing the
-         two REFERENCE params through it decays them to BY-VALUE copies (a2/a3 +
-         a stack word).  The oracle passes the references themselves (a2=&keyval,
-         a3=&command) -> cast the fn-ptr to the real reference signature.  Also
-         `(int)ptVar4 + delta` (not fItemList-0x10) to get the oracle's
-         `addu a0,currMenu,delta` operand order. */
-      ((void (*)(int,tPlayer,tInputKeyType &,tMenuCommand &))(*this->currMenu->_vf)[3].pfn)
-                ((int)this->currMenu + (*this->currMenu->_vf)[3].delta,fromPlayer,keyval,
+  if ((this->_base_tMenuItemSlidingMenu).fSlideOffset == 0) {
+    iVar2 = this->fActive;
+    if (iVar2 == 0) goto SlideActivProc_callBaseProcess;
+    ptVar4 = (this->_base_tMenuItemSlidingMenu).currMenu;
+    if (ptVar4 != (tInsideBoxMenu *)0x0) {
+      pa_Var3 = (ptVar4->_base_tMenu)._vf;
+      NFS4_VCALL_AUTO((*pa_Var3)[3].pfn, (int)(ptVar4->_base_tMenu).fItemList + (*pa_Var3)[3].delta + -0x10,fromPlayer,keyval,
                  command);
       goto SlideActivProc_getActive;
     }
   }
+  else {
 SlideActivProc_getActive:
-  if ((this->fActive != 0) && ((keyval == kInput_KeyType_Up || (keyval == kInput_KeyType_Down)))) {
+    iVar2 = this->fActive;
+  }
+  if ((iVar2 != 0) && ((keyval == kInput_KeyType_Up || (keyval == kInput_KeyType_Down)))) {
     keyval = kInput_KeyType_AlreadyProcessed;
   }
 SlideActivProc_callBaseProcess:
@@ -1430,17 +1366,18 @@ void tMenuItemLeftRightFade::MyLeftRightDraw(int x,int y)
 
 {
   int ColText;
+  char *sMenuText;
   tDrawShapeExtended aCol;
   
   aCol.tint[0] = CalcFadeVal(0xc83c1e,0xbebe,
-                            (int)this->fSelFade,(int)this->fFadeVal);
-  DrawLeftFlare(y,(int)this->fSelFade,
+                            (int)(this->_base_tMenuItemLeftRightChoice)._base_tMenuItemInteractive._base_tMenuItem.fSelFade,(int)this->fFadeVal);
+  DrawLeftFlare(y,(int)(this->_base_tMenuItemLeftRightChoice)._base_tMenuItemInteractive._base_tMenuItem.fSelFade,
              (int)this->fFadeVal,this->flareextra);
   ColText = CalcTextFadeSelToHi(textType_Options,
-                   this->fSelFade,
+                   (this->_base_tMenuItemLeftRightChoice)._base_tMenuItemInteractive._base_tMenuItem.fSelFade,
                    this->fFadeVal);
-  FETextRender_FullTextRGB(TextSys_Word(this->fTextDescription),
-                           (short)x,(short)y,ColText,'\0',1);
+  sMenuText = TextSys_Word((this->_base_tMenuItemLeftRightChoice)._base_tMenuItemInteractive._base_tMenuItem.fTextDescription);
+  FETextRender_FullTextRGB(sMenuText,(short)x,(short)y,ColText,'\0',1);
   DrawShapeExtended(0x2e,0x18,x + 0x1a,y + 1,0,0,&aCol);
   DrawShapeExtended(0x2f,0x18,x + 0xc8,y + 1,0,0,&aCol);
   return;
@@ -1450,35 +1387,35 @@ void tMenuItemLeftRightFade::MyLeftRightDraw(int x,int y)
 
 /* ---- tMenuItemDisplayLeftRightChoice::Draw  [FEMENUOPTIONS.CPP:1085-1102] SLD-VERIFIED ---- */
 
-void tMenuItemDisplayLeftRightChoice::Draw(int offx,int offy,bool selected)
+int tMenuItemDisplayLeftRightChoice::Draw(int offx,int offy,bool selected)
 
 {
-  /* SYM-ABI-PARAM: selected -- unused, but the `iib` linkage proves the bool arg.
-     SYM 8c block: params this($s3)/offx($s0)/offy($s2) and the ONE named local
-     `int ColText` ($s2, reusing offy's reg); x/y are compiler temps.
-     MATCH: NO return funnel — retail drops the result ($v0 is the shared `li 2`
-     stack arg, and on the fade==0x80 early-out it is the compare's `li 0x80`);
-     x stays an int narrowed per use, while y's narrowing CSEs once. */
+  short sVar1;
+  int iVar2;
+  int iVar3;
   int ColText;
-  /* SYM-CODEGEN-CARRIER: x -- the parameter-only spelling changes retail's
-     saved-register handout (42 diffs); retaining only y leaves 40 diffs. */
-  int x;
-  /* SYM-CODEGEN-CARRIER: y -- retaining only x leaves a 16-diff allocation
-     swap.  Both independent values are required for the exact 60-insn body. */
-  int y;
-
-  if (this->fFadeVal != 0x80) {
-    x = TextSys_WordX(this->fTextDescription) + offx;
-    y = TextSys_WordY(this->fTextDescription) + offy;
+  char *sMenuText;
+  __vtbl_ptr_type (*pa_Var4) [6];
+  tListIterator *ptVar5;
+  int iVar6;
+  
+  iVar2 = 0x80;
+  if ((this->_base_tMenuItemLeftRightFade).fFadeVal != 0x80) {
+    iVar3 = TextSys_WordX((this->_base_tMenuItemLeftRightFade)._base_tMenuItemLeftRightChoice._base_tMenuItemInteractive._base_tMenuItem.fTextDescription);
+    iVar2 = TextSys_WordY((this->_base_tMenuItemLeftRightFade)._base_tMenuItemLeftRightChoice._base_tMenuItemInteractive._base_tMenuItem.fTextDescription);
     ColText = CalcTextFadeSelToHi(textType_Options,
-                     this->fSelFade,this->fFadeVal);
-    this->MyLeftRightDraw((short)x,(short)y);
-    FETextRender_FullTextRGB(
-        TextSys_Word((int)(short)(*(*this->fData->_vf)[3].pfn)
-            ((char *)this->fData + (int)(*this->fData->_vf)[3].delta,
-             gMenu_SubMenuPlayer)),
-        (short)(x + 0x73),(short)y,ColText,'\0',2);
+                     (this->_base_tMenuItemLeftRightFade)._base_tMenuItemLeftRightChoice._base_tMenuItemInteractive._base_tMenuItem.fSelFade,(this->_base_tMenuItemLeftRightFade).fFadeVal);
+    iVar6 = (iVar2 + offy) * 0x10000;
+    this->_base_tMenuItemLeftRightFade.MyLeftRightDraw((iVar3 + offx) * 0x10000 >> 0x10,iVar6 >> 0x10);
+    ptVar5 = (this->_base_tMenuItemLeftRightFade)._base_tMenuItemLeftRightChoice.fData;
+    pa_Var4 = ptVar5->_vf;
+    sVar1 = NFS4_VCALL_AUTO((*pa_Var4)[3].pfn, (char *)ptVar5 + (int)(*pa_Var4)[3].delta,gMenu_SubMenuPlayer);
+    sMenuText = TextSys_Word((int)sVar1);
+    iVar2 = 2;
+    FETextRender_FullTextRGB(sMenuText,(short)((u_int)((iVar3 + offx + 0x73) * 0x10000) >> 0x10),
+               (short)((u_int)iVar6 >> 0x10),ColText,'\0',2);
   }
+  return iVar2;
 }
 
 
@@ -1488,10 +1425,15 @@ void tMenuItemDisplayLeftRightChoice::Draw(int offx,int offy,bool selected)
 void tMenuItemOnOffLeftRightChoice::TransitionOn()
 
 {
-  this->fOnFade = (u_short)
-    ((0 < (*(u_char (*)(char *, int))(*this->fData->_vf)[2].pfn)
-      ((char *)this->fData + (int)(*this->fData->_vf)[2].delta,0xffffffff)) << 7);
-  this->tMenuItemLeftRightFade::TransitionOn();
+  char cVar1;
+  tListIterator *ptVar2;
+  __vtbl_ptr_type (*pa_Var3) [6];
+  
+  ptVar2 = (this->_base_tMenuItemLeftRightFade)._base_tMenuItemLeftRightChoice.fData;
+  pa_Var3 = ptVar2->_vf;
+  cVar1 = NFS4_VCALL_AUTO((*pa_Var3)[2].pfn, (char *)ptVar2 + (int)(*pa_Var3)[2].delta,0xffffffff);
+  this->fOnFade = (u_short)(cVar1 != '\0') << 7;
+  this->_base_tMenuItemLeftRightFade.TransitionOn();
   return;
 }
 
@@ -1502,43 +1444,48 @@ void tMenuItemOnOffLeftRightChoice::TransitionOn()
 void tMenuItemOnOffLeftRightChoice::Draw(int offx,int offy,bool selected)
 
 {
-  /* SYM-ABI-PARAM: selected -- unused, but the `iib` linkage proves the bool arg.
-     MATCH (same family as tMenuItemDisplayLeftRightChoice::Draw): no return
-     funnel, in-branch fOnFade stores, x/y plain ints narrowed PER USE, and the
-     TextSys_Word results consumed straight into $a0. */
-  /* SYM-CODEGEN-CARRIER: x -- adjusting the parameters directly is two
-     instructions short and 68 diffs; retaining only y leaves 64 diffs. */
-  int x;
-  /* SYM-CODEGEN-CARRIER: y -- retaining only x leaves 80 diffs.  The two
-     independent values restore the exact 94-insn frame and allocation. */
-  int y;
+  char cVar1;
+  char *text;
+  __vtbl_ptr_type (*pa_Var3) [6];
+  int iVar4;
+  int iVar5;
+  tListIterator *ptVar6;
+  short sVar7;
   int ColTextOn;
   int ColTextOff;
-
-  if (this->fFadeVal != 0x80) {
-    /* MATCH: branch polarity — the `!= 0` (+0x20) arm is the FALL-THROUGH. */
-    if ((char)(*(*this->fData->_vf)[2].pfn)
-          ((char *)this->fData + (int)(*this->fData->_vf)[2].delta,
-           0xffffffff) != '\0') {
-      this->fOnFade = this->fOnFade + 0x20;
+  
+  if ((this->_base_tMenuItemLeftRightFade).fFadeVal != 0x80) {
+    ptVar6 = (this->_base_tMenuItemLeftRightFade)._base_tMenuItemLeftRightChoice.fData;
+    pa_Var3 = ptVar6->_vf;
+    cVar1 = NFS4_VCALL_AUTO((*pa_Var3)[2].pfn, (char *)ptVar6 + (int)(*pa_Var3)[2].delta,0xffffffff,offy,
+                       selected);
+    if (cVar1 == '\0') {
+      sVar7 = this->fOnFade + -0x20;
     }
     else {
-      this->fOnFade = this->fOnFade + -0x20;
+      sVar7 = this->fOnFade + 0x20;
     }
+    this->fOnFade = sVar7;
     if (0x80 < this->fOnFade) {
       this->fOnFade = 0x80;
     }
     if (this->fOnFade < 0) {
       this->fOnFade = 0;
     }
-    x = TextSys_WordX(this->fTextDescription) + offx;
-    y = TextSys_WordY(this->fTextDescription) + offy;
+    iVar4 = TextSys_WordX((this->_base_tMenuItemLeftRightFade)._base_tMenuItemLeftRightChoice._base_tMenuItemInteractive._base_tMenuItem.fTextDescription);
+    iVar4 = iVar4 + offx;
+    iVar5 = TextSys_WordY((this->_base_tMenuItemLeftRightFade)._base_tMenuItemLeftRightChoice._base_tMenuItemInteractive._base_tMenuItem.fTextDescription);
     CalcOnOffFade(textType_Options,this->fOnFade,
-               this->fSelFade,this->fFadeVal,ColTextOn,ColTextOff);  /* W58-A1: int& decl */
-    this->MyLeftRightDraw((short)x,(short)y);
-    FETextRender_FullTextRGB(TextSys_Word(0x66),(short)(x + 0x37),(short)y,ColTextOn,'\0',0);
-    FETextRender_FullTextRGB(TextSys_Word(0x67),(short)(x + 0x9e),(short)y,ColTextOff,'\0',0);
+               (this->_base_tMenuItemLeftRightFade)._base_tMenuItemLeftRightChoice._base_tMenuItemInteractive._base_tMenuItem.fSelFade,(this->_base_tMenuItemLeftRightFade).fFadeVal,ColTextOn,ColTextOff);
+    iVar5 = (iVar5 + offy) * 0x10000;
+    this->_base_tMenuItemLeftRightFade.MyLeftRightDraw(iVar4 * 0x10000 >> 0x10,iVar5 >> 0x10);
+    text = TextSys_Word(0x66);
+    sVar7 = (short)((u_int)iVar5 >> 0x10);
+    FETextRender_FullTextRGB(text,(short)((u_int)((iVar4 + 0x37) * 0x10000) >> 0x10),sVar7,ColTextOn,'\0',0);
+    text = TextSys_Word(0x67);
+    FETextRender_FullTextRGB(text,(short)((u_int)((iVar4 + 0x9e) * 0x10000) >> 0x10),sVar7,ColTextOff,'\0',0);
   }
+  return;
 }
 
 
@@ -1546,13 +1493,13 @@ void tMenuItemOnOffLeftRightChoice::Draw(int offx,int offy,bool selected)
 /* ---- tMenuItemLeftRightAudioSlider::ctor  [FEMENUOPTIONS.CPP:1152-1156] SLD-VERIFIED ---- */
 tMenuItemLeftRightAudioSlider::tMenuItemLeftRightAudioSlider(u_int textDescription,tListIterator *dataPtr,
           int AudioArt)
-  : tMenuItemLeftRightSlider(textDescription,dataPtr)
+  : _base_tMenuItemLeftRightSlider(textDescription,dataPtr)
 {
   
-  *(void **)&(this->_vf) = (void *)tMenuItemLeftRightAudioSlider_vtable;
+  *(void **)&((this->_base_tMenuItemLeftRightSlider)._base_tMenuItemInteractive._base_tMenuItem._vf) = (void *)tMenuItemLeftRightAudioSlider_vtable;
   this->fAudioArt = (short)AudioArt;
   this->flareextra = 0;
-  this->fSelFade = 0;
+  (this->_base_tMenuItemLeftRightSlider)._base_tMenuItemInteractive._base_tMenuItem.fSelFade = 0;
   return;
 }
 
@@ -1563,7 +1510,7 @@ tMenuItemLeftRightAudioSlider::tMenuItemLeftRightAudioSlider(u_int textDescripti
 tMenuItemLeftRightAudioSlider::~tMenuItemLeftRightAudioSlider()
 
 {
-  *(void **)&(this->_vf) = (void *)tMenuItemLeftRightAudioSlider_vtable;
+  *(void **)&((this->_base_tMenuItemLeftRightSlider)._base_tMenuItemInteractive._base_tMenuItem._vf) = (void *)tMenuItemLeftRightAudioSlider_vtable;
   return;
 }
 
@@ -1571,67 +1518,57 @@ tMenuItemLeftRightAudioSlider::~tMenuItemLeftRightAudioSlider()
 
 /* ---- tMenuItemLeftRightAudioSlider::Draw  [FEMENUOPTIONS.CPP:1167-1201] SLD-VERIFIED ---- */
 
-void tMenuItemLeftRightAudioSlider::Draw(int ox,int oy,bool selected)
+int tMenuItemLeftRightAudioSlider::Draw(int ox,int oy,bool selected)
 
 {
-  /* SYM-ABI-PARAM: selected -- unused, retained by the retail `iib` linkage. */
+  u_short uVar1;
   int coltext;
-  /* SYM-CODEGEN-CARRIER: brightTextColor
-     The trusted block names only `coltext` ($s0). Retail nevertheless holds
-     textDefinitions[][5]'s bright palette color across DrawLeftFlare in $s2;
-     no debug name survives, so this semantic name is not claimed as original. */
-  int brightTextColor;
-  /* SYM-CODEGEN-CARRIER: rgbVals
-     GCC must materialize kRGBVals before the first TextSys_WordFlags call so
-     the address remains in $s1 across both calls; inlining the array base
-     rematerializes it after the call and loses the 131/131 retail allocation. */
-  int *rgbVals;
+  char *sMenuText;
+  __vtbl_ptr_type (*pa_Var3) [6];
+  tListIterator *ptVar4;
+  u_int uVar5;
+  int iVar6;
   tDrawShapeExtended tCol;
-
-  /* MATCH: `textDefinitions` is 6 bytes per row in retail (index scaling
-     `sll 1; addu` = *3, then *2) — the externs header now carries the true
-     [14][6] shape (it used to say [6][14] -> stride 14 -> `sll 3; subu` = *7,
-     a real OOB addressing bug).
-     Also: read (short)fTextDescription straight off the field (`lh 4(s3)`) —
-     the `u_int uVar5` cache forced an `lw` + `sll/sra` pair. */
-  coltext = TextSys_WordX(this->fTextDescription);
-  this->fX = (short)coltext + (short)ox;
-  coltext = TextSys_WordY(this->fTextDescription);
-  this->fY = (short)coltext + (short)oy;
-  /* MATCH (methodology #16): the oracle completes the `la s1,kRGBVals` BEFORE the
-     TextSys_WordFlags call (s1 held across it); the natural in-expression use
-     rematerializes the address after the call. */
-  rgbVals = kRGBVals;
-  coltext = TextSys_WordFlags((int)(short)this->fTextDescription);
-  brightTextColor = rgbVals[(u_char)textDefinitions[coltext][5]];
-  coltext = TextSys_WordFlags((int)(short)this->fTextDescription);
-  coltext = rgbVals[(u_char)textDefinitions[coltext][4]];
-  DrawLeftFlare((int)this->fY,
-             (int)this->fSelFade,
+  
+  coltext = TextSys_WordX((this->_base_tMenuItemLeftRightSlider)._base_tMenuItemInteractive._base_tMenuItem.fTextDescription);
+  uVar5 = (this->_base_tMenuItemLeftRightSlider)._base_tMenuItemInteractive._base_tMenuItem.fTextDescription;
+  (this->_base_tMenuItemLeftRightSlider).fX = (short)coltext + (short)ox;
+  coltext = TextSys_WordY(uVar5);
+  uVar5 = (this->_base_tMenuItemLeftRightSlider)._base_tMenuItemInteractive._base_tMenuItem.fTextDescription;
+  (this->_base_tMenuItemLeftRightSlider).fY = (short)coltext + (short)oy;
+  coltext = TextSys_WordFlags((int)(short)uVar5);
+  iVar6 = kRGBVals[(u_char)textDefinitions[coltext][5]];
+  coltext = TextSys_WordFlags((int)(short)(this->_base_tMenuItemLeftRightSlider)._base_tMenuItemInteractive._base_tMenuItem.fTextDescription);
+  coltext = kRGBVals[(u_char)textDefinitions[coltext][4]];
+  DrawLeftFlare((int)(this->_base_tMenuItemLeftRightSlider).fY,
+             (int)(this->_base_tMenuItemLeftRightSlider)._base_tMenuItemInteractive._base_tMenuItem.fSelFade,
              (int)this->fFadeVal,this->flareextra);
-  coltext = CalcFadeVal(coltext,brightTextColor,
-                     (int)this->fSelFade,
+  coltext = CalcFadeVal(coltext,iVar6,
+                     (int)(this->_base_tMenuItemLeftRightSlider)._base_tMenuItemInteractive._base_tMenuItem.fSelFade,
                      (int)this->fFadeVal);
-  /* MATCH: no return funnel ($v0 incidental) and the fData reload lives INSIDE
-     the DrawSlider argument list. */
+  iVar6 = 0x80;
   if (this->fFadeVal != 0x80) {
-    FETextRender_FullTextRGB(TextSys_Word(this->fTextDescription),this->fX,this->fY,
+    sMenuText = TextSys_Word((this->_base_tMenuItemLeftRightSlider)._base_tMenuItemInteractive._base_tMenuItem.fTextDescription);
+    FETextRender_FullTextRGB(sMenuText,(this->_base_tMenuItemLeftRightSlider).fX,(this->_base_tMenuItemLeftRightSlider).fY,
                coltext,'\0',1);
     tCol.tint[0] = CalcFadeVal(0x551e00,0xbebe,
-                              (int)this->fSelFade,(int)this->fFadeVal);
-    if (this->fSelFade != 0) {
+                              (int)(this->_base_tMenuItemLeftRightSlider)._base_tMenuItemInteractive._base_tMenuItem.fSelFade,(int)this->fFadeVal);
+    if ((this->_base_tMenuItemLeftRightSlider)._base_tMenuItemInteractive._base_tMenuItem.fSelFade != 0) {
       DrawShapeExtended(this->fAudioArt + 1,0x10,0,0,0,0,&tCol);
     }
-    DrawSlider((*(*this->fData->_vf)[2].pfn)
-                   ((char *)this->fData + (int)(*this->fData->_vf)[2].delta,
-                    0xffffffff) & 0xff,
-               (u_short)(u_char)this->fData->fMinValue,
-               (u_short)(u_char)this->fData->fMaxValue,
-               this->fX + 0x14,this->fY + 1,
-               this->fWidth,this->fHeight,4,4,
-               false,0,this->fSelFade,
+    ptVar4 = (this->_base_tMenuItemLeftRightSlider).fData;
+    pa_Var3 = ptVar4->_vf;
+    uVar1 = NFS4_VCALL_AUTO((*pa_Var3)[2].pfn, (char *)ptVar4 + (int)(*pa_Var3)[2].delta,0xffffffff)
+    ;
+    ptVar4 = (this->_base_tMenuItemLeftRightSlider).fData;
+    iVar6 = (int)this->fFadeVal;
+    DrawSlider(uVar1 & 0xff,(u_short)(u_char)ptVar4->fMinValue,(u_short)(u_char)ptVar4->fMaxValue,
+               (this->_base_tMenuItemLeftRightSlider).fX + 0x14,(this->_base_tMenuItemLeftRightSlider).fY + 1,
+               (this->_base_tMenuItemLeftRightSlider).fWidth,(this->_base_tMenuItemLeftRightSlider).fHeight,4,4,
+               false,0,(this->_base_tMenuItemLeftRightSlider)._base_tMenuItemInteractive._base_tMenuItem.fSelFade,
                this->fFadeVal);
   }
+  return iVar6;
 }
 
 
@@ -1641,20 +1578,23 @@ void tMenuItemLeftRightAudioSlider::Draw(int ox,int oy,bool selected)
 int tMenuItemLeftRightAudioSlider::Percentage()
 
 {
+  char cVar1;
+  __vtbl_ptr_type (*pa_Var2) [6];
+  u_int uVar3;
+  int iVar4;
+  tListIterator *ptVar5;
+  int iVar6;
   int percent;
-
-  /* MATCH: SLD's only source local is `percent` in $s0.  Assign the scaled
-     numerator to it before division; the decompiler's iVar6 pseudo kept that
-     value in a caller register and displaced the inlined iterator `this`. */
-  percent = (((*(*this->fData->_vf)[2].pfn)
-               ((char *)this->fData + (int)(*this->fData->_vf)[2].delta,
-                0xffffffff) & 0xff) -
-             (u_int)(u_char)this->fData->fMinValue) * 100;
-  percent = percent / (int)((u_int)(u_char)this->fData->fMaxValue -
-                            (u_int)(u_char)this->fData->fMinValue);
-  if (((u_char)(*(*this->fData->_vf)[2].pfn)
-       ((char *)this->fData + (int)(*this->fData->_vf)[2].delta,0xffffffff) != 0) &&
-      (percent < 100)) {
+  
+  ptVar5 = (this->_base_tMenuItemLeftRightSlider).fData;
+  pa_Var2 = ptVar5->_vf;
+  uVar3 = NFS4_VCALL_AUTO((*pa_Var2)[2].pfn, (char *)ptVar5 + (int)(*pa_Var2)[2].delta,0xffffffff);
+  ptVar5 = (this->_base_tMenuItemLeftRightSlider).fData;
+  iVar6 = ((uVar3 & 0xff) - (u_int)(u_char)ptVar5->fMinValue) * 100;
+  iVar4 = (u_int)(u_char)ptVar5->fMaxValue - (u_int)(u_char)ptVar5->fMinValue;
+  percent = iVar6 / iVar4;
+  cVar1 = NFS4_VCALL_AUTO((*ptVar5->_vf)[2].pfn, (char *)ptVar5 + (int)(*ptVar5->_vf)[2].delta,0xffffffff);
+  if ((cVar1 != '\0') && (percent < 100)) {
     percent = percent + 1;
   }
   return percent;
@@ -1681,7 +1621,7 @@ void tMenuItemLeftRightAudioSlider::TransitionOn()
 {
   this->fFadeVal = 0x80;
   this->fFadeDir = -0x3c;
-  this->fSelFade = 0;
+  (this->_base_tMenuItemLeftRightSlider)._base_tMenuItemInteractive._base_tMenuItem.fSelFade = 0;
   return;
 }
 
@@ -1689,7 +1629,7 @@ void tMenuItemLeftRightAudioSlider::TransitionOn()
 
 /* ---- tMenuItemLeftRightAudioSlider::TransitionIsFinished  [FEMENUOPTIONS.CPP:1223-1231] SLD-VERIFIED ---- */
 
-bool tMenuItemLeftRightAudioSlider::TransitionIsFinished()
+void * tMenuItemLeftRightAudioSlider::TransitionIsFinished()
 
 {
   this->fInTransition = 0;
@@ -1699,7 +1639,7 @@ bool tMenuItemLeftRightAudioSlider::TransitionIsFinished()
   if ((0 < this->fFadeDir) && (this->fFadeVal < 0x80)) {
     this->fInTransition = 1;
   }
-  return !this->fInTransition;
+  return (void *)(this->fInTransition ^ 1);
 }
 
 
@@ -1709,11 +1649,8 @@ bool tMenuItemLeftRightAudioSlider::TransitionIsFinished()
 void tMenuItemLeftRightAudioSlider::UpdateTransition(bool selected)
 
 {
-  /* SYM-CODEGEN-CARRIER: iVar1 -- one signed promoted sum is required for
-   * retail's 19-insn clamp.  Field-in-place is FAIL 21 / 24; a repeated
-   * ternary is count-exact but FAIL 20 from unsigned reloads/allocation. */
   int iVar1;
-
+  
   iVar1 = (int)this->fFadeVal + (int)this->fFadeDir;
   if (0x80 < iVar1) {
     iVar1 = 0x80;
@@ -1732,20 +1669,24 @@ void tMenuItemLeftRightAudioSlider::UpdateTransition(bool selected)
 
 tInsideBoxSongMenu::tInsideBoxSongMenu(u_int flags,tScreen *screenHandler,tMenu *nextMenu,
               tMenu *optionsMenu,void (*OnButtonPress)(tMenuCommand&),short title,tMenuItem *firstItem,...)
+  : _base_tInsideBoxMenu()
 {
   int j;
-
-  new ((tMenu *)this) tMenu(flags,screenHandler,nextMenu,optionsMenu,OnButtonPress,title);
+  va_list ap;
+  
+  *(tMenu *)this = tMenu(flags,screenHandler,nextMenu,optionsMenu,OnButtonPress,title);
   j = 0;
-  *(void **)&(this->_vf) = (void *)tInsideBoxSongMenu_vtable;
+  *(void **)&((this->_base_tInsideBoxMenu)._base_tMenu._vf) = (void *)tInsideBoxSongMenu_vtable;
   do {
     this->fSelFade[j] = 0;
     this->fOnOffFade[j] = 0;
     j = j + 1;
   } while (j < 5);
-  ((tMenu *)this)->tMenuConstructor(firstItem,(&firstItem + 1));
-  this->fMoving = 0;
-  this->fMovingDir = 0;
+  va_start(ap,firstItem);
+  ((tMenu *)this)->tMenuConstructor(firstItem,ap);
+  va_end(ap);
+  (this->_base_tInsideBoxMenu).fMoving = 0;
+  (this->_base_tInsideBoxMenu).fMovingDir = 0;
   return;
 }
 
@@ -1756,7 +1697,7 @@ tInsideBoxSongMenu::tInsideBoxSongMenu(u_int flags,tScreen *screenHandler,tMenu 
 tInsideBoxSongMenu::~tInsideBoxSongMenu()
 
 {
-  *(void **)&(this->_vf) = (void *)tInsideBoxSongMenu_vtable;
+  *(void **)&((this->_base_tInsideBoxMenu)._base_tMenu._vf) = (void *)tInsideBoxSongMenu_vtable;
   return;
 }
 
@@ -1767,82 +1708,70 @@ tInsideBoxSongMenu::~tInsideBoxSongMenu()
 void tInsideBoxSongMenu::Draw(short x,short y,short w,short slideOffset,short maxheight)
 
 {
-  /* SYM-CODEGEN-CARRIER: drawBaseY
-     SYM-CODEGEN-CARRIER: fadeValue
-     SYM-CODEGEN-CARRIER: fe
-     SYM-CODEGEN-CARRIER: slide
-     SYM-CODEGEN-CARRIER: width
-     MATCH W67: 126 -> PASS.  SYM authenticates j, drawY and song; removing the
-     Ghidra pointer walk, SSA scalar copies, and cached vtable row restores
-     retail's indexed fade loops.  The optimized-only expression carriers place
-     slideOffset/width in IDA's gold $s6/$s4 allocation.  Natural FEPlayList
-     ownership plus index-first address arithmetic preserves `addu v0,v0,fp`,
-     while the right-grouped Y sum reproduces retail's addition chain. */
+  short sVar1;
+  u_short uVar2;
+  short sVar3;
+  int iVar4;
+  int iVar5;
+  __vtbl_ptr_type (*pa_Var7) [11];
   int song;
   int j;
   int drawY;
-  int drawBaseY;
-  u_int slide;
-  tfrontEnd *fe;
-  int width;
-
-  slide = (u_short)slideOffset;
   
   if (screenAudio->songlist != (AudioMus_tSongList *)0x0) {
-    drawBaseY = (short)y + ((short)maxheight - 0x15 >> 1);
     j = 0;
     do {
       if (j != 2) {
-        int fadeValue = this->fSelFade[j] - 8;
-        if (fadeValue < 0) {
-          fadeValue = 0;
+        iVar4 = this->fSelFade[j] + -8;
+        if (iVar4 < 0) {
+          iVar4 = 0;
         }
-        this->fSelFade[j] = (short)fadeValue;
+        this->fSelFade[j] = (short)iVar4;
       }
       j = j + 1;
     } while (j < 5);
-    {
-      int fadeValue = this->fSelFade[2] + 8;
-      if (0x80 < fadeValue) {
-        fadeValue = 0x80;
-      }
-      this->fSelFade[2] = (short)fadeValue;
+    j = this->fSelFade[2] + 8;
+    if (0x80 < j) {
+      j = 0x80;
     }
-    if (this->fMoving != 0) {
-      this->fMoving = (u_short)this->fMoving + (u_short)this->fMovingDir * 2;
-      if ((this->fMovingDir < 0) && (this->fMoving < 0)) {
-        this->fMoving = 0;
+    sVar3 = (this->_base_tInsideBoxMenu).fMoving;
+    sVar1 = (this->_base_tInsideBoxMenu).fMoving;
+    this->fSelFade[2] = (short)j;
+    if (sVar3 != 0) {
+      uVar2 = sVar1 + (this->_base_tInsideBoxMenu).fMovingDir * 2;
+      (this->_base_tInsideBoxMenu).fMoving = uVar2;
+      if (((this->_base_tInsideBoxMenu).fMovingDir < 0) && ((int)((u_int)uVar2 << 0x10) < 0)) {
+        (this->_base_tInsideBoxMenu).fMoving = 0;
       }
-      if ((0 < this->fMovingDir) && (0 < this->fMoving)) {
-        this->fMoving = 0;
+      if ((0 < (this->_base_tInsideBoxMenu).fMovingDir) && (0 < (this->_base_tInsideBoxMenu).fMoving)) {
+        (this->_base_tInsideBoxMenu).fMoving = 0;
       }
     }
     j = 0;
-    fe = &frontEnd;
-    width = (short)w;
     drawY = -0x28;
     do {
-      song = screenAudio->fSelectedSong + j - 2;
+      iVar5 = screenAudio->fSelectedSong + j;
+      song = iVar5 + -2;
       if ((-1 < song) && (song < screenAudio->songlist->numsongs)) {
-        if (*(int *)(song * 4 + (int)fe->FEPlayList) != 0) {
-          this->fOnOffFade[j] += 0x20;
+        if (*(int *)(frontEnd.checkPointDisplay + iVar5 * 4 + -3) == 0) {
+          sVar3 = this->fOnOffFade[j] + -0x20;
         }
         else {
-          this->fOnOffFade[j] -= 0x20;
+          sVar3 = this->fOnOffFade[j] + 0x20;
         }
+        this->fOnOffFade[j] = sVar3;
         if (0x80 < this->fOnOffFade[j]) {
           this->fOnOffFade[j] = 0x80;
         }
         if (this->fOnOffFade[j] < 0) {
           this->fOnOffFade[j] = 0;
         }
-        (*(*(this->_vf + 1))[1].pfn)
-                  ((int)this + (*(this->_vf + 1))[1].delta,
+        pa_Var7 = (this->_base_tInsideBoxMenu)._base_tMenu._vf;
+        NFS4_VCALL_AUTO(pa_Var7[1][1].pfn, (char *)this + pa_Var7[1][1].delta,
                    song * 0x10000 >> 0x10,(int)x,
-                   (int)((slide +
-                         ((u_int)(u_short)this->fMoving +
-                          (drawBaseY + drawY))) * 0x10000) >> 0x10,
-                   width,
+                   (int)(((u_int)(u_short)slideOffset +
+                         (u_int)(u_short)(this->_base_tInsideBoxMenu).fMoving +
+                         (int)y + (maxheight + -0x15 >> 1) + drawY) * 0x10000) >> 0x10,(int)w,
                    (int)this->fOnOffFade[j],(int)this->fSelFade[j]);
       }
       drawY = drawY + 0x15;
@@ -1860,36 +1789,37 @@ void tInsideBoxSongMenu::DrawOneSong(short songnum,short x,short y,short w,short
                short fSelFade)
 
 {
-  /* PASS.  The decisive source shape is typed indexing through
-     `songlist->song[songnum]`: the 64-byte AudioMus_tSongEntry stride keeps
-     raw `songnum` in $s4 until the first access, exactly like retail.  The two
-     displayed strings are the entry's title and artist fields.
-
-     SYM 8c block (06A — the local list is the allocation budget): mask $807f0000
-     = s0-s6 + ra, fsize 64, and the ONLY locals are `Col` (REG $s6), `ColText`
-     (REG $s0) and the two AUTO ints ColTextOn/ColTextOff.  The Ghidra-invented
-     sVar1/pcVar3/iVar4/iVar5 pseudos cost an eighth saved reg ($s7) + 8 frame
-     bytes; drop them and use the params directly. */
+  short sVar1;
   int Col;
   int ColText;
+  char *pcVar3;
+  u_short in_register_0000001a;
+  int iVar4;
+  int iVar5;
   int ColTextOn;
   int ColTextOff;
-
+  
+  sVar1 = w;
+  w = (u_int)(u_short)w;
+  iVar4 = (int)x;
   Col = CalcFadeVal(0x551e00,0x28);   /* H13: 2nd arg is the literal 0x28 (oracle 0x8001EC84 $a1=0x28), not x */
-  CalcOnOffFade(textType_Options,fOnOffFade,fSelFade,0,ColTextOn,ColTextOff);  /* W58-A1: int& decl */
+  CalcOnOffFade(textType_Options,fOnOffFade,fSelFade,0,ColTextOn,ColTextOff);
   ColText = CalcTextFadeSelToHi(textType_Options,fSelFade,0);
   FETextRender_FullTextRGB(screenAudio->songlist->song[songnum].title,
-             (short)(x + 3),y + 2,ColText,'\0',0);
+             (short)((u_int)((iVar4 + 3) * 0x10000) >> 0x10),y + 2,ColText,'\0',0);
   FETextRender_FullTextRGB(screenAudio->songlist->song[songnum].artist,
-             (short)(x + 2),y + 10,ColText,'\0',0);
-  FETextRender_FullTextRGB(TextSys_Word(0x66),
-             (short)(x + (u_short)w - 0x5a),y + 6,ColTextOn,'\0',2);
-  FETextRender_FullTextRGB(TextSys_Word(0x67),
-             (short)(x + (u_short)w - 0x1e),y + 6,ColTextOff,'\0',2);
-  PSXDrawSquare(Col,(int)x + (int)w + -0x78,(int)y,2,0x13);
-  PSXDrawSquare(Col,(int)x + (int)w + -0x3c,(int)y,2,0x13);
-  PSXDrawSquare(Col,(int)x,(int)y,(int)w,1);
-  PSXDrawSquare(Col,(int)x,(int)y + 0x13,(int)w,-1);
+             (short)((u_int)((iVar4 + 2) * 0x10000) >> 0x10),y + 10,ColText,'\0',0);
+  pcVar3 = TextSys_Word(0x66);
+  FETextRender_FullTextRGB(pcVar3,(short)((iVar4 + w + -0x5a) * 0x10000 >> 0x10),y + 6,ColTextOn,'\0',2);
+  pcVar3 = TextSys_Word(0x67);
+  FETextRender_FullTextRGB(pcVar3,(short)((iVar4 + w + -0x1e) * 0x10000 >> 0x10),y + 6,ColTextOff,'\0',2);
+  iVar4 = (int)x;
+  iVar5 = (int)sVar1;
+  ColText = (int)y;
+  PSXDrawSquare(Col,iVar4 + iVar5 + -0x78,ColText,2,0x13);
+  PSXDrawSquare(Col,iVar4 + iVar5 + -0x3c,ColText,2,0x13);
+  PSXDrawSquare(Col,iVar4,ColText,iVar5,1);
+  PSXDrawSquare(Col,iVar4,ColText + 0x13,iVar5,-1);
   return;
 }
 
@@ -1911,70 +1841,79 @@ void tInsideBoxSongMenu::ProcessInput(tPlayer fromPlayer,tInputKeyType &keyval,
               tMenuCommand &command)
 
 {
-  /* SYM-ABI-PARAM: fromPlayer -- retained by the mangled ABI signature. */
-  /* SYM-ABI-PARAM: command -- retained by the mangled ABI signature. */
-  /* SYM: FCN VOID, one local (int j). w35-a9 diagnosis confirmed against the
-     raw oracle: this fn writes its result THROUGH the keyval reference (not
-     a return value) -- the earlier `return 0x1000`/`return -0x7ffb0000`
-     were Ghidra fictions (the latter a misread `lui v0,%hi(screenAudio)`
-     delay slot feeding the fall-through Up-case address materialize, not a
-     constant). Real switch (gcc balance_case_nodes: ==0x400 root + <0x401
-     bound test over 0x200/0x400/0x800/0x1000), tDialogYesNo recipe. */
+  short sVar1;
+  tInputKeyType tVar2;
+  tScreenAudio *ptVar3;
+  int iVar4;
   int j;
-
+  int iVar5;
+  int iVar6;
+  
   if (screenAudio->songlist == (AudioMus_tSongList *)0x0) {
     return;
   }
   if (keyval == kInput_KeyType_Left) {
-    AudioCmn_PlayFESFX(5);
+    iVar4 = 5;
+InBoxSong_playSfx:
+    AudioCmn_PlayFESFX(iVar4);
   }
-  else if (keyval == kInput_KeyType_Right) {
-    AudioCmn_PlayFESFX(6);
+  else {
+    iVar4 = 6;
+    if (keyval == kInput_KeyType_Right) goto InBoxSong_playSfx;
   }
-  switch (keyval) {
-  case kInput_KeyType_Left:
-    frontEnd.FEPlayList[screenAudio->fSelectedSong] =
-         (u_int)(frontEnd.FEPlayList[screenAudio->fSelectedSong] == 0);
-    break;
-  case kInput_KeyType_Right:
-    frontEnd.FEPlayList[screenAudio->fSelectedSong] =
-         (u_int)(frontEnd.FEPlayList[screenAudio->fSelectedSong] == 0);
-    break;
-  case kInput_KeyType_Up:
-    if ((screenAudio->fSelectedSong < 1) || (this->fMoving != 0)) break;
-    this->fMoving = -0x15;
-    this->fMovingDir = 4;
-    j = 4;
-    do {
-      this->fOnOffFade[j] = this->fOnOffFade[j + -1];
-      this->fSelFade[j] = this->fSelFade[j + -1];
-      j = j + -1;
-    } while (0 < j);
-    this->fOnOffFade[0] = 0;
-    this->fSelFade[0] = 0;
-    screenAudio->fSelectedSong = screenAudio->fSelectedSong + -1;
-    AudioCmn_PlayFESFX(3);
-    break;
-  case kInput_KeyType_Down:
+  tVar2 = keyval;
+  if (tVar2 == kInput_KeyType_Down) {
     if ((screenAudio->songlist->numsongs + -1 <= (int)screenAudio->fSelectedSong) ||
-       (this->fMoving != 0)) break;
-    this->fMoving = 0x15;
-    this->fMovingDir = -4;
+       ((this->_base_tInsideBoxMenu).fMoving != 0)) goto InBoxSong_finishReturn;
+    (this->_base_tInsideBoxMenu).fMoving = 0x15;
+    (this->_base_tInsideBoxMenu).fMovingDir = -4;
     j = 0;
     do {
+      iVar6 = j + 1;
       this->fOnOffFade[j] = this->fOnOffFade[j + 1];
       this->fSelFade[j] = this->fSelFade[j + 1];
-      j = j + 1;
-    } while (j < 4);
+      ptVar3 = screenAudio;
+      j = iVar6;
+    } while (iVar6 < 4);
     this->fOnOffFade[4] = 0;
     this->fSelFade[4] = 0;
-    screenAudio->fSelectedSong = screenAudio->fSelectedSong + 1;
-    AudioCmn_PlayFESFX(4);
-    break;
-  default:
-    return;
+    iVar4 = 4;
+    sVar1 = ptVar3->fSelectedSong + 1;
   }
+  else {
+    if (0x400 < (int)tVar2) {
+      if ((tVar2 != kInput_KeyType_Left) && (tVar2 != kInput_KeyType_Right)) {
+        return;
+      }
+      frontEnd.FEPlayList[screenAudio->fSelectedSong] =
+           (u_int)(frontEnd.FEPlayList[screenAudio->fSelectedSong] == 0);
+      goto InBoxSong_finishReturn;
+    }
+    if (tVar2 != kInput_KeyType_Up) {
+      return;
+    }
+    if ((screenAudio->fSelectedSong < 1) || ((this->_base_tInsideBoxMenu).fMoving != 0))
+    goto InBoxSong_finishReturn;
+    (this->_base_tInsideBoxMenu).fMoving = -0x15;
+    (this->_base_tInsideBoxMenu).fMovingDir = 4;
+    j = 4;
+    do {
+      iVar5 = j + -1;
+      this->fOnOffFade[j] = this->fOnOffFade[j + -1];
+      this->fSelFade[j] = this->fSelFade[j + -1];
+      ptVar3 = screenAudio;
+      j = iVar5;
+    } while (0 < iVar5);
+    this->fOnOffFade[0] = 0;
+    this->fSelFade[0] = 0;
+    iVar4 = 3;
+    sVar1 = ptVar3->fSelectedSong + -1;
+  }
+  ptVar3->fSelectedSong = sVar1;
+  AudioCmn_PlayFESFX(iVar4);
+InBoxSong_finishReturn:
   keyval = kInput_KeyType_AlreadyProcessed;
+  return;
 }
 
 
@@ -1984,71 +1923,60 @@ void tInsideBoxSongMenu::ProcessInput(tPlayer fromPlayer,tInputKeyType &keyval,
 void tMenuItemControllerLeftRightChoice::Draw(int ox,int oy,bool selected)
 
 {
-  /* SYM-ABI-PARAM: selected -- unused, retained by the retail `iib` linkage.
-     MATCH: (a) BASE-ANCHOR — retail holds `&gHelpShapes[0x1e]` in one saved reg
-     ($s5: `lui;lw;addiu +960`), not the array base re-indexed per use;
-     (b) ONE tDrawShapeExtended AUTO (the 2nd cost 32 frame bytes);
-     (c) no return funnel — $v0 is the last stack arg, incidental;
-     (d) `y` is an int MUTATED in place by -3 (`addiu s0,s0,-3`) and reused;
-     (e) SYM records inner `tCol` and outer `drawFlags` at the same AUTO -56.
-     Declaring drawFlags after the inner block lets gcc reuse that slot. */
   tTexture_ShapeInfo *shape;
-  /* SYM-CODEGEN-CARRIER: x -- parameter mutation leaves 34 diffs; retaining
-     only y leaves 24.  Its independent pseudo is required by retail. */
-  int x;
-  /* SYM-CODEGEN-CARRIER: y -- retaining only x leaves 28 diffs.  With both
-     values exposed, GCC reproduces the exact 129-insn saved-register map. */
-  int y;
+  short sVar2;
+  int iVar3;
+  int iVar4;
   int Col;
   int ColText;
-  int w;
-
-  x = TextSys_WordX(this->fTextDescription) + ox;
-  y = TextSys_WordY(this->fTextDescription) + oy;
-  shape = &gHelpShapes[0x1e];
-  Col = CalcFadeVal(0xc83c1e,0xbebe,
-                     (int)this->fSelFade,
-                     (int)this->fFadeVal);
-  ColText = CalcTextFadeSelToHi(textType_Options,
-                   this->fSelFade,this->fFadeVal);
-  if (this->fFadeVal != 0x80) {
-    tDrawShapeExtended tCol;
-
-    tCol.tint[0] = Col;
-    FETextRender_FullTextRGB(TextSys_Word(this->fTextDescription),
-                             (short)x,(short)y,ColText,'\0',0);
-    FETextRender_FullTextRGB(
-        TextSys_Word((int)(short)(*(*this->fData->_vf)[3].pfn)
-            ((char *)this->fData + (int)(*this->fData->_vf)[3].delta,
-             gMenu_SubMenuPlayer)),
-        (short)(x + 0x97),(short)y,ColText,'\0',2);
-  }
+  char *pcVar6;
+  __vtbl_ptr_type (*pa_Var7) [6];
+  short y;
+  tListIterator *ptVar8;
+  tDrawShapeExtended tCol;
   tDrawShapeExtended drawFlags;
-
-  drawFlags.tint[0] = CalcFadeVal(0,0xbebe,(int)this->fSelFade,
-                            (int)this->fFadeVal);
-  DrawShapeExtended(0xa,0x18,(short)x + 0x83,(short)y,0,1,&drawFlags);
-  DrawShapeExtended(0xb,0x18,(short)x + 0xa1,(short)y,0,1,&drawFlags);
-  /* SYM-CODEGEN-CARRIER: w
-     MATCH: keep the subtraction UN-reassociated — inline, gcc rewrites
-     `x - (w - 0xb0)` into `(x + 0xb0) - w`; a temp pins the oracle's
-     `addiu a2,a2,-176; subu a2,s1,a2`. */
-  w = (int)shape->width - 0xb0;
-  DrawShapeExtended(0x1e,8,(short)x - w,(short)y - 3,
-             (int)this->fFadeVal,0,(tDrawShapeExtended *)0x0);
-  PSXDrawSquare(0,(short)x,(short)y - 3,0xb0 - shape->width,(int)shape->height);
+  
+  iVar3 = TextSys_WordX((this->_base_tMenuItemLeftRightFade)._base_tMenuItemLeftRightChoice._base_tMenuItemInteractive._base_tMenuItem.fTextDescription);
+  iVar3 = iVar3 + ox;
+  iVar4 = TextSys_WordY((this->_base_tMenuItemLeftRightFade)._base_tMenuItemLeftRightChoice._base_tMenuItemInteractive._base_tMenuItem.fTextDescription);
+  shape = gHelpShapes;
+  Col = CalcFadeVal(0xc83c1e,0xbebe,
+                     (int)(this->_base_tMenuItemLeftRightFade)._base_tMenuItemLeftRightChoice._base_tMenuItemInteractive._base_tMenuItem.fSelFade,
+                     (int)(this->_base_tMenuItemLeftRightFade).fFadeVal);
+  ColText = CalcTextFadeSelToHi(textType_Options,
+                   (this->_base_tMenuItemLeftRightFade)._base_tMenuItemLeftRightChoice._base_tMenuItemInteractive._base_tMenuItem.fSelFade,(this->_base_tMenuItemLeftRightFade).fFadeVal);
+  y = (short)((u_int)((iVar4 + oy) * 0x10000) >> 0x10);
+  if ((this->_base_tMenuItemLeftRightFade).fFadeVal != 0x80) {
+    tCol.tint[0] = Col;
+    pcVar6 = TextSys_Word((this->_base_tMenuItemLeftRightFade)._base_tMenuItemLeftRightChoice._base_tMenuItemInteractive._base_tMenuItem.fTextDescription);
+    FETextRender_FullTextRGB(pcVar6,(short)((u_int)(iVar3 * 0x10000) >> 0x10),y,ColText,'\0',0);
+    ptVar8 = (this->_base_tMenuItemLeftRightFade)._base_tMenuItemLeftRightChoice.fData;
+    pa_Var7 = ptVar8->_vf;
+    sVar2 = NFS4_VCALL_AUTO((*pa_Var7)[3].pfn, (char *)ptVar8 + (int)(*pa_Var7)[3].delta,gMenu_SubMenuPlayer);
+    pcVar6 = TextSys_Word((int)sVar2);
+    FETextRender_FullTextRGB(pcVar6,(short)((u_int)((iVar3 + 0x97) * 0x10000) >> 0x10),y,ColText,'\0',2);
+  }
+  drawFlags.tint[0] = CalcFadeVal(0,0xbebe,(int)(this->_base_tMenuItemLeftRightFade)._base_tMenuItemLeftRightChoice._base_tMenuItemInteractive._base_tMenuItem.fSelFade,
+                            (int)(this->_base_tMenuItemLeftRightFade).fFadeVal);
+  DrawShapeExtended(0xa,0x18,iVar3 + 0x83,(int)y,0,1,&drawFlags);
+  DrawShapeExtended(0xb,0x18,iVar3 + 0xa1,(int)y,0,1,&drawFlags);
+  DrawShapeExtended(0x1e,8,iVar3 - ((int)shape[0x1e].width - 0xb0),(int)y - 3,(int)(this->_base_tMenuItemLeftRightFade).fFadeVal,0,(tDrawShapeExtended *)0x0);
+  Col = (int)shape[0x1e].height;
+  PSXDrawSquare(0,iVar3 * 0x10000 >> 0x10,((iVar4 + oy) * 0x10000 >> 0x10) + -3,
+             0xb0 - shape[0x1e].width,Col);
+  return;
 }
 
 
 
 /* ---- tInsideBoxLeftRightSlider::ctor  [FEMENUOPTIONS.CPP:1465-1469] SLD-VERIFIED ---- */
 tInsideBoxLeftRightSlider::tInsideBoxLeftRightSlider(u_int textDescription,tListIterator *dataPtr)
-  : tMenuItemLeftRightSlider(textDescription,dataPtr)
+  : _base_tMenuItemLeftRightSlider(textDescription,dataPtr)
 {
   
-  *(void **)&(this->_vf) = (void *)tInsideBoxLeftRightSlider_vtable;
-  this->fSelFade = 0;
-  this->fHeight = 5;
+  *(void **)&((this->_base_tMenuItemLeftRightSlider)._base_tMenuItemInteractive._base_tMenuItem._vf) = (void *)tInsideBoxLeftRightSlider_vtable;
+  (this->_base_tMenuItemLeftRightSlider)._base_tMenuItemInteractive._base_tMenuItem.fSelFade = 0;
+  (this->_base_tMenuItemLeftRightSlider).fHeight = 5;
   return;
 }
 
@@ -2059,7 +1987,7 @@ tInsideBoxLeftRightSlider::tInsideBoxLeftRightSlider(u_int textDescription,tList
 tInsideBoxLeftRightSlider::~tInsideBoxLeftRightSlider()
 
 {
-  *(void **)&(this->_vf) = (void *)tInsideBoxLeftRightSlider_vtable;
+  *(void **)&((this->_base_tMenuItemLeftRightSlider)._base_tMenuItemInteractive._base_tMenuItem._vf) = (void *)tInsideBoxLeftRightSlider_vtable;
   return;
 }
 
@@ -2067,53 +1995,54 @@ tInsideBoxLeftRightSlider::~tInsideBoxLeftRightSlider()
 
 /* ---- tInsideBoxLeftRightSlider::Draw  [FEMENUOPTIONS.CPP:1480-1493] SLD-VERIFIED ---- */
 
-void tInsideBoxLeftRightSlider::Draw(int x,int y,int w,bool selected)
+int tInsideBoxLeftRightSlider::Draw(int x,int y,int w,bool selected)
 
 {
-  /* SYM-ABI-PARAM: selected -- unused, retained by the retail `iiib` linkage.
-     MATCH: no `fSelFade`/`col` return funnel — retail's Draw drops its result
-     ($v0 is DrawSlider's, incidental), so the `lh 8(s0)` for the fSelFade arg is
-     emitted LATE at the call instead of being hoisted into a saved reg.  Decl
-     order coltext-before-col is the s3/s4 assignment. */
-  int coltext;
+  short fSelFade;
+  u_short uVar1;
   int col;
+  int coltext;
+  char *sMenuText;
+  __vtbl_ptr_type (*pa_Var3) [6];
+  tListIterator *ptVar4;
   
-  this->fX = (short)x;
-  this->fY = (short)y;
+  (this->_base_tMenuItemLeftRightSlider).fX = (short)x;
+  (this->_base_tMenuItemLeftRightSlider).fY = (short)y;
   col = CalcFadeVal(0x551e00,0xc83c1e,
-                     (int)this->fSelFade);
+                     (int)(this->_base_tMenuItemLeftRightSlider)._base_tMenuItemInteractive._base_tMenuItem.fSelFade);
   coltext = CalcTextFadeUnselToSel(textType_Options,
-                      this->fSelFade,0);
-  PSXDrawSquare(col,(int)this->fX,(int)this->fY
+                      (this->_base_tMenuItemLeftRightSlider)._base_tMenuItemInteractive._base_tMenuItem.fSelFade,0);
+  PSXDrawSquare(col,(int)(this->_base_tMenuItemLeftRightSlider).fX,(int)(this->_base_tMenuItemLeftRightSlider).fY
              ,w,1);
-  PSXDrawSquare(col,(int)this->fX,this->fY + 8,
+  PSXDrawSquare(col,(int)(this->_base_tMenuItemLeftRightSlider).fX,(this->_base_tMenuItemLeftRightSlider).fY + 8,
              w,1);
-  FETextRender_FullTextRGB(TextSys_Word(this->fTextDescription),this->fX + 4,
-             this->fY + 10,coltext,'\0',0);
-  /* MATCH: keep the virtual selection read nested in DrawSlider's first
-     argument; this leaves the following fData reload inside the argument list
-     and schedules it between retail's fX and fY reads. */
-  DrawSlider((*(*this->fData->_vf)[2].pfn)
-                 ((char *)this->fData + (int)(*this->fData->_vf)[2].delta,
-                  0xffffffff) & 0xff,
-             (u_short)(u_char)this->fData->fMinValue,
-             (u_short)(u_char)this->fData->fMaxValue,
-             this->fX + 4,this->fY + 2,
-             (short)((u_int)((w + -8) * 0x10000) >> 0x10),this->fHeight,4,
-             4,false,0,this->fSelFade,0);
+  sMenuText = TextSys_Word((this->_base_tMenuItemLeftRightSlider)._base_tMenuItemInteractive._base_tMenuItem.fTextDescription);
+  FETextRender_FullTextRGB(sMenuText,(this->_base_tMenuItemLeftRightSlider).fX + 4,
+             (this->_base_tMenuItemLeftRightSlider).fY + 10,coltext,'\0',0);
+  ptVar4 = (this->_base_tMenuItemLeftRightSlider).fData;
+  pa_Var3 = ptVar4->_vf;
+  uVar1 = NFS4_VCALL_AUTO((*pa_Var3)[2].pfn, (char *)ptVar4 + (int)(*pa_Var3)[2].delta,0xffffffff);
+  ptVar4 = (this->_base_tMenuItemLeftRightSlider).fData;
+  fSelFade = (this->_base_tMenuItemLeftRightSlider)._base_tMenuItemInteractive._base_tMenuItem.fSelFade;
+  col = (int)fSelFade;
+  DrawSlider(uVar1 & 0xff,(u_short)(u_char)ptVar4->fMinValue,(u_short)(u_char)ptVar4->fMaxValue,
+             (this->_base_tMenuItemLeftRightSlider).fX + 4,(this->_base_tMenuItemLeftRightSlider).fY + 2,
+             (short)((u_int)((w + -8) * 0x10000) >> 0x10),(this->_base_tMenuItemLeftRightSlider).fHeight,4,
+             4,false,0,fSelFade,0);
+  return col;
 }
 
 
 
 /* ---- tInsideBoxTwoWaySlider::ctor  [FEMENUOPTIONS.CPP:1497-1504] SLD-VERIFIED ---- */
 tInsideBoxTwoWaySlider::tInsideBoxTwoWaySlider(u_int textDescription,tListIterator *dataPtr,int type)
-  : tMenuItemLeftRightSlider(textDescription,dataPtr)
+  : _base_tMenuItemLeftRightSlider(textDescription,dataPtr)
 {
   
-  *(void **)&(this->_vf) = (void *)tInsideBoxTwoWaySlider_vtable;
+  *(void **)&((this->_base_tMenuItemLeftRightSlider)._base_tMenuItemInteractive._base_tMenuItem._vf) = (void *)tInsideBoxTwoWaySlider_vtable;
   this->fType = (short)type;
-  this->fSelFade = 0;
-  this->fHeight = 5;
+  (this->_base_tMenuItemLeftRightSlider)._base_tMenuItemInteractive._base_tMenuItem.fSelFade = 0;
+  (this->_base_tMenuItemLeftRightSlider).fHeight = 5;
   this->fActive = 0;
   return;
 }
@@ -2125,7 +2054,7 @@ tInsideBoxTwoWaySlider::tInsideBoxTwoWaySlider(u_int textDescription,tListIterat
 tInsideBoxTwoWaySlider::~tInsideBoxTwoWaySlider()
 
 {
-  *(void **)&(this->_vf) = (void *)tInsideBoxTwoWaySlider_vtable;
+  *(void **)&((this->_base_tMenuItemLeftRightSlider)._base_tMenuItemInteractive._base_tMenuItem._vf) = (void *)tInsideBoxTwoWaySlider_vtable;
   return;
 }
 
@@ -2133,142 +2062,158 @@ tInsideBoxTwoWaySlider::~tInsideBoxTwoWaySlider()
 
 /* ---- tInsideBoxTwoWaySlider::ProcessInput  [FEMENUOPTIONS.CPP:1512-1536] SLD-VERIFIED ---- */
 
-void tInsideBoxTwoWaySlider::ProcessInput(tPlayer fromPlayer,tInputKeyType &keyval,
+int tInsideBoxTwoWaySlider::ProcessInput(tPlayer fromPlayer,tInputKeyType &keyval,
               tMenuCommand &command)
 
 {
-  /* SYM-ABI-PARAM: fromPlayer -- retained by the mangled ABI signature. */
-  /* SYM-ABI-PARAM: command -- retained by the mangled ABI signature. */
-  /* MATCH: plain straight-line ifs reading the `keyval` REFERENCE directly — no
-     tVar1 cache, no volatile, no goto.  gcc reloads keyval at the end of the
-     Cross body all by itself (partial redundancy across the two `if (keyval==K)`
-     statements), and jump-threads the `!fActive` R1 exit straight into the
-     Left/Right test.  The tVar1 cache was also what stole $s0 from `keyval`. */
-  if (keyval == kInput_KeyType_Cross) {
+  tInputKeyType tVar1;
+  
+  tVar1 = keyval;
+  if (tVar1 == kInput_KeyType_Cross) {
     AudioCmn_PlayFESFX(0);
     this->fActive = 1;
     keyval = kInput_KeyType_AlreadyProcessed;
+    tVar1 = keyval;
   }
-  if (keyval == kInput_KeyType_R1) {
+  if (tVar1 == kInput_KeyType_R1) {
+    tVar1 = kInput_KeyType_R1;
     if (this->fActive != 0) {
       AudioCmn_PlayFESFX(1);
       this->fActive = 0;
       keyval = kInput_KeyType_AlreadyProcessed;
+      goto IBTwoWaySlide_activeCheck;
     }
   }
-  if (this->fActive != 0) {
-    keyval = kInput_KeyType_AlreadyProcessed;
-    return;
+  else {
+IBTwoWaySlide_activeCheck:
+    if (this->fActive != 0) goto IBTwoWaySlide_processed;
+    tVar1 = keyval;
   }
-  if ((keyval != kInput_KeyType_Left) && (keyval != kInput_KeyType_Right)) {
-    return;
+  if ((tVar1 != kInput_KeyType_Left) && (tVar1 != kInput_KeyType_Right)) {
+    return 0x1000;
   }
+IBTwoWaySlide_processed:
   keyval = kInput_KeyType_AlreadyProcessed;
-  return;
+  return 1;
 }
 
 
 
 /* ---- tInsideBoxTwoWaySlider::Draw  [FEMENUOPTIONS.CPP:1543-1573] SLD-VERIFIED ---- */
 
-void tInsideBoxTwoWaySlider::Draw(int x,int y,int w,bool selected)
+int tInsideBoxTwoWaySlider::Draw(int x,int y,int w,bool selected)
 
 {
-  /* SYM-ABI-PARAM: selected -- unused, retained by the retail `iiib` linkage. */
-  /* SYM-CODEGEN-CARRIER: selection
-     The virtual read must remain a separate statement before fWidth so retail
-     performs the jalr before the width narrowing; SYM retains only the inlined
-     tListIterator `this`, so no original name survives for this value. */
-  u_short selection;
+  short sVar1;
+  u_short uVar2;
   int col2;
   int col;
   int coltext;
-  /* SYM-CODEGEN-CARRIER: fWidth
-     A named narrow value preserves the shared 16-bit width passed to both
-     DrawSlider calls; inlining it changes the retail argument schedule. */
-  short fWidth;
+  char *sMenuText;
+  __vtbl_ptr_type (*pa_Var4) [6];
+  tListIterator *ptVar5;
   int ww;
-
+  short fWidth;
+  
   if (this->fActive != 0) {
     this->Calibrate();
   }
-  /* MATCH (LAW 05A — the SLD IS the statement order): retail computes `ww` at
-     line 1553, BEFORE the 1555 fX/fY + CalcFadeVal group; hoisting it here is
-     what puts the `w` param in $s2 and `y` in $s1 like the oracle.
-     Also: read fSelFade AT the call — a `short sVar1` copy makes gcc stage it
-     `lhu; sll 16; sra 16` (+2) where the oracle has a bare `lh`. */
-  ww = (w >> 1) + -4;
-  this->fX = (short)x;
-  this->fY = (short)y;
-  col2 = CalcFadeVal(0x551e00,0xc83c1e,(int)this->fSelFade);
+  sVar1 = (this->_base_tMenuItemLeftRightSlider)._base_tMenuItemInteractive._base_tMenuItem.fSelFade;
+  (this->_base_tMenuItemLeftRightSlider).fX = (short)x;
+  (this->_base_tMenuItemLeftRightSlider).fY = (short)y;
+  col2 = CalcFadeVal(0x551e00,0xc83c1e,(int)sVar1);
   col = CalcFadeVal(0x551e00,0xbebe,
-                   (int)this->fSelFade);
+                   (int)(this->_base_tMenuItemLeftRightSlider)._base_tMenuItemInteractive._base_tMenuItem.fSelFade);
   coltext = CalcTextFadeUnselToSel(textType_Options,
-                      this->fSelFade,0);
-  PSXDrawSquare(col2,(int)this->fX,(int)this->fY
+                      (this->_base_tMenuItemLeftRightSlider)._base_tMenuItemInteractive._base_tMenuItem.fSelFade,0);
+  ww = (w >> 1) + -4;
+  PSXDrawSquare(col2,(int)(this->_base_tMenuItemLeftRightSlider).fX,(int)(this->_base_tMenuItemLeftRightSlider).fY
              ,ww,1);
-  PSXDrawSquare(col2,this->fX + ww + 8,
-             (int)this->fY,ww,1);
-  PSXDrawSquare(col2,(int)this->fX,this->fY + 8,
+  PSXDrawSquare(col2,(this->_base_tMenuItemLeftRightSlider).fX + ww + 8,
+             (int)(this->_base_tMenuItemLeftRightSlider).fY,ww,1);
+  PSXDrawSquare(col2,(int)(this->_base_tMenuItemLeftRightSlider).fX,(this->_base_tMenuItemLeftRightSlider).fY + 8,
              ww,1);
-  PSXDrawSquare(col2,this->fX + ww + 9,
-             this->fY + 8,ww,1);
-  PSXDrawSquare(col,this->fX + ww + 3,
-             (int)this->fY,2,9);
-  FETextRender_FullTextRGB(TextSys_Word(this->fTextDescription),this->fX + 4,
-             this->fY + 10,coltext,'\0',0);
-  selection = (*(*this->fData->_vf)[2].pfn)
-      ((char *)this->fData + (int)(*this->fData->_vf)[2].delta,0xffffffff);
-  /* MATCH: the min/max fData reloads remain inside the argument list, and
-     retail drops the result ($v0 = DrawSlider's). */
+  PSXDrawSquare(col2,(this->_base_tMenuItemLeftRightSlider).fX + ww + 9,
+             (this->_base_tMenuItemLeftRightSlider).fY + 8,ww,1);
+  PSXDrawSquare(col,(this->_base_tMenuItemLeftRightSlider).fX + ww + 3,
+             (int)(this->_base_tMenuItemLeftRightSlider).fY,2,9);
+  sMenuText = TextSys_Word((this->_base_tMenuItemLeftRightSlider)._base_tMenuItemInteractive._base_tMenuItem.fTextDescription);
+  FETextRender_FullTextRGB(sMenuText,(this->_base_tMenuItemLeftRightSlider).fX + 4,
+             (this->_base_tMenuItemLeftRightSlider).fY + 10,coltext,'\0',0);
+  ptVar5 = (this->_base_tMenuItemLeftRightSlider).fData;
+  pa_Var4 = ptVar5->_vf;
+  uVar2 = NFS4_VCALL_AUTO((*pa_Var4)[2].pfn, (char *)ptVar5 + (int)(*pa_Var4)[2].delta,0xffffffff);
+  ptVar5 = (this->_base_tMenuItemLeftRightSlider).fData;
   fWidth = (short)((u_int)(((w >> 1) + -8) * 0x10000) >> 0x10);
-  DrawSlider(selection & 0xff,(u_short)(u_char)this->fData->fMinValue,
-             (u_short)(u_char)this->fData->fMaxValue,
-             this->fX + 1,this->fY + 2,fWidth,
-             this->fHeight,4,4,true,0,
-             this->fSelFade,0);
-  selection = (*(*this->fData->_vf)[2].pfn)
-      ((char *)this->fData + (int)(*this->fData->_vf)[2].delta,0xffffffff);
-  DrawSlider(selection & 0xff,(u_short)(u_char)this->fData->fMinValue,
-             (u_short)(u_char)this->fData->fMaxValue,
-             (short)(((u_int)(u_short)this->fX + ww + 10) * 0x10000 >>
-                    0x10),this->fY + 2,fWidth,
-             this->fHeight,4,4,false,0,this->fSelFade,0);
+  DrawSlider(uVar2 & 0xff,(u_short)(u_char)ptVar5->fMinValue,(u_short)(u_char)ptVar5->fMaxValue,
+             (this->_base_tMenuItemLeftRightSlider).fX + 1,(this->_base_tMenuItemLeftRightSlider).fY + 2,fWidth,
+             (this->_base_tMenuItemLeftRightSlider).fHeight,4,4,true,0,
+             (this->_base_tMenuItemLeftRightSlider)._base_tMenuItemInteractive._base_tMenuItem.fSelFade,0);
+  ptVar5 = (this->_base_tMenuItemLeftRightSlider).fData;
+  pa_Var4 = ptVar5->_vf;
+  uVar2 = NFS4_VCALL_AUTO((*pa_Var4)[2].pfn, (char *)ptVar5 + (int)(*pa_Var4)[2].delta,0xffffffff);
+  ptVar5 = (this->_base_tMenuItemLeftRightSlider).fData;
+  sVar1 = (this->_base_tMenuItemLeftRightSlider)._base_tMenuItemInteractive._base_tMenuItem.fSelFade;
+  col2 = (int)sVar1;
+  DrawSlider(uVar2 & 0xff,(u_short)(u_char)ptVar5->fMinValue,(u_short)(u_char)ptVar5->fMaxValue,
+             (short)(((u_int)(u_short)(this->_base_tMenuItemLeftRightSlider).fX + ww + 10) * 0x10000 >>
+                    0x10),(this->_base_tMenuItemLeftRightSlider).fY + 2,fWidth,
+             (this->_base_tMenuItemLeftRightSlider).fHeight,4,4,false,0,sVar1,0);
+  return col2;
 }
 
 
 
 /* ---- GetCurrentStickRange  [FEMENUOPTIONS.CPP:1578-1582] SLD-VERIFIED ---- */
 
-/* MATCH: PASS (23 insns).  The five-line SLD span and NFS2's ABS/MAX
-   definitions recover two initializer macro expansions followed by MAX. */
 char GetCurrentStickRange(int player)
 
 {
-  int range1 = ((0x80 - (int)gPadinfo.buf[player * 4].data.negcon.twist) > 0) ?
-      (0x80 - (int)gPadinfo.buf[player * 4].data.negcon.twist) :
-      -(0x80 - (int)gPadinfo.buf[player * 4].data.negcon.twist);
-  int range2 = ((0x80 - (int)gPadinfo.buf[player * 4].data.negcon.buttonI) > 0) ?
-      (0x80 - (int)gPadinfo.buf[player * 4].data.negcon.buttonI) :
-      -(0x80 - (int)gPadinfo.buf[player * 4].data.negcon.buttonI);
-  return (range1 > range2) ? range1 : range2;
+  u_int uVar1;
+  int range2;
+  int range1;
+  
+  uVar1 = (u_int)gPadinfo.buf[player * 4].data.negcon.twist;
+  range1 = 0x80 - uVar1;
+  if (range1 < 1) {
+    range1 = uVar1 - 0x80;
+  }
+  uVar1 = (u_int)gPadinfo.buf[player * 4].data.negcon.buttonI;
+  range2 = 0x80 - uVar1;
+  if (range2 < 1) {
+    range2 = uVar1 - 0x80;
+  }
+  if (range2 < range1) {
+    range2 = range1;
+  }
+  return (char)range2;
 }
 
 
 
 /* ---- GetCurrentStickRange2  [FEMENUOPTIONS.CPP:1586-1590] SLD-VERIFIED ---- */
 
-/* MATCH: PASS (23 insns).  Twin ABS/MAX expansion for the second axis pair. */
 char GetCurrentStickRange2(int player)
 
 {
-  int range1 = ((0x80 - (int)gPadinfo.buf[player * 4].data.negcon.buttonII) > 0) ?
-      (0x80 - (int)gPadinfo.buf[player * 4].data.negcon.buttonII) :
-      -(0x80 - (int)gPadinfo.buf[player * 4].data.negcon.buttonII);
-  int range2 = ((0x80 - (int)gPadinfo.buf[player * 4].data.negcon.leftshift) > 0) ?
-      (0x80 - (int)gPadinfo.buf[player * 4].data.negcon.leftshift) :
-      -(0x80 - (int)gPadinfo.buf[player * 4].data.negcon.leftshift);
-  return (range1 > range2) ? range1 : range2;
+  u_int uVar1;
+  int range2;
+  int range1;
+  
+  uVar1 = (u_int)gPadinfo.buf[player * 4].data.negcon.buttonII;
+  range1 = 0x80 - uVar1;
+  if (range1 < 1) {
+    range1 = uVar1 - 0x80;
+  }
+  uVar1 = (u_int)gPadinfo.buf[player * 4].data.negcon.leftshift;
+  range2 = 0x80 - uVar1;
+  if (range2 < 1) {
+    range2 = uVar1 - 0x80;
+  }
+  if (range2 < range1) {
+    range2 = range1;
+  }
+  return (char)range2;
 }
 
 
@@ -2278,136 +2223,127 @@ char GetCurrentStickRange2(int player)
 void tInsideBoxTwoWaySlider::Calibrate()
 
 {
-  int range;
-  int player;
-  /* SYM-CODEGEN-CARRIER: padInfo
-     SYM-CODEGEN-CARRIER: padBase
-     SYM-CODEGEN-CARRIER: screen
-     SYM-CODEGEN-CARRIER: app
-     The trusted block names only range/player. These typed expression carriers
-     preserve retail's screen/a0, app/v1, pad-base and indexed-pad lifetimes;
-     their semantic reconstruction names are not claimed as original. */
-  tPadModuleState *padInfo;
-  tPadModuleState *padBase;
-  tScreenControllerConfig *screen;
-  tFEApplication *app;
-
-  /* MATCH: separate typed assignments preserve the retail global-pointer load
-     order without volatile, then expose gPadinfo before reading the player. */
-  screen = screenControllerConfig[0];
-  app = FEApp;
-  /* MATCH: SYM declares GetCurrentStickRange{,2} as CHAR; their nonnegative
-     ABS/MAX expressions need no callee-side mask, and the caller's explicit
-     u_char cast yields the oracle's `andi a1,v0,255` after each jal. */
-  padBase = &gPadinfo;
-  player = (u_char)app->fInputPlayer;
-  padInfo = (tPadModuleState *)((char *)padBase + player * 0x20);
-  fHelpText = GetHelpText(screen);
-  switch (this->fType) {
-  case 0:
-    if (padInfo->buf[0].ID == '#') {
-      range = padInfo->buf[0].data.negcon.twist;
-      range = (range < 0x80) ? 0x80 - range : range - 0x80;
-      if (range < (u_char)frontEnd.deadSpot[player] + 10) {
-        range = (u_char)frontEnd.deadSpot[player] + 10;
+  uchar uVar1;
+  short sVar2;
+  u_char range;
+  char cVar4;
+  u_char bVar5;
+  int iVar6;
+  u_int uVar7;
+  u_int uVar8;
+  int iVar9;
+  u_int player;
+  
+  player = (u_int)(u_char)FEApp->fInputPlayer;
+  fHelpText = GetHelpText(screenControllerConfig);
+  sVar2 = this->fType;
+  if (sVar2 == 1) {
+    uVar1 = gPadinfo.buf[player * 4].ID;
+    if (uVar1 == '#') {
+      uVar8 = (u_int)gPadinfo.buf[player * 4].data.negcon.twist;
+      if (uVar8 < 0x80) {
+        iVar6 = 0x80 - uVar8;
       }
-      frontEnd.steeringRange[player] = (char)range;
+      else {
+        iVar6 = uVar8 - 0x80;
+      }
+      iVar9 = (u_char)frontEnd.steeringRange[player] - 10;
+      if (iVar9 < iVar6) {
+        iVar6 = iVar9;
+      }
+      cVar4 = (char)iVar6;
+      if (iVar6 < 0) {
+        cVar4 = '\0';
+      }
+      frontEnd.deadSpot[player] = cVar4;
     }
-    else if ((padInfo->buf[0].ID == 'S') || (padInfo->buf[0].ID == 's')) {
-      range = (u_char)GetCurrentStickRange(player);
-      if (range < (u_char)frontEnd.J1MIN[player] + 10) {
-        range = (u_char)frontEnd.J1MIN[player] + 10;
+    else if ((uVar1 == 'S') || (uVar1 == 's')) {
+      range = GetCurrentStickRange(player);
+      uVar7 = (u_char)frontEnd.J1MAX[player] - 10;
+      uVar8 = (u_int)range;
+      if ((int)uVar7 < (int)(u_int)range) {
+        uVar8 = uVar7;
       }
-      frontEnd.J1MAX[player] = (char)range;
+      cVar4 = (char)uVar8;
+      if ((int)uVar8 < 0) {
+        cVar4 = '\0';
+      }
+      frontEnd.J1MIN[player] = cVar4;
     }
-    break;
-  case 1:
-    if (padInfo->buf[0].ID == '#') {
-      /* SYM-CODEGEN-CARRIER: value
-         The repeated branch-local narrow destination preserves retail's
-         sign-test/zero-select/store sequence; SYM retains no original name. */
-      char value;
-
-      range = padInfo->buf[0].data.negcon.twist;
-      range = (range < 0x80) ? 0x80 - range : range - 0x80;
-      if ((u_char)frontEnd.steeringRange[player] - 10 < range) {
-        range = (u_char)frontEnd.steeringRange[player] - 10;
+  }
+  else if (sVar2 < 2) {
+    if (sVar2 == 0) {
+      uVar1 = gPadinfo.buf[player * 4].ID;
+      if (uVar1 == '#') {
+        uVar8 = (u_int)gPadinfo.buf[player * 4].data.negcon.twist;
+        if (uVar8 < 0x80) {
+          iVar6 = 0x80 - uVar8;
+        }
+        else {
+          iVar6 = uVar8 - 0x80;
+        }
+        iVar9 = (u_char)frontEnd.deadSpot[player] + 10;
+        if (iVar6 < iVar9) {
+          iVar6 = iVar9;
+        }
+        frontEnd.steeringRange[player] = (char)iVar6;
       }
-      value = (char)range;
-      if (range < 0) {
-        value = 0;
+      else if ((uVar1 == 'S') || (uVar1 == 's')) {
+        range = GetCurrentStickRange(player);
+        uVar8 = (u_char)frontEnd.J1MIN[player] + 10;
+        if (range < uVar8) {
+          range = (u_char)uVar8;
+        }
+        frontEnd.J1MAX[player] = range;
       }
-      frontEnd.deadSpot[player] = value;
     }
-    else if ((padInfo->buf[0].ID == 'S') || (padInfo->buf[0].ID == 's')) {
-      char value;
-
-      range = (u_char)GetCurrentStickRange(player);
-      if ((u_char)frontEnd.J1MAX[player] - 10 < range) {
-        range = (u_char)frontEnd.J1MAX[player] - 10;
-      }
-      value = (char)range;
-      if (range < 0) {
-        value = 0;
-      }
-      frontEnd.J1MIN[player] = value;
+  }
+  else if (sVar2 == 2) {
+    uVar1 = gPadinfo.buf[player * 4].ID;
+    if (uVar1 == '#') {
+      frontEnd.ImaxRange[player] = gPadinfo.buf[player * 4].data.negcon.buttonI;
     }
-    break;
-  case 2:
-    if (padInfo->buf[0].ID == '#') {
-      char value;
-
-      range = padInfo->buf[0].data.negcon.buttonI;
-      value = (char)range;
-      if (range < 0) {
-        value = 0;
+    else if ((uVar1 == 'S') || (uVar1 == 's')) {
+      range = GetCurrentStickRange2(player);
+      uVar7 = (u_char)frontEnd.J2MIN[player] + 10;
+      uVar8 = (u_int)range;
+      if (range < uVar7) {
+        uVar8 = uVar7;
       }
-      frontEnd.ImaxRange[player] = value;
+      /* @0x8001FB80: first (unclamped) J2MAX write; @0x8001FB84-94: second write stores
+       * (uVar8>=0 ? uVar8 : 0) -- a clamp-to-nonnegative (delay-slot store). The recon wrote the
+       * unclamped (char)uVar8 twice, dropping the negative->0 clamp (mirror J2MIN below) (M11). */
+      frontEnd.J2MAX[player] = (char)uVar8;
+      cVar4 = (char)uVar8;
+      if ((int)uVar8 < 0) {
+        cVar4 = '\0';
+      }
+      frontEnd.J2MAX[player] = cVar4;
     }
-    else if ((padInfo->buf[0].ID == 'S') || (padInfo->buf[0].ID == 's')) {
-      char value;
-
-      range = (u_char)GetCurrentStickRange2(player);
-      if (range < (u_char)frontEnd.J2MIN[player] + 10) {
-        range = (u_char)frontEnd.J2MIN[player] + 10;
+  }
+  else if (sVar2 == 3) {
+    uVar1 = gPadinfo.buf[player * 4].ID;
+    if (uVar1 == '#') {
+      range = gPadinfo.buf[player * 4].data.negcon.buttonII;
+      bVar5 = 10;
+      if (9 < range) {
+        bVar5 = range;
       }
-      frontEnd.J2MAX[player] = (char)range;
-      value = (char)range;
-      if (range < 0) {
-        value = 0;
-      }
-      frontEnd.J2MAX[player] = value;
+      frontEnd.IImaxRange[player] = bVar5;
     }
-    break;
-  case 3:
-    if (padInfo->buf[0].ID == '#') {
-      /* SYM-CODEGEN-CARRIER: minimum
-         MATCH: the bound is an int carrier.  GCC can then share literal 10
-         between the comparison and fallback value, selecting retail's
-         `li; slt` pair instead of `slti` followed by a late `li`. */
-      int minimum;
-
-      range = padInfo->buf[0].data.negcon.buttonII;
-      minimum = 10;
-      if (minimum <= range) {
-        minimum = range;
+    else if ((uVar1 == 'S') || (uVar1 == 's')) {
+      range = GetCurrentStickRange2(player);
+      uVar7 = (u_char)frontEnd.J2MAX[player] - 10;
+      uVar8 = (u_int)range;
+      if ((int)uVar7 < (int)(u_int)range) {
+        uVar8 = uVar7;
       }
-      frontEnd.IImaxRange[player] = minimum;
+      cVar4 = (char)uVar8;
+      if ((int)uVar8 < 0) {
+        cVar4 = '\0';
+      }
+      frontEnd.J2MIN[player] = cVar4;
     }
-    else if ((padInfo->buf[0].ID == 'S') || (padInfo->buf[0].ID == 's')) {
-      char value;
-
-      range = (u_char)GetCurrentStickRange2(player);
-      if ((u_char)frontEnd.J2MAX[player] - 10 < range) {
-        range = (u_char)frontEnd.J2MAX[player] - 10;
-      }
-      value = (char)range;
-      if (range < 0) {
-        value = 0;
-      }
-      frontEnd.J2MIN[player] = value;
-    }
-    break;
   }
   return;
 }
@@ -2416,16 +2352,16 @@ void tInsideBoxTwoWaySlider::Calibrate()
 
 /* ---- tUserNameMenuItem::ctor  [FEMENUOPTIONS.CPP:1688-1697] SLD-VERIFIED ---- */
 tUserNameMenuItem::tUserNameMenuItem(u_int textDescription)
-  : tMenuItem(textDescription)
+  : _base_tMenuItem(textDescription)
 {
   short i;
   
   i = 0;
-  *(void **)&(this->_vf) = (void *)tUserNameMenuItem_vtable;
+  *(void **)&((this->_base_tMenuItem)._vf) = (void *)tUserNameMenuItem_vtable;
   this->fCurrentRow = 0;
   this->fCurrentColumn = 0;
   do {
-    this->fRowList[0][(short)i * 9] = '\0';
+    this->fRowList[i][0] = '\0';
     i = i + 1;
   } while (i * 0x10000 >> 0x10 < 10);
   this->fData = (char *)0x0;
@@ -2436,187 +2372,167 @@ tUserNameMenuItem::tUserNameMenuItem(u_int textDescription)
 
 /* ---- CheckForCheats  [FEMENUOPTIONS.CPP:1701-1708] SLD-VERIFIED ---- */
 
-bool CheckForCheats(char *fData)
+void * CheckForCheats(char *fData)
 
 {
-  int len;
-
-  for (len = strlen(fData); len < 8; len = len + 1) {
+  u_int len;
+  void *pvVar2;
+  
+  for (len = strlen(fData); (int)len < 8; len = len + 1) {
     fData[len] = '\0';
   }
-  if ((FECheat_ActivateCheat(fData) != 0) ||
-      (FECheat_ActivateBonusByCode(fData) != 0)) {
-    return true;
+  pvVar2 = (void *)(intptr_t)FECheat_ActivateCheat(fData);
+  if ((pvVar2 == (void *)0x0) &&
+     (pvVar2 = (void *)(intptr_t)FECheat_ActivateBonusByCode(fData), pvVar2 == (void *)0x0)) {
+    return (void *)0x0;
   }
-  return false;
+  return (void *)0x1;
 }
 
 
 
 /* ---- tUserNameMenuItem::ProcessInput  [FEMENUOPTIONS.CPP:1712-1849] SLD-VERIFIED ---- */
 
-void tUserNameMenuItem::ProcessInput(tPlayer fromPlayer,tInputKeyType &keyval,
+int tUserNameMenuItem::ProcessInput(tPlayer fromPlayer,tInputKeyType &keyval,
               tMenuCommand &command)
 
 {
-  /* SYM: FCN VOID, REGPARM this($s0)+keyval($s1) only -- fromPlayer/command
-     are dead (never read in the body, matching the oracle: $a3/&command is
-     never touched). SYM's 8c block shows NO named locals at all: every
-     scalar below is a Ghidra-fabricated compiler temp, not a real variable.
-     SYM-ABI-PARAM: fromPlayer
-     SYM-ABI-PARAM: command
-     SYM-CODEGEN-CARRIER: selectedChar
-     SYM-CODEGEN-CARRIER: column
-     SYM-CODEGEN-CARRIER: stringLength
-     SYM-CODEGEN-CARRIER: character
-     SYM-CODEGEN-CARRIER: rowBase
-     SYM-CODEGEN-CARRIER: soundId
-     SYM-CODEGEN-CARRIER: rowOffset
-     SYM-CODEGEN-CARRIER: lastColumn
-     These semantic carrier names are reconstruction descriptions, not claims
-     that the optimized-away original identifiers can be recovered from SYM.
-     Real switch(keyval) (gcc balance_case_nodes: ==0x400/Down root, <0x401
-     bound test over 0x2/Cross+0x200/Up, else 0x800/Left+0x1000/Right).
-     Switching and testing the reference directly preserves the shared
-     Up/Down test: Down supplies the tiny 0x200 header while Up reuses the
-     dispatch compare. menu_kUserNameRows is read lazily in that shared body
-     (the oracle stages its lui in the split-test delay slot). */
-  u_char selectedChar;
-  short column;
-  u_int stringLength;
-  u_int character;
-  int rowBase;
-  int soundId;
-
-  switch (keyval) {
-  case kInput_KeyType_Down:
-  case kInput_KeyType_Up:
-    if (keyval == kInput_KeyType_Up) {
-      this->fCurrentRow--;
-      soundId = 3;
-      if (this->fCurrentRow < 0) {
+  u_char bVar1;
+  u_short uVar2;
+  short sVar3;
+  short sVar4;
+  u_int uVar5;
+  void *pvVar6;
+  int iVar7;
+  tInputKeyType tVar8;
+  int iVar9;
+  u_int uVar10;
+  
+  sVar4 = menu_kUserNameRows;
+  tVar8 = keyval;
+  if (tVar8 == kInput_KeyType_Down) {
+UserNameProcInp_handleUpDown:
+    if (tVar8 == kInput_KeyType_Up) {
+      uVar2 = this->fCurrentRow - 1;
+      this->fCurrentRow = uVar2;
+      iVar9 = 3;
+      if ((int)((u_int)uVar2 << 0x10) < 0) {
         this->fCurrentRow = menu_kUserNameRows + -1;
       }
     }
     else {
-      this->fCurrentRow++;
-      soundId = 4;
-      if (this->fCurrentRow >= (short)menu_kUserNameRows) {
+      sVar3 = this->fCurrentRow + 1;
+      this->fCurrentRow = sVar3;
+      iVar9 = 4;
+      if (sVar4 <= sVar3) {
         this->fCurrentRow = 0;
       }
     }
-    AudioCmn_PlayFESFX(soundId);
+    AudioCmn_PlayFESFX(iVar9);
     if (this->fCurrentColumn < 0) {
       this->fCurrentColumn = 0;
     }
+UserNameProcInp_markProcessed:
     keyval = kInput_KeyType_AlreadyProcessed;
-    break;
-  case kInput_KeyType_Left:
-    this->fCurrentColumn--;
-    soundId = 3;
-    if (this->fCurrentColumn < 0) {
-      this->fCurrentColumn = 5;
-    }
-    AudioCmn_PlayFESFX(soundId);
-    keyval = kInput_KeyType_AlreadyProcessed;
-    break;
-  case kInput_KeyType_Right:
-    this->fCurrentColumn++;
-    if (this->fCurrentColumn > 5) {
-      this->fCurrentColumn = 0;
-    }
-    AudioCmn_PlayFESFX(4);
-    keyval = kInput_KeyType_AlreadyProcessed;
-    column = this->fCurrentColumn;
-    rowBase = this->fCurrentRow * 9;
-    if (this->fRowList[0][this->fCurrentColumn + rowBase] == '-') {
-      int rowOffset = rowBase;
-      do {
-        this->fCurrentColumn = column + 1;
-        if (this->fCurrentColumn > 5) {
-          this->fCurrentColumn = 0;
+  }
+  else if ((int)tVar8 < 0x401) {
+    if (tVar8 == kInput_KeyType_Cross) {
+      uVar5 = strlen(this->fData);
+      bVar1 = this->fRowList[0][(int)this->fCurrentColumn + this->fCurrentRow * 9];
+      uVar10 = (u_int)bVar1;
+      sVar4 = (short)uVar5;
+      if (uVar10 - 0x23 < 2) {
+        iVar9 = 0x15;
+        if (0 < sVar4) {
+          this->fData[sVar4 + -1] = '\0';
+          goto UserNameProcInp_playSfxAndMarkProcessed;
         }
-        column = this->fCurrentColumn;
-      } while (this->fRowList[0][this->fCurrentColumn + rowOffset] == '-');
-    }
-    /* MATCH/CFG (w65-a1, 04Q class): when the Right case lands on a NON-dash cell
-       the function-tail's backward skip re-reads the very same byte and re-tests
-       it, so retail's `bne v1,45` jumps STRAIGHT past that block to the strupr
-       call (branch word 17: ours +113 vs retail +140).  The explicit goto is the
-       only thing that reproduces the routing; the instruction stream is identical
-       (PASS 240 both ways).  Falsified alternative (also clean): spelling the head
-       test as an early-out `if (... != '-') goto feo_upper;` around a bare block. */
-    else goto feo_upper;
-    break;
-  case kInput_KeyType_Cross:
-    stringLength = strlen(this->fData);
-    selectedChar = this->fRowList[this->fCurrentRow][this->fCurrentColumn];
-    column = (short)stringLength;
-    if ((u_int)(selectedChar - 0x23) < 2) {
-      if (0 < column) {
-        this->fData[column + -1] = '\0';
-        AudioCmn_PlayFESFX(0x15);
+        goto UserNameProcInp_markProcessed;
       }
-      keyval = kInput_KeyType_AlreadyProcessed;
-      break;
-    }
-    else {
-      /* Pin-free zero-insn fence: retain the retail byte-extension boundary. */
-      __asm__("" : "+r"(selectedChar));
-      character = (u_int)selectedChar & 0xff;
-      if ((character == 0x21) || (character == 0x40)) {
-        if (CheckForCheats(this->fData)) {
+      if ((uVar10 == 0x21) || (uVar10 == 0x40)) {
+        pvVar6 = CheckForCheats(this->fData);
+        if (pvVar6 != (void *)0x0) {
           *this->fData = '\0';
+          goto UserNameProcInp_skipDashColumns;
         }
-        else {
-          if ((FEApp->fCurrentMenu[0]->fFlags & 0x100) != 0) {
-            keyval = kInput_KeyType_Triangle;
-          }
-          else {
-            keyval = kInput_KeyType_Start;
-          }
-          AudioCmn_PlayFESFX(1);
+        tVar8 = kInput_KeyType_Triangle;
+        if ((FEApp->fCurrentMenu[0]->fFlags & 0x100) == 0) {
+          tVar8 = kInput_KeyType_Start;
         }
+        keyval = tVar8;
       }
-      else if ((character == 0x26) || (character == 0x5e)) {
-        if (column < this->fMaxStringLength) {
-          this->fData[column] = ' ';
-          this->fData[column + 1] = '\0';
+      else if ((uVar10 == 0x26) || (uVar10 == 0x5e)) {
+        iVar9 = (int)sVar4;
+        if (iVar9 < this->fMaxStringLength) {
+          this->fData[iVar9] = ' ';
+          this->fData[iVar9 + 1] = '\0';
           AudioCmn_PlayFESFX(0x15);
-        }
-        else {
-          AudioCmn_PlayFESFX(1);
+          goto UserNameProcInp_skipDashColumns;
         }
       }
       else {
-        if (column >= this->fMaxStringLength) {
-          AudioCmn_PlayFESFX(1);
-        }
-        else {
-          this->fData[column] = selectedChar;
-          this->fData[column + 1] = '\0';
-          AudioCmn_PlayFESFX(0x15);
-          keyval = kInput_KeyType_AlreadyProcessed;
+        iVar7 = (int)sVar4;
+        iVar9 = 0x15;
+        if (iVar7 < this->fMaxStringLength) {
+          this->fData[iVar7] = bVar1;
+          this->fData[iVar7 + 1] = '\0';
+          goto UserNameProcInp_playSfxAndMarkProcessed;
         }
       }
+      AudioCmn_PlayFESFX(1);
     }
-    break;
+    else if (tVar8 == kInput_KeyType_Up) goto UserNameProcInp_handleUpDown;
   }
-  column = this->fCurrentColumn;
-  rowBase = this->fCurrentRow * 9;
-  if (this->fRowList[0][this->fCurrentColumn + rowBase] == '-') {
-    int lastColumn = 5;
-    int rowOffset = rowBase;
-    do {
-      this->fCurrentColumn = column - 1;
-      if (this->fCurrentColumn < 0) {
-        this->fCurrentColumn = lastColumn;
+  else {
+    if (tVar8 == kInput_KeyType_Left) {
+      uVar2 = this->fCurrentColumn - 1;
+      this->fCurrentColumn = uVar2;
+      iVar9 = 3;
+      if ((int)((u_int)uVar2 << 0x10) < 0) {
+        this->fCurrentColumn = 5;
       }
-      column = this->fCurrentColumn;
-    } while (this->fRowList[0][this->fCurrentColumn + rowOffset] == '-');
+UserNameProcInp_playSfxAndMarkProcessed:
+      AudioCmn_PlayFESFX(iVar9);
+      goto UserNameProcInp_markProcessed;
+    }
+    if (tVar8 == kInput_KeyType_Right) {
+      sVar4 = this->fCurrentColumn + 1;
+      this->fCurrentColumn = sVar4;
+      if (5 < sVar4) {
+        this->fCurrentColumn = 0;
+      }
+      AudioCmn_PlayFESFX(4);
+      keyval = kInput_KeyType_AlreadyProcessed;
+      sVar4 = this->fCurrentColumn;
+      iVar9 = this->fCurrentRow * 9;
+      iVar7 = 0x2d;
+      if (this->fRowList[0][this->fCurrentColumn + iVar9] != '-')
+      goto UserNameProcInp_convertAndReturn;
+      do {
+        this->fCurrentColumn = sVar4 + 1;
+        if (5 < (short)(sVar4 + 1)) {
+          this->fCurrentColumn = 0;
+        }
+        sVar4 = this->fCurrentColumn;
+      } while (this->fRowList[0][this->fCurrentColumn + iVar9] == '-');
+    }
   }
-feo_upper:
+UserNameProcInp_skipDashColumns:
+  iVar9 = this->fCurrentRow * 9;
+  iVar7 = 0x2d;
+  if (this->fRowList[0][this->fCurrentColumn + iVar9] == '-') {
+    iVar7 = (u_short)this->fCurrentColumn - 1;
+    do {
+      this->fCurrentColumn = (short)iVar7;
+      if (iVar7 << 0x10 < 0) {
+        this->fCurrentColumn = 5;
+      }
+      iVar7 = (u_short)this->fCurrentColumn - 1;
+    } while (this->fRowList[0][this->fCurrentColumn + iVar9] == '-');
+  }
+UserNameProcInp_convertAndReturn:
   Stattool_SamNelsonsUpperLowerStringConverterForRecords(this->fData);
+  return iVar7;
 }
 
 
@@ -2627,41 +2543,41 @@ int SpecialCharacter(char current)
 
 {
   int ret;
-
+  
   ret = 0;
-  switch((u_char)current) {
-  case 0xe4:
-    ret = 0x51;
-    break;
-  case 0xf6:
-    ret = 0x52;
-    break;
-  case 0xfc:
-    ret = 0x53;
-    break;
-  case 0xe9:
-    ret = 0x54;
-    break;
-  case 0xe8:
-    ret = 0x55;
-    break;
-  case 0xe1:
+  switch(current) {
+  case -0x1f:
     ret = 0x56;
     break;
-  case 0xed:
+  case -0x1c:
+    ret = 0x51;
+    break;
+  case -0x1b:
+    ret = 0x5b;
+    break;
+  case -0x18:
+    ret = 0x55;
+    break;
+  case -0x17:
+    ret = 0x54;
+    break;
+  case -0x13:
     ret = 0x57;
     break;
-  case 0xf3:
-    ret = 0x58;
-    break;
-  case 0xfa:
-    ret = 0x59;
-    break;
-  case 0xf1:
+  case -0xf:
     ret = 0x5a;
     break;
-  case 0xe5:
-    ret = 0x5b;
+  case -0xd:
+    ret = 0x58;
+    break;
+  case -10:
+    ret = 0x52;
+    break;
+  case -6:
+    ret = 0x59;
+    break;
+  case -4:
+    ret = 0x53;
   }
   return ret;
 }
@@ -2670,266 +2586,101 @@ int SpecialCharacter(char current)
 
 /* ---- tUserNameMenuItem::Draw  [FEMENUOPTIONS.CPP:1874-1966] SLD-VERIFIED ---- */
 
-void tUserNameMenuItem::Draw(bool selected)
+int tUserNameMenuItem::Draw(bool selected)
 
 {
-  /* SYM-ABI-PARAM: selected
-     SYM-CODEGEN-CARRIER: boxRight
-     SYM-CODEGEN-CARRIER: menuStartY
-     SYM-CODEGEN-CARRIER: columnx
-     SYM-CODEGEN-CARRIER: row
-     SYM-CODEGEN-CARRIER: right
-     SYM names x/y/shape and the inner lexical locals, but not these ABI and
-     expression carriers; the descriptive names below are not claimed as
-     recoverable original identifiers.
-     MATCH (2026-08-14): IDA/SLD show that lowercase, digit, and fallback
-     glyphs share the scoped `shapetodraw` join, while punctuation arms call
-     directly.  Keeping the column*28 value separate from `xx`, and spelling
-     startx as two assignments, restores retail's a2/s1 web and start-x
-     arithmetic.  The value-specific empty template preserves the otherwise-
-     combined column offset.  A split MENUUSERNAME_STARTY pointer plus a
-     read-only row fence fills the column-load delay slot, and two tail
-     lifetime markers buy reqdelta's measured +2 live-length for `shape`,
-     recovering retail's shape/y saved-register order.  All templates emit no
-     bytes and pin no register.  Detailed residual: 63 -> 42 -> 17.
-
-     W60-A10: the remaining 8 diffs are count-exact (254/254) and are TWO
-     copies of one fact -- the `boxRight` constant 156 lands in $v1 for us and
-     in $t0 for retail (which REUSES the register that held `x` and is dead by
-     then), plus the resulting 2-slot shift of the `li` inside the argument
-     setup (`li v1,156` before `addu a0,zero,zero` vs retail's `li t0,156`
-     after `addu a2,s0,zero`).  Every other instruction in both tail blocks is
-     byte-exact.
-     FALSIFIED, all exactly NEUTRAL at 8 (so the dial is not source-visible):
-     ONE fn-scope carrier shared by both blocks (05D global-allocno promotion);
-     a second identity fence (07B 2-of-3 step); assign-not-decl-with-init;
-     the carrier declared first / last in the function's top decl list (the
-     W52-a9 decl-order-is-the-register-map lever); a void-tail fence after the
-     identity fence.  REGRESSIONS: read-only instead of identity fence 89 (253,
-     the constant folds back); a read-only fence on `shape` 32.
-     => local-alloc QTY handout (Sec.4.6 / 06E), same class as
-     front.cpp GetPSXPadValue and feaudio.cpp FeAudio_InitViv this wave.
-
-     W62-A15 -- RECLASSIFIED: this is a CONFLICT-STRUCTURE question, not a
-     QTY/priority one, read off the real CC1PLPSX `-dg` dump of this TU (-G0,
-     harness scratchpad/w62a15/dumpg.py):
-         ;; 196 conflicts: 80 82 83 84 98 100 101 196 210 211 2 29
-         ;; 211 preferences: 4      (211 is allocated BEFORE 196 and takes a0)
-         ;; Register dispositions: ... 196 in 3 ...
-     196 is the boxRight constant.  Its HARD-reg conflict set is {v0(2),
-     sp(29)} plus the already-assigned 211 -> a0(4).  find_reg's plain
-     ascending scan therefore hands it v1(3).  To reach retail's t0(8) the
-     pseudo would have to conflict with v0,v1,a0,a1,a2,a3 -- i.e. stay live
-     ACROSS the whole hard-argument setup.  It cannot: gcc computes every call
-     argument's VALUE into a pseudo first and only then moves those pseudos
-     into $a0-$a3, so the 156 constant dies at the `subu` long before a1/a2/a3
-     exist.  No ref-count, priority or fence dial changes a conflict set.
-     NEW FALSIFICATIONS (base 8, all re-gated, all reverted) -- the 13B COPY
-     devices, which did not exist when the rows above were written:
-       COPY-TAIL (`int b2 = boxRight;` + read-only fence on the still-live
-         source, both blocks)                                  8 (exactly inert)
-       COPY-TAIL applied to the first block only               8 (inert)
-       COPY-BACK (`int w = shape->width; int h = shape->height;`
-         pre-read, both blocks)                                8 (inert)
-       height read hoisted above the identity fence, both blocks  16
-     The two inert copy results are the 13B GOVERNING LIMIT in action: cse eats
-     a synthetic copy before local-alloc, so a copy dial exists only where the
-     emitted code ALREADY carries a real reg-reg copy -- and here it does not.
-     => the open device is one that lengthens the constant's live range across
-     the argument-move block without relocating a use (the same 4-witness
-     instrument feaudio's FeAudio_InitViv is waiting for).
-
-     W64-A16 -- THE CLASS IS RE-READ: retail's $t0 is a RELOAD REGISTER, not an
-     allocno at all, so no allocno instrument can ever reach it.  Evidence, all
-     from the oracle stream itself: two insns before the block retail does
-     `lw t0,88(sp)` (the spilled `x` reloaded) + `addiu s1,t0,156`; $t0 is dead
-     immediately after, and retail then RE-USES it for `li t0,156` placed
-     IMMEDIATELY BEFORE its consumer (after `addu a2,s0,zero`, not before
-     `addu a0,zero,zero` as ours is).  Rematerialising a REG_EQUIV constant into
-     a spill/reload register at the point of use, in a register drawn from
-     order_regs_for_reload's pool (which starts at the least-used caller-saved
-     regs, i.e. $t0), reproduces BOTH facts at once -- the register AND the
-     2-slot-later position -- where an allocated pseudo reproduces neither
-     (find_reg's ascending scan can only ever hand out $v1 here, exactly as
-     W62-A15's conflict-structure certificate proves).  So the 8 diffs are the
-     price of the identity fence FORCING an allocation: the fence kills the
-     REG_EQUIV, and every spelling that restores it (plain literal, unfenced
-     local) lets cse share ONE constant across both blocks instead of two.
-     NEW FALSIFICATIONS (base 8, re-gated, all reverted): plain `0x9c` literal in
-     both blocks 67 @253 (one shared `li`, plus a whole s2<->s3 saved-band
-     rotation); unfenced `int boxRight = 0x9c;` in both blocks the same 67 @253;
-     literal in the FIRST block only 78 @254; literal in the SECOND block only
-     EXACTLY 8 -- i.e. the second block's identity fence is inert and only the
-     first one is load-bearing; `int boxRight; boxRight = 0x9c;` (12D
-     decl-with-init demote) exactly 8, inert; a 15A foreign-operand fence on
-     `shape` after the identity fence 32.
-     => the wanted device is now precisely named and is NOT an allocno dial: a
-     way to keep the constant REG_EQUIV/unallocated per block (two remats) while
-     stopping cse from sharing one materialisation between the two blocks.
-     Harness: scratchpad/w64a16/un.py.
-     W67-A8 (2026-08-15, base 8): the screenmain VOID-FENCE UN-SHARER probed as
-     that device -- FALSIFIED in every form.  A void fence at block-2's head
-     with plain literals 67 @253, with unfenced per-block decls 67 @253, at
-     BOTH block heads 67 @253 (all three land the known shared-li basin -- the
-     volatile asm does not invalidate cse's register-constant equivalence the
-     way it un-shared screenmain's cse2 cross-arm %hi), and on top of the
-     current fences exactly 8 (inert).  The un-sharer axis is closed; the
-     device still does not exist at source level.
-     Harness: scratchpad/w67a8/un_v1.json + probe.py.
-
-     *** W72-A5 2026-08-22 -- SEALED, PASS 254/254 (was 8).  THE FIVE-WAVE
-     CERTIFICATE WAS ANSWERING THE WRONG QUESTION. ***
-     W64-A16's reading was RIGHT (retail's $t0 is a reload rematerialisation of a
-     REG_EQUIV constant, not an allocno) but every wave then hunted a device that
-     would make an ALLOCATED pseudo land in $t0.  The fix is the opposite move:
-     stop the constant being allocated at all.
-
-     THE LANDED SHAPE -- one function-scope `int boxRight = 0x9c;` declared with
-     x/y/shape at the top of the body, referenced plainly in BOTH PSXDrawSquare
-     calls, with NO fence, NO per-block scope and NO literal.  A pseudo whose live
-     range spans the whole function (~200 insns) has priority
-     floor_log2(refs)*refs*size/live ~= 1*3*1/200, so global_alloc never gives it a
-     hard register; it keeps its REG_EQUIV (const_int 156) and reload
-     REMATERIALISES it at each use, inside the argument block, into a register
-     drawn from order_regs_for_reload's pool -- $t0, the same register retail
-     reuses.  That reproduces BOTH residual facts at once: the REGISTER ($t0, not
-     $v1) and the 2-slot-later POSITION (immediately before its `subu` consumer,
-     after `addu a2,s0,zero`, because a remat is emitted at the point of use, not
-     at a definition site).  cse cannot share the two materialisations because
-     there is no register holding the value between them -- the spill IS the
-     un-sharer, which is why the 3-wave hunt for a cse un-sharer never had to
-     succeed.
-     ⚠️ The two `__asm__("" : : "r"(this))` fences above ARE still load-bearing --
-     removing them from the sealed basin regresses to an s5/s6 rotation (re-tested
-     W72-A5, restored).  The per-block `{ }` scopes were vestigial and are gone.
-
-     NEW LAW (generalisable): WHEN THE ORACLE'S REGISTER IS A RELOAD REGISTER,
-     DEMOTE THE PSEUDO OUT OF ALLOCATION -- do not dial it INTO the wanted hard
-     reg.  A long-lived, few-ref, REG_EQUIV-eligible local (a constant, or any
-     value gcc can rematerialise) is the zero-instruction way to request
-     "spill me and remat me at each use".  Tell that you are in this class:
-     count is already exact, the wanted register is one the SAME function uses for
-     a SPILL RELOAD elsewhere (here `lw t0,88(sp)`), and the wanted `li` sits
-     immediately before its consumer rather than at a definition point.
-
-     W72-A5 measurements on the way (all re-gated from the 8 base):
-       (a) 20B hard-reg-clobber device `__asm__("" : "=r"(b) : "0"(b) : "$3","$5",
-           "$6","$7")` on BOTH blocks -- it DOES land retail's $t0 for the
-           constant (all four `li v1,156`/`subu a3,v1,a3` diffs vanish) but costs
-           SIX new ones: with $t0 owned by an allocno, order_regs_for_reload
-           re-ranks the spill pool and all three `x` reloads move $t0 -> $t1
-           (`lw t1,88(sp)`, `sll a1,t1,16`, `addiu a1,t1,78`, `addiu s1,t1,156`).
-           16 @254.  First-block-only: 18 @254.  ⇒ a QUANTIFIED PROOF that the
-           constant and the `x` reload cannot BOTH have $t0 while the constant is
-           allocated -- i.e. direct confirmation that retail's constant is not an
-           allocno.  (This is 20B LIMIT (2) -- regs_explicitly_used /
-           bad_spill_regs -- observed from the other side.)
-       (b) cse UN-SHARER FOUND (recorded, superseded by the seal): plain literals
-           in both blocks plus a dead `boxRight = 0;` after the first call gives
-           254 insns and 8 diffs -- flow.c deletes the dead store (zero insns)
-           while cse's `invalidate` on that pseudo stops the second literal
-           reusing the first's register.  So the W67-A8 "un-sharer does not exist"
-           verdict is FALSE: a dead SET un-shares where a volatile asm does not
-           (cse invalidates pseudos on SETs, hard regs on clobbers).  Kept here as
-           the mechanism note only -- the sealed shape needs no un-sharer. */
+  char current_00;
+  tTexture_ShapeInfo *shape;
+  short sVar2;
+  int shapetodraw;
   int x;
   int y;
-  tTexture_ShapeInfo *shape;
-  int boxRight = 0x9c;
+  int ColText;
+  int Col;
+  char *sMenuText;
+  u_int sl;
+  int current;
+  int iVar5;
+  int yy;
+  int j;
+  int xx;
+  int startx;
+  char output [2];
+  /* SYM AUTO local optimizer-ELIMINATED (disasm: cursor draw uses fFlags, slot sp+0x28 unused) */
+  tDrawShapeExtended tCol;
+  tDrawShapeExtended fFlags;
+  int cursorX;
   
-  x = TextSys_WordX(this->fTextDescription);
-  y = TextSys_WordY(this->fTextDescription);
-  shape = &gHelpShapes[0x1e];
+  x = TextSys_WordX((this->_base_tMenuItem).fTextDescription);
+  y = TextSys_WordY((this->_base_tMenuItem).fTextDescription);
+  shape = gHelpShapes;
   if (this->fFadeVal != 0x80) {
-    short j;
-    char output[2];
-    int ColText;
-    int Col;
-    tDrawShapeExtended tCol;
-    short sl;
-    short startx;
-    short *menuStartY;
-    int columnx;
-    int row;
-    int xx;
-    int yy;
-
     output[1] = '\0';
     ColText = CalcFadeVal(0xbebe,(int)this->fFadeVal);
     Col = CalcFadeVal(0xbebe,(int)this->fFadeVal);
-    tCol.tint[0] = Col;
     j = 0;
-    FETextRender_FullTextRGB(TextSys_Word(this->fTextDescription),(short)x,(short)y,
-                            ColText,'\0',0);
-    sl = (short)strlen(this->fData);
-    startx = x + 0x4e;
-    startx = startx - this->fMaxStringLength * 10;
-    if (0 < sl) {
+    sMenuText = TextSys_Word((this->_base_tMenuItem).fTextDescription);
+    FETextRender_FullTextRGB(sMenuText,(short)x,(short)y,ColText,'\0',0);
+    sl = strlen(this->fData);
+    sVar2 = (short)sl;
+    startx = x + 0x4e + this->fMaxStringLength * -10;
+    iVar5 = x;
+    if (0 < sVar2) {
       do {
-        output[0] = this->fData[j];
-        FETextRender_FullTextRGB(output,(short)(startx + j * 0x14),(short)(y + 0x11),
-                                ColText,'\x01',0);
-        __asm__("" : : "r"(this));
+        output[0] = this->fData[(short)j];
+        FETextRender_FullTextRGB(output,(short)((u_int)((startx + (short)j * 0x14) * 0x10000) >> 0x10),
+                   (short)((u_int)((y + 0x11) * 0x10000) >> 0x10),ColText,'\x01',0);
         j = j + 1;
-      } while (j < sl);
+      } while (j * 0x10000 >> 0x10 < (int)sVar2);
     }
-    j = sl;
-    if (j < this->fMaxStringLength) {
+    sl = sl & 0xffff;
+    if (sVar2 < this->fMaxStringLength) {
       do {
-        PSXDrawSquare(Col,startx + j * 0x14,y + 0x19,0x11,1);
-        j = j + 1;
-      } while (j < this->fMaxStringLength);
+        PSXDrawSquare(Col,(startx * 0x10000 >> 0x10) + (short)sl * 0x14,y + 0x19,0x11,1);
+        sl = sl + 1;
+      } while ((int)(sl * 0x10000) >> 0x10 < (int)this->fMaxStringLength);
     }
-    menuStartY = &MENUUSERNAME_STARTY;
-    columnx = this->fCurrentColumn * 0x1c;
-    row = this->fCurrentRow;
-    __asm__("" : : "r"(row));
-    xx = columnx + 0x102;
-    __asm__("" : "=r"(columnx) : "0"(columnx));
-    yy = *menuStartY + row * 0xf;
     if (this->fFadeVal == 0) {
-      tDrawShapeExtended fFlags;
-      char current;
-
       fFlags.tint[0] = PulsateYellow;
-      current = this->fRowList[0][(int)this->fCurrentColumn + this->fCurrentRow * 9];
-      if ((current == '!') || (current == '@')) {
-        DrawShapeExtended(0x4e,0x10,columnx + 0xfd,yy - 3,0,0,&fFlags);
+      current = (int)this->fCurrentColumn + this->fCurrentRow * 9;
+      current_00 = this->fRowList[0][current];
+      if ((current_00 == '!') || (current_00 == '@')) {
+        shapetodraw = 0x4e;
+        cursorX = this->fCurrentColumn * 0x1c + 0xfd;
       }
-      else if ((u_char)(current - 0x23U) < 2) {
-        DrawShapeExtended(0x4f,0x10,columnx + 0xfd,yy - 3,0,0,&fFlags);
+      else if ((u_char)(current_00 - 0x23U) < 2) {
+        shapetodraw = 0x4f;
+        cursorX = this->fCurrentColumn * 0x1c + 0xfd;
       }
-      else if ((current == '&') || (current == '^')) {
-        DrawShapeExtended(0x50,0x10,columnx + 0xfd,yy - 3,0,0,&fFlags);
+      else if ((current_00 == '&') || (current_00 == '^')) {
+        shapetodraw = 0x50;
+        cursorX = this->fCurrentColumn * 0x1c + 0xfd;
       }
       else {
-        int shapetodraw;
-
-        if ((u_char)(current - 0x61U) < 0x1a) {
-          shapetodraw = (u_char)this->fRowList[0][(int)this->fCurrentColumn +
-                                                   this->fCurrentRow * 9] - 0x37;
+        if ((u_char)(current_00 - 0x61U) < 0x1a) {
+          shapetodraw = (u_char)this->fRowList[0][current] - 0x37;
         }
-        else if ((u_char)(current - 0x30U) < 0xa) {
-          shapetodraw = (u_char)this->fRowList[0][(int)this->fCurrentColumn +
-                                                   this->fCurrentRow * 9] + 0x14;
+        else if ((u_char)(current_00 - 0x30U) < 0xa) {
+          shapetodraw = (u_char)this->fRowList[0][current] + 0x14;
         }
         else {
-          shapetodraw = SpecialCharacter(current);
+          shapetodraw = SpecialCharacter(current_00);
         }
-        DrawShapeExtended(shapetodraw,0x10,xx - 5,yy - 3,0,0,&fFlags);
+        cursorX = (this->fCurrentColumn * 0x1c + 0x102) - 5;
       }
+      yy = *(short *)&MENUUSERNAME_STARTY /* @0x800529b2 */ + this->fCurrentRow * 0xf;
+      DrawShapeExtended(shapetodraw,0x10,cursorX,yy - 3,0,0,&fFlags);
     }
   }
-  int right = x + 0x9c;
-  DrawShapeExtended(0x1e,8,right - (int)shape->width,y - 3,
-                    (int)this->fFadeVal,0,(tDrawShapeExtended *)0x0);
-  PSXDrawSquare(0,x,y + -3,boxRight - shape->width,(int)shape->height);
-  shape = &gHelpShapes[0x21];
-  DrawShapeExtended(0x21,8,right - (int)shape->width,y + 0xc,
-                    (int)this->fFadeVal,0,(tDrawShapeExtended *)0x0);
-  __asm__("" : : "r"(this));
-  __asm__("" : : "r"(this));
-  PSXDrawSquare(0,x,y + 0xc,boxRight - shape->width,(int)shape->height);
+  xx = x + 0x9c;
+  DrawShapeExtended(0x1e,8,xx - (int)shape[0x1e].width,y + -3,(int)this->fFadeVal,0,(tDrawShapeExtended *)0x0);
+  iVar5 = 0x9c;
+  PSXDrawSquare(0,x,y + -3,0x9c - shape[0x1e].width,(int)shape[0x1e].height);
+  shape = gHelpShapes;
+  DrawShapeExtended(0x21,8,xx - (int)shape[0x21].width,y + 0xc,(int)this->fFadeVal,0,(tDrawShapeExtended *)0x0);
+  iVar5 = (int)shape[0x21].height;
+  PSXDrawSquare(0,x,y + 0xc,0x9c - shape[0x21].width,iVar5);
+  return iVar5;
 }
 
 
@@ -2950,59 +2701,64 @@ void tUserNameMenuItem::TransitionOff()
 void tUserNameMenuItem::TransitionOn()
 
 {
-  /* SYM 8c block: locals are exactly `short i` (REG $s2) and
-     `short NumberOfRows[6]` (AUTO -0x28 = sp+0x10) -- the 6 other Ghidra temps
-     and the hand-expanded unaligned store soup were fictions: the table is an
-     AGGREGATE INITIALIZER, i.e. gcc's own 12-byte rodata->stack block copy
-     (3x lwl/lwr + swl/swr from D_80010A00).  SLD: 1982-1985 the sprintf loop /
-     1989 the table / 1990 kUserNameRows / 1992-1994 the row+column scan /
-     1996 fCurrentRow-- / 2000-2003 fade+selfade / 2010-2012 the speech. */
-  short i;
-  /* MATCH: unsized-array asm-label view of the scalar extern.  A scalar extern
-     compiles to the single `lh $r,sym` / `sh $r,sym` ASSEMBLER MACRO, which is
-     unschedulable (delay-slot poison) and uses the `$at` scratch on stores; the
-     array view splits it into a schedulable lui + lh/sh pair like the oracle. */
-  extern short menu_kUserNameRowsA[] __asm__("menu_kUserNameRows");
-
-  for (i = 0; i < 10; i++) {
-    sprintf(this->fRowList[i],TextSys_Word(i + 0x1fb));
-  }
-
-  {
-    short NumberOfRows [6] = { 7, 9, 9, 9, 8, 9 };   /* @0x80010A00 */
-    /* SYM-CODEGEN-CARRIER: dst
-       Hoists the store-address lui before the frontEnd.language lbu; the
-       compiler-generated address pseudo is absent from the SYM local list. */
-    short *dst = menu_kUserNameRowsA;
-
-    dst[0] = NumberOfRows[(u_char)frontEnd.language];
-  }
-
+  char cVar1;
+  short sVar2;
+  u_int *puVar3;
+  char *fmt;
+  u_int uVar4;
+  short sVar5;
+  int iVar6;
+  int i;
+  short NumberOfRows [6];
+  
+  i = 0;
+  do {
+    fmt = TextSys_Word((short)i + 0x1fb);
+    sprintf(this->fRowList[0] + (short)i * 9,fmt);
+    i = i + 1;
+  } while (i * 0x10000 >> 0x10 < 10);
+  i = 0;
+  NumberOfRows[0] = 7;
+  NumberOfRows[1] = 9;
+  NumberOfRows[2] = 9;
+  NumberOfRows[3] = 9;
+  NumberOfRows[4] = 8;
+  NumberOfRows[5] = 9;
+  menu_kUserNameRows = NumberOfRows[(u_char)frontEnd.language];
   this->fCurrentRow = 0;
-  while ((this->fRowList[this->fCurrentRow][this->fCurrentColumn] != '!') &&
-         (this->fRowList[this->fCurrentRow][this->fCurrentColumn] != '@') &&
-         (this->fCurrentRow < menu_kUserNameRowsA[0])) {
-    this->fCurrentColumn = 0;
-    while ((this->fRowList[this->fCurrentRow][this->fCurrentColumn] != '!') &&
-           (this->fRowList[this->fCurrentRow][this->fCurrentColumn] != '@') &&
-           ((int)this->fCurrentColumn < (int)strlen(this->fRowList[this->fCurrentRow]))) {
-      this->fCurrentColumn = this->fCurrentColumn + 1;
+  cVar1 = this->fRowList[0][this->fCurrentColumn];
+  if ((cVar1 != '!') && (cVar1 != '@')) {
+    while (i < menu_kUserNameRows) {
+      this->fCurrentColumn = 0;
+      i = this->fCurrentRow * 9;
+      cVar1 = this->fRowList[0][i];
+      iVar6 = 0;
+      if ((cVar1 != '!') && (cVar1 != '@')) {
+        while (uVar4 = strlen(this->fRowList[0] + i), iVar6 < (int)uVar4) {
+          sVar5 = this->fCurrentColumn + 1;
+          iVar6 = (int)sVar5;
+          i = this->fCurrentRow * 9;
+          this->fCurrentColumn = sVar5;
+          cVar1 = this->fRowList[0][iVar6 + i];
+          if ((cVar1 == '!') || (cVar1 == '@')) break;
+        }
+      }
+      sVar5 = this->fCurrentRow + 1;
+      i = (int)sVar5;
+      this->fCurrentRow = sVar5;
+      cVar1 = this->fRowList[0][(int)this->fCurrentColumn + i * 9];
+      if ((cVar1 == '!') || (cVar1 == '@')) break;
     }
-    this->fCurrentRow = this->fCurrentRow + 1;
   }
-  this->fCurrentRow = this->fCurrentRow - 1;
+  sVar2 = this->fCurrentRow;
   this->fFadeVal = 0x80;
   this->fFadeDir = -0x1e;
-  this->fSelFade = 0;
-  {
-    /* MATCH (methodology #16): the oracle keeps &FEApp in a callee-saved reg
-       ($s2) ACROSS the FeAudio_AsyncPlaySpeech call and reloads the pointer
-       through it; taking the address into a local forces the sN hoist. */
-    extern tFEApplication *FEAppA[] __asm__("FEApp");
-    if (FEAppA[0]->speechToPlay[this->fPlayer] != -1) {
-      FeAudio_AsyncPlaySpeech(2,FEAppA[0]->speechToPlay[this->fPlayer]);
-      FEAppA[0]->speechToPlay[this->fPlayer] = -1;
-    }
+  sVar5 = this->fPlayer;
+  (this->_base_tMenuItem).fSelFade = 0;
+  this->fCurrentRow = sVar2 + -1;
+  if (FEApp->speechToPlay[sVar5] != -1) {
+    FeAudio_AsyncPlaySpeech(2,FEApp->speechToPlay[sVar5]);
+    FEApp->speechToPlay[this->fPlayer] = -1;
   }
   return;
 }
@@ -3011,27 +2767,15 @@ void tUserNameMenuItem::TransitionOn()
 
 /* ---- tUserNameMenuItem::TransitionIsFinished  [FEMENUOPTIONS.CPP:2018-2028] SLD-VERIFIED ---- */
 
-bool tUserNameMenuItem::TransitionIsFinished()
+void * tUserNameMenuItem::TransitionIsFinished()
 
 {
   this->fInTransition = 0;
-  if (this->fFadeDir < 0) {
-    if (0 < this->fFadeVal) {
-      this->fInTransition = 1;
-      goto done;
-    }
+  if (((this->fFadeDir < 0) && (0 < this->fFadeVal)) ||
+     ((0 < this->fFadeDir && ((this->fFadeVal < 0x80 || ((*(u_short*)((char*)&ginfo + 16)) != 0)))))) {
+    this->fInTransition = 1;
   }
-  if (0 < this->fFadeDir) {
-    if (this->fFadeVal < 0x80) {
-      this->fInTransition = 1;
-      goto done;
-    }
-    if ((*(u_short*)&ginfo[16]) != 0) {
-      this->fInTransition = 1;
-    }
-  }
-done:
-  return !this->fInTransition;
+  return (void *)(this->fInTransition ^ 1);
 }
 
 
@@ -3041,8 +2785,7 @@ done:
 void tUserNameMenuItem::UpdateTransition(bool selected)
 
 {
-  /* SYM-CODEGEN-CARRIER: iVar2
-   * Compiler-created destination of the one-line nested MIN/MAX clamp. */
+  __vtbl_ptr_type (*pa_Var1) [11];
   int iVar2;
   
   iVar2 = (int)this->fFadeVal + (int)this->fFadeDir;
@@ -3052,9 +2795,10 @@ void tUserNameMenuItem::UpdateTransition(bool selected)
   if (iVar2 < 0) {
     iVar2 = 0;
   }
+  pa_Var1 = (this->_base_tMenuItem)._vf;
   this->fFadeVal = (short)iVar2;
-  (*(*this->_vf)[9].pfn)((int)this + (int)(*this->_vf)[9].delta);
-  this->tMenuItem::UpdateTransition(selected);
+  NFS4_VCALL_AUTO((*pa_Var1)[9].pfn, (int)(this->fRowList + -4) + 2 + (int)(*pa_Var1)[9].delta);
+  this->_base_tMenuItem.UpdateTransition(selected);
   return;
 }
 
@@ -3062,126 +2806,79 @@ void tUserNameMenuItem::UpdateTransition(bool selected)
 
 /* ---- tMemoryCardMenuItem::Draw  [FEMENUOPTIONS.CPP:2048-2085] SLD-VERIFIED ---- */
 
-void tMemoryCardMenuItem::Draw(bool selected)
+int tMemoryCardMenuItem::Draw(bool selected)
 
 {
-  /* SYM-ABI-PARAM: selected -- retained by the mangled ABI signature. */
-  /* SYM-CODEGEN-CARRIER: sVar2
-   * SYM-CODEGEN-CARRIER: v
-   * SYM-CODEGEN-CARRIER: sv
-   * SYM-CODEGEN-CARRIER: less
-   * These are the caller-saved expression results described by the measured
-   * load/clamp receipts below; none consumes a SYM local or saved register. */
-  /* SYM 8c local list (the allocation budget, 06A): fEnableFade $10=s0,
-     fEnableSlide $13=s3, x $14=s4, y $16=s6, ColText $11=s1, Col $10=s0,
-     tCol AUTO -0x38, fWidth $10=s0, shape $11=s1.  Everything else here is a
-     caller-saved temp the oracle keeps in $v0/$v1/$a0 (no saved-reg cost). */
   tTexture_ShapeInfo *shape;
   short sVar2;
   int x;
   int y;
+  int iVar4;
   int Col;
+  char *sMenuText;
+  short fEnableSlide;
+  int iVar6;
   int ColText;
-  int fEnableSlide;
   int fEnableFade;
+  int amount;
   int fWidth;
+  /* SYM AUTO local optimizer-ELIMINATED (disasm: draw passes NULL, slot sp+0x20 unused) */
   tDrawShapeExtended tCol;
-  int v;
-  int sv;
-  int less;
-
-  /* MATCH: test `(fFlags & 1) != 0` -> oracle `andi;beqz` (branch-when-clear to the
-     +8 arm, -8 in the fall-through), not the `== 0` -> `bnez` polarity. */
-  if ((this->fFlags & 1) != 0) {
-    sVar2 = this->fEnableVal + -8;
+  
+  if (((this->_base_tMenuItemGoToMenuButtonFade)._base_tMenuItemGoToMenuButton._base_tMenuItemInteractive._base_tMenuItem.fFlags & 1) == 0) {
+    sVar2 = (this->_base_tMenuItemGoToMenuButtonFade).fEnableVal + 8;
   }
   else {
-    sVar2 = this->fEnableVal + 8;
+    sVar2 = (this->_base_tMenuItemGoToMenuButtonFade).fEnableVal + -8;
   }
-  /* MATCH: the oracle RE-READS fEnableVal from memory for the clamp -- `lh a0`
-     (SIGNED, the compare operand) FIRST, then `lhu v1` (the pass-through default).
-     The barrier that stops cse store-forwarding must sit on the STORE, not on the
-     reads: a volatile MEM also blocks combine, so a `volatile signed short` READ
-     degrades to lhu + sll/sra (and the u_short read to lhu + andi 0xffff). */
-  *(volatile short *)&this->fEnableVal = sVar2;
-  sv = this->fEnableVal;
-  v = *(u_short *)&this->fEnableVal;
-  /* NESTED, not `&&`: gcc's fold_truthop merges `(sv<0x100) && (sv<1)` into the
-     single `sv<1` test and the oracle's `slti 256` branch disappears. */
-  if (sv < 0x100) {
-    if (sv < 1) goto fEnableZero;
+  (this->_base_tMenuItemGoToMenuButtonFade).fEnableVal = sVar2;
+  sVar2 = (this->_base_tMenuItemGoToMenuButtonFade).fEnableVal;
+  fEnableSlide = (this->_base_tMenuItemGoToMenuButtonFade).fEnableVal;
+  if ((sVar2 < 0x100) && (sVar2 < 1)) {
+    fEnableSlide = 0;
   }
-  if (0x100 < sv) {
-    v = 0x100;
+  else if (0x100 < sVar2) {
+    fEnableSlide = 0x100;
   }
-  goto fEnableStore;
-fEnableZero:
-  v = 0;
-fEnableStore:
-  this->fEnableVal = (short)v;
-  v = (signed short)v;   /* oracle sll 16 / sra 16 of the just-stored value */
-  /* H-W57: fEnableFade (SYM $10=s0) was MISSING entirely -- retail derives a
-     SECOND fade from fEnableVal and feeds it to both CalcFadeVal calls; the recon
-     passed fSelFade there instead (a real behavioural bug). */
-  fEnableFade = v - 0x80;
-  if (0x80 < fEnableFade) {
-    fEnableFade = 0x80;
+  (this->_base_tMenuItemGoToMenuButtonFade).fEnableVal = fEnableSlide;
+  iVar6 = (int)fEnableSlide;
+  fEnableFade = 0x80;
+  if ((iVar6 < 0x80) && (fEnableFade = 0, 0 < iVar6)) {
+    fEnableFade = iVar6;
   }
-  if (fEnableFade < 0) {
-    fEnableFade = 0;
-  }
-  /* MATCH: PASS (150 insns).  This is the duplicated EA clamp predicate rather
-     than a simplified clamp.  The zero-insn opacity fence stops jump.c proving
-     the second `less` test from the outer arm; inverted inner arms then retain
-     retail's `bnez`/`s3=v` delay slot and otherwise dead `li s3,128`. */
-  less = v < 0x80;
-  if (less) {
-    if (0 < v) {
-      __asm__("" : "=r"(less) : "0"(less));
-      if (!less) {
-        fEnableSlide = 0x80;
-      }
-      else {
-        fEnableSlide = v;
-      }
-    }
-    else {
-      fEnableSlide = 0;
-    }
-  }
-  else {
-    fEnableSlide = 0x80;
-  }
-  __asm__("" : : "r"(sv));   /* 05C read-only fence: extends sv's live range past
-                                v's death so local_alloc hands v the lower reg */
-  if ((this->fFadeVal != 0x80) && (this->fEnableVal != 0)) {
-    fEnableFade = 0x80 - fEnableFade;
-    x = TextSys_WordX(this->fTextDescription);
-    y = TextSys_WordY(this->fTextDescription);
+  iVar6 = (int)(this->_base_tMenuItemGoToMenuButtonFade).fFadeVal;
+  if ((iVar6 != 0x80) && (iVar6 = 0, (this->_base_tMenuItemGoToMenuButtonFade).fEnableVal != 0)) {
+    x = TextSys_WordX((this->_base_tMenuItemGoToMenuButtonFade)._base_tMenuItemGoToMenuButton._base_tMenuItemInteractive._base_tMenuItem.fTextDescription);
+    y = TextSys_WordY((this->_base_tMenuItemGoToMenuButtonFade)._base_tMenuItemGoToMenuButton._base_tMenuItemInteractive._base_tMenuItem.fTextDescription);
     ColText = CalcTextFadeSelToHi(textType_Options,
-                       this->fSelFade,
-                       this->fFadeVal);
-    Col = CalcFadeVal(0xc83c1e,0xbebe,(int)this->fSelFade,(int)this->fFadeVal);
-    Col = CalcFadeVal(Col,fEnableFade);
-    ColText = CalcFadeVal(ColText,fEnableFade);
-    tCol.tint[0] = Col;
-    if (ColText != 0) {
-      FETextRender_FullTextRGB(TextSys_Word(this->fTextDescription),
-                               (short)x,(short)y,ColText,'\0',0);
+                       (this->_base_tMenuItemGoToMenuButtonFade)._base_tMenuItemGoToMenuButton._base_tMenuItemInteractive._base_tMenuItem.fSelFade,
+                       (this->_base_tMenuItemGoToMenuButtonFade).fFadeVal);
+    amount = (int)(this->_base_tMenuItemGoToMenuButtonFade)._base_tMenuItemGoToMenuButton._base_tMenuItemInteractive._base_tMenuItem.fSelFade;
+    Col = CalcFadeVal(0xc83c1e,0xbebe,amount,(int)(this->_base_tMenuItemGoToMenuButtonFade).fFadeVal);
+    CalcFadeVal(Col,amount);
+    iVar6 = CalcFadeVal(ColText,amount);
+    if (iVar6 != 0) {
+      sMenuText = TextSys_Word((this->_base_tMenuItemGoToMenuButtonFade)._base_tMenuItemGoToMenuButton._base_tMenuItemInteractive._base_tMenuItem.fTextDescription);
+      FETextRender_FullTextRGB(sMenuText,(short)x,(short)y,iVar6,'\0',0);
     }
-    /* the width is a VARIABLE the source seeds with 150 -- expand-time reg*reg
-       `mult` (06D multiply-by-the-VARIABLE); a literal 0x96 strength-reduces to a
-       5-insn shift/add chain the oracle does not have. */
-    fWidth = 150;
-    fWidth = fEnableSlide * fWidth / 0x80 * (0x80 - (int)this->fFadeVal) / 0x80;
-    shape = gHelpShapes + 0x1e;   /* SYM ptr = the ELEMENT, not the base (07C) */
-    DrawShapeExtended(0x1e,8,(x + fWidth) - (int)shape->width,y + -3,0,0,
-                      (tDrawShapeExtended *)0x0);
-    if ((int)shape->width < fWidth) {
-      PSXDrawSquare(0,x,y + -3,fWidth - (int)shape->width,(int)shape->height);
+    shape = gHelpShapes;
+    fWidth = fEnableFade * 0x96;   /* H14: was fWidth (uninitialized); oracle 0x80020A30 __MULT($s3=fEnableFade,0x96) */
+    if (fWidth < 0) {
+      fWidth = fWidth + 0x7f;
+    }
+    fWidth = (fWidth >> 7) * (0x80 - (this->_base_tMenuItemGoToMenuButtonFade).fFadeVal);
+    if (fWidth < 0) {
+      fWidth = fWidth + 0x7f;
+    }
+    DrawShapeExtended(0x1e,8,(x + (fWidth >> 7)) - (int)shape[0x1e].width,y + -3,0,0,(tDrawShapeExtended *)0x0);
+    iVar4 = (int)shape[0x1e].width;
+    iVar6 = 0;
+    if (iVar4 < fWidth >> 7) {
+      iVar6 = (int)shape[0x1e].height;
+      PSXDrawSquare(0,x,y + -3,(fWidth >> 7) - iVar4,iVar6);
     }
   }
-  /* retail DROPS the result (06A no-trailing-return) */
+  return iVar6;
 }
 
 
@@ -3192,14 +2889,19 @@ void tInsideBoxControllerLeftRightSlider::ProcessInput(tPlayer fromPlayer,tInput
                tMenuCommand &command)
 
 {
-  if (((keyval == kInput_KeyType_Left) || (keyval == kInput_KeyType_Right)) &&
-      ((keyval != kInput_KeyType_Right) ||
-       ((u_char)(*(*this->_base_tInsideBoxLeftRightSlider.fData->_vf)[2].pfn)
-          ((char *)this->_base_tInsideBoxLeftRightSlider.fData +
-           (int)(*this->_base_tInsideBoxLeftRightSlider.fData->_vf)[2].delta,
-           0xffffffff) !=
-        (u_char)this->_base_tInsideBoxLeftRightSlider.fData->fMaxValue))) {
-    screenControllerConfig[0]->fResetShakeTimeOut = 1;
+  char cVar1;
+  __vtbl_ptr_type (*pa_Var2) [6];
+  tInputKeyType tVar3;
+  tListIterator *ptVar4;
+  
+  tVar3 = keyval;
+  if (((tVar3 == kInput_KeyType_Left) || (tVar3 == kInput_KeyType_Right)) &&
+     ((tVar3 != kInput_KeyType_Right ||
+      (ptVar4 = (this->_base_tInsideBoxLeftRightSlider)._base_tMenuItemLeftRightSlider.fData,
+      pa_Var2 = ptVar4->_vf,
+      cVar1 = NFS4_VCALL_AUTO((*pa_Var2)[2].pfn, (char *)ptVar4 + (int)(*pa_Var2)[2].delta,0xffffffff),
+      cVar1 != ((this->_base_tInsideBoxLeftRightSlider)._base_tMenuItemLeftRightSlider.fData)->fMaxValue)))) {
+    screenControllerConfig->fResetShakeTimeOut = 1;
   }
   ((tMenuItemLeftRightSlider *)this)->ProcessInput(fromPlayer,keyval,command)
   ;
@@ -3210,60 +2912,5 @@ void tInsideBoxControllerLeftRightSlider::ProcessInput(tPlayer fromPlayer,tInput
 
 /* end of femenuoptions.cpp */
 
-extern "C" {
-void ___25tInsideBoxLeftRightSlider(void *);
-void ___35tInsideBoxControllerLeftRightSlider(void *thisp) { ___25tInsideBoxLeftRightSlider(thisp); }
-}
-
-/* tMemoryCardMenuItem dtor is a delegating thunk to ___23tMenuItemGoToMenuButton
- * (oracle @0x80020BD8: jal ___23tMenuItemGoToMenuButton) -- was missing entirely
- * (gate "NOT IN OBJECT").  Same form as ___27tMenuItemGoToMenuButtonFade. */
-extern "C" {
-void ___23tMenuItemGoToMenuButton(void *);
-void ___19tMemoryCardMenuItem(void *thisp) { ___23tMenuItemGoToMenuButton(thisp); }
-}
-
-extern "C" {
-void ___23tMenuItemGoToMenuButton(void *);
-void ___27tMenuItemGoToMenuButtonFade(void *thisp) { ___23tMenuItemGoToMenuButton(thisp); }
-}
-
-extern "C" {
-void ___9tMenuItem(void *);
-void ___17tUserNameMenuItem(void *thisp) { ___9tMenuItem(thisp); }
-}
-
-extern "C" {
-void ___24tMenuItemLeftRightChoice(void *);
-void ___34tMenuItemControllerLeftRightChoice(void *thisp) { ___24tMenuItemLeftRightChoice(thisp); }
-}
-
-extern "C" {
-void ___24tMenuItemLeftRightChoice(void *);
-void ___29tMenuItemOnOffLeftRightChoice(void *thisp) { ___24tMenuItemLeftRightChoice(thisp); }
-}
-
-extern "C" {
-void ___24tMenuItemLeftRightChoice(void *);
-void ___31tMenuItemDisplayLeftRightChoice(void *thisp) { ___24tMenuItemLeftRightChoice(thisp); }
-}
-
-extern "C" {
-void ___20tMenuItemSlidingMenu(void *);
-void ___25tMenuItemSlidingActivated(void *thisp) { ___20tMenuItemSlidingMenu(thisp); }
-}
-
-extern "C" {
-void ___24tMenuItemLeftRightChoice(void *);
-void ___22tMenuItemLeftRightFade(void *thisp) { ___24tMenuItemLeftRightChoice(thisp); }
-}
-
-/* W60-A10: the tMenuItemGoToMenuNFS4Button::Draw(bool) nullsub USED to be defined here
-   (cont.34 re-attribution from front.c).  It is a DUPLICATE -- femenuextended.cpp also
-   defines it, so both objects emitted a global Draw__27tMenuItemGoToMenuNFS4Buttonb
-   (multiply-defined at link; invisible to verify_asm, which gates per-fn).
-   OWNER = FEMenuExtended.obj, proven from the SYM: the SLD run covering $8001bf40 is
-   "Set SLD to line 215 of file C:\nfs4\FRONTEND\COMMON\FEMENUEXTENDED.H" and ends at
-   $8001bf48, where FEMenuOptions.obj's first fn (CalcPulsateYellow__Fv) starts.
-   0x8001BF40 is also FAR below this TU's own VA range, i.e. an inversion here.
-   Definition removed; femenuextended.cpp keeps it as its last emitted fn. */
+/* owning-TU def (extern-declared, never defined; link-harness) */
+short _UNK_80010a02, _UNK_80010a06, _UNK_80010a0a;

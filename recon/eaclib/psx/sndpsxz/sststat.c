@@ -1,31 +1,33 @@
-/* eaclib/psx/sndpsxz/sststat.c -- RECONSTRUCTED. NOT original.  *** 1/1 PASS ***  obj sststat.obj @0x800E86D8 */
-extern int sndgs[];
-extern int  iSNDstreamgetstreamptr(int tag);                       /* sst      */
-extern int  SNDPKTPLAY_unsafeframesoutstanding(int player);        /* spktplay */
-extern void iSNDenteraudio(void);                                  /* sserver  */
-extern void iSNDleaveaudio(void);
-extern void trap(unsigned int code);
-extern int  SNDSTRM_status(int tag, int s);   /* @0x800E86D8 */
+#include "../../../lib/snd.h"
+
+/* eaclib/psx/sndpsxz/sststat.c -- RECONSTRUCTED. NOT original.  *** 1/1 ***  obj sststat.obj @0x800E86D8 */
+extern "C" int sndgs[];
+extern "C" SndStreamState *iSNDstreamgetstreamptr(int tag);            /* sst      */
+extern "C" int  SNDPKTPLAY_unsafeframesoutstanding(int player);        /* spktplay */
+extern "C" void iSNDenteraudio(void);                                  /* sserver  */
+extern "C" void iSNDleaveaudio(void);
+extern "C" void trap(unsigned int code);
+extern "C" int  SNDSTRM_status(int tag, SNDSTREAMSTATUS *status);   /* @0x800E86D8 */
 /* SNDSTRM_status : fill the 3-int status block `s` (active, bytes, permille) for stream `tag`. */
-extern int SNDSTRM_status(int tag, int s)
+extern "C" int SNDSTRM_status(int tag, SNDSTREAMSTATUS *status)
 {
-    int *sp;
-    unsigned int frames, outstanding;
-    *(int *)(s + 8) = 0;
-    *(int *)(s + 4) = 0;
-    *(int *)s = 0;
-    if ((signed char)sndgs[0xf] == 0) return -10;
-    sp = (int *)iSNDstreamgetstreamptr(tag);
+    SndStreamState *sp;
+    unsigned int rate;
+    status->timebuffered = 0;
+    status->currentrequest = 0;
+    status->outstandingrequests = 0;
+    if ((char)sndgs[0xf] == 0) return -10;
+    sp = iSNDstreamgetstreamptr(tag);
     if (sp == 0) return -8;
     iSNDenteraudio();
-    *(int *)s = ((int)(*(volatile unsigned char *)((int)sp + 0x16) << 24)) >> 24;
-    if (*(unsigned char *)((int)sp + 0x16) != 0) {
-        *(int *)(s + 4) = *(int *)(*sp + 4);
-        frames = (unsigned int)*(unsigned short *)(sp + 7);
-        if (frames != 0) {
-            outstanding = (unsigned int)SNDPKTPLAY_unsafeframesoutstanding(sp[3]);
-            *(unsigned int *)(s + 8) =
-                (outstanding * 1000) / (unsigned int)*(unsigned short *)(sp + 7);
+    status->outstandingrequests = sp->requestCount;
+    if (sp->requestCount != 0) {
+        status->currentrequest = sp->requests[0].id;
+        rate = (unsigned int)(unsigned short)sp->lockedRate;
+        if (rate != 0) {
+            unsigned int frames = (unsigned int)SNDPKTPLAY_unsafeframesoutstanding(sp->packetPlayer);
+            if ((unsigned short)sp->lockedRate == 0) trap(0x1c00);
+            status->timebuffered = (frames * 1000) / rate;
         }
     }
     iSNDleaveaudio();

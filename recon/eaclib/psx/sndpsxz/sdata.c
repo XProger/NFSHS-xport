@@ -4,12 +4,12 @@
  *   allocator's free).  Ghidra nfs4-f.exe.c (sdata).
  */
 
-extern void iSNDpsxfree(int ptr);   /* sdmemman */
+extern "C" void iSNDpsxfree(int ptr);   /* sdmemman */
 
-extern void iSNDplatformfree(int ptr);   /* @0x800FE594 */
+extern "C" void iSNDplatformfree(int ptr);   /* @0x800FE594 */
 
 /* iSNDplatformfree @0x800FE594 : free the SPU block at `ptr`. */
-extern void iSNDplatformfree(int ptr)
+extern "C" void iSNDplatformfree(int ptr)
 {
     iSNDpsxfree(ptr);
 }

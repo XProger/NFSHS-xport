@@ -1,7 +1,8 @@
 /* frontend/common/femenu_externs.h - reconstructed externs. NOT original. */
 #ifndef _FE_SCREENS_FEMENU_EXTERNS_H_
 #define _FE_SCREENS_FEMENU_EXTERNS_H_
-#include "femenu_types.h"
+#include "../../nfs4_types.h"
+#include "../../lib/libfns.h"
 
 /* ===== class vtables ===== */
 extern __vtbl_ptr_type tListIterator_vtable[];
@@ -18,30 +19,22 @@ extern __vtbl_ptr_type tMenuItemGoToMenuButton_vtable[];
 extern __vtbl_ptr_type tMenu_vtable[];
 
 /* ===== globals ===== */
+extern "C" u_char        *&Render_gPacketPtr, *&Render_gPalettePtr;
 extern tFEApplication *FEApp;
-extern tPlayer        gMenu_SubMenuPlayer[];   /* unsized array (§3.12 #5): forces separate-$v0 scratch on value-load (oracle lui/lw, not gp-rel) */
+extern tPlayer        gMenu_SubMenuPlayer;
 
 /* ===== text / audio / app ===== */
-int   TextSys_Word(int id);
-int   TextSys_WordX(int id);
-int   TextSys_WordY(int id);
+extern "C" { int   TextSys_Word(int id); }
+extern "C" { int   TextSys_WordX(int id); }
+extern "C" { int   TextSys_WordY(int id); }
 void  FETextRender_Title(short word);
-void  FETextRender_MenuTextPositioned(short word, short x, short y,
-                                      int state, int type)
-    __asm__("FETextRender_MenuTextPositioned__Fsss14tMenuTextState13tMenuTextType");
+extern "C" { void  FETextRender_MenuTextPositioned(short word, short x, short y, tMenuTextState state, tMenuTextType type); }
 void  AudioCmn_PlayFESFX(int sfx);
 void  AudioCmn_PlayFESFXVol(int sfx, int vol);
-/* w64 unlock (A19 sec-2.4): member fn taking short -- the free-fn int decl
- * emitted the phantom DisplayHelp__FP14tFEApplicationi. */
-void  DisplayHelp(tFEApplication *app, short which) __asm__("DisplayHelp__14tFEApplications");
+void  DisplayHelp(tFEApplication *app, int which);
 
 /* ===== fefades.obj fade helper (overloaded) + libgpu ===== */
 int   CalcFadeVal(int color, int fade);
 int   CalcFadeVal(int color, int packedRGB, int fade);
-
-extern "C" {
-void SetPolyF4(...);
-void SetSemiTrans(...);
-}
 
 #endif

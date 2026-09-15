@@ -17,243 +17,420 @@
  */
 #include "video.h"
 #include "video_externs.h"
-/* MATCH: split-address view of `ticks` for videodecode's PRE-LOOP read only -- a bare
-   scalar extern compiles to the atomic `lw $r,sym` assembler macro, so its lui cannot
-   interleave with timerhz's the way retail does.  The IN-LOOP read must stay the plain
-   scalar: the array view there lets loop.c hoist the %hi out of the loop (+2 insns). */
-extern int ticks_a[] asm("ticks");
+
+#ifdef AP_WIN
+/* STR/MDEC is deliberately outside the native-port scope.  Keep the public
+   frontend video surface valid without allocating streams or touching a
+   synthetic handle, so screen transitions cannot wait on PSX movie I/O. */
+intptr_t VIDEO_create(int,int,int,int,int) { return 0; }
+void VIDEO_destroy(intptr_t) {}
+void VIDEO_spoolfile(intptr_t,char *) {}
+void VIDEO_startplayback(intptr_t) {}
+void VIDEO_abortplayback(intptr_t) {}
+extern "C" VIDEOSTATE VIDEO_state(intptr_t) { return VIDEOSTATE_IDLE; }
+int VIDEO_updateframexy(intptr_t,int,int) { return 0; }
+void videoupdatetime(VIDEOSTRUCT *) {}
+int videodecode(VIDEOSTRUCT *,STREAMCHUNKHDR *,int,int) { return 0; }
+#else
 
 /* lines 1-61: file header, #includes, static data, macros (no symbols emitted) */
 
 /* ---- VIDEO_create  (video.cpp:62, code lines 62-102) ---- */
-int VIDEO_create(int width,int height,int fps,int streambuffersize,int memtype)
+intptr_t VIDEO_create(int width,int height,int fps,int streambuffersize,int memtype)
+
 
 {
-  struct VIDEOSTRUCT *vid;
+
+
+  int status;
+
+  VIDEOSTRUCT *vid;
+
+  void *mem;
+
   int handle;
+
   SNDPLAYOPTS playopts;
+
   char fname [60];
+
   
+
   Platform_ResetDCTBuffer();
+
   sprintf(fname,"%sDCT.BIN",Paths_Paths[0x20]);
-  handle = asyncloadfileat(fname,(int)CF_DVLC);
-  while (getasyncreadstatus(handle) == 0) {
+
+  handle = asyncloadfileat(fname,CF_DVLC);
+
+  while (status = getasyncreadstatus(handle), status == 0) {
+
     systemtask(0);
+
   }
-  vid = (struct VIDEOSTRUCT *)reservememadr("Videostruct",0x40,memtype);
+
+  vid = (VIDEOSTRUCT *)reservememadr("Videostruct",0x40,memtype);
+
   blockclear(vid,0x40);
+
   vid->id = 0x57444956;   /* 'VIDW' */
+
   vid->bufferwidth = width;
+
   vid->bufferheight = height;
-  vid->streambuffer = (char *)reservememadr("streambuffer",streambuffersize,memtype);
-  vid->videotap = (long)STREAM_create(2,2,2,vid->streambuffer,streambuffersize);
+
+  mem = reservememadr("streambuffer",streambuffersize,memtype);
+
+  vid->streambuffer = (char *)mem;
+
+  vid->videotap = STREAM_create(2,2,2,vid->streambuffer,streambuffersize);
   STREAM_setfilter(vid->videotap,1,0xffff,0x4353,2);
-  {
-    extern int screenbpp[];
-    extern int timerhz[];
-    /* MATCH: reaching timerhz through a pointer local makes its address a plain
-       schedulable pseudo instead of an in-struct array MEM: retail materializes the
-       %hi in a SEPARATE scratch ($v1) and issues the load BEFORE the mdechandle
-       store, which still holds the call result in $v0.  A direct timerhz[0] read
-       sinks below the store and then self-temps into $a0. */
-    int *hzp /* SYM-CODEGEN-CARRIER: hzp -- the direct timerhz read sinks past the
-                mdechandle store and changes retail scheduling, as measured above */ = timerhz;
-    vid->mdechandle = initmdec(width,height,screenbpp[0],memtype);
-    vid->displaytimeincr = fixeddiv(fixedmult(*hzp << 0x10,0xa0000),fps);
-  }
+
+
+
+  vid->mdechandle = initmdec(width,height,screenbpp,memtype);
+
+
+
+  vid->displaytimeincr = fixeddiv(fixedmult(timerhz << 0x10,0xa0000),fps);
+
   vid->state = VIDEOSTATE_IDLE;
-  return (int)vid;
+
+  return (intptr_t)vid;
 }
 
 /* lines 103-119: (static data / macros / comments - no emitted code) */
 
 /* ---- VIDEO_destroy  (video.cpp:120, code lines 120-136) ---- */
-void VIDEO_destroy(int handle)
+void VIDEO_destroy(intptr_t handle)
+
 
 {
+
   
+
   if (((VIDEOSTRUCT *)handle)->id == 0x57444956   /* 'VIDW' */) {
+
     ((VIDEOSTRUCT *)handle)->id = 0;
+
     restoremdec(((VIDEOSTRUCT *)handle)->mdechandle);
+
     STREAM_destroy(((VIDEOSTRUCT *)handle)->videotap);
+
     purgememadr(((VIDEOSTRUCT *)handle)->streambuffer);
+
   }
+
   return;
+
 }
 
 /* lines 137-138: (static data / macros / comments - no emitted code) */
 
 /* ---- VIDEO_spoolfile  (video.cpp:139, code lines 139-155) ---- */
-void VIDEO_spoolfile(int handle,char *fname)
+void VIDEO_spoolfile(intptr_t handle,char *fname)
+
 
 {
+
+  int requestid;
+
+  
+
   if ((((VIDEOSTRUCT *)handle)->id == 0x57444956   /* 'VIDW' */) && (((VIDEOSTRUCT *)handle)->state == VIDEOSTATE_IDLE)) {
-    ((VIDEOSTRUCT *)handle)->streamrequestid =
-        STREAM_queuefile(((VIDEOSTRUCT *)handle)->videotap,fname,0,0);
+
+    requestid = STREAM_queuefile(((VIDEOSTRUCT *)handle)->videotap,fname,0,0);
+
+    ((VIDEOSTRUCT *)handle)->streamrequestid = requestid;
+
     ((VIDEOSTRUCT *)handle)->state = VIDEOSTATE_SPOOLING;
+
   }
+
   return;
+
 }
 
 /* lines 156-157: (static data / macros / comments - no emitted code) */
 
 /* ---- VIDEO_startplayback  (video.cpp:158, code lines 158-179) ---- */
-void VIDEO_startplayback(int handle)
+void VIDEO_startplayback(intptr_t handle)
+
 
 {
-  if ((((VIDEOSTRUCT *)handle)->id == 0x57444956   /* 'VIDW' */) && (((VIDEOSTRUCT *)handle)->state != VIDEOSTATE_IDLE)) {
-    if (STREAM_bufferusage(((VIDEOSTRUCT *)handle)->videotap) >= 20001) {
-      ((VIDEOSTRUCT *)handle)->state = VIDEOSTATE_PLAYING;
-    }
+
+  int buffered;
+
+  
+
+  if (((((VIDEOSTRUCT *)handle)->id == 0x57444956   /* 'VIDW' */) && (((VIDEOSTRUCT *)handle)->state != VIDEOSTATE_IDLE)) &&
+
+     (buffered = STREAM_bufferusage(((VIDEOSTRUCT *)handle)->videotap), 20000 < buffered)
+
+     ) {
+
+    ((VIDEOSTRUCT *)handle)->state = VIDEOSTATE_PLAYING;
+
   }
+
   return;
+
 }
 
 /* lines 180-181: (static data / macros / comments - no emitted code) */
 
 /* ---- VIDEO_abortplayback  (video.cpp:182, code lines 182-195) ---- */
-void VIDEO_abortplayback(int handle)
+void VIDEO_abortplayback(intptr_t handle)
+
 
 {
+
   
+
   if (((VIDEOSTRUCT *)handle)->id == 0x57444956   /* 'VIDW' */) {
+
     STREAM_kill(((VIDEOSTRUCT *)handle)->videotap);
+
     ((VIDEOSTRUCT *)handle)->state = VIDEOSTATE_IDLE;
+
   }
+
   return;
+
 }
 
 /* lines 196-197: (static data / macros / comments - no emitted code) */
 
 /* ---- VIDEO_state  (video.cpp:198, code lines 198-247) ---- */
-enum VIDEOSTATE VIDEO_state(int handle)
+extern "C" VIDEOSTATE VIDEO_state(intptr_t handle)
+
 
 {
-  struct VIDEOSTRUCT *vid;
+
+  int result;
+
+  int streamstate;
+
+  VIDEOSTRUCT *vid;
+
   SNDREQUESTSTATUS srs;
-  vid = (struct VIDEOSTRUCT *)handle;
+
+  vid = (VIDEOSTRUCT *)handle;
   
-  if (vid->id != 0x57444956   /* 'VIDW' */) {
-    return (enum VIDEOSTATE)0;
-  }
-  if (vid->state == VIDEOSTATE_SPOOLING) {
-    if (STREAM_state(vid->videotap) == 2) {
-      extern int ticks[];
-      vid->reftime = ticks[0] * 10;
-      vid->state = VIDEOSTATE_PLAYING;
-      vid->displaytime = 0;
-      vid->displaytimefrac = 0;
+
+  result = 0;
+
+  if (vid->id == 0x57444956   /* 'VIDW' */) {
+
+    if (vid->state == VIDEOSTATE_SPOOLING) {
+
+      streamstate = STREAM_state(vid->videotap);
+
+
+      if (streamstate == 2) {
+
+        vid->state = VIDEOSTATE_PLAYING;
+
+        vid->displaytime = 0;
+
+        vid->displaytimefrac = 0;
+
+        vid->reftime = ticks * 10;
+
+      }
+
     }
+
+    else if ((vid->state == VIDEOSTATE_PLAYING) &&
+
+            (result = STREAM_state(vid->videotap), result == 0))
+
+    {
+
+      vid->state = VIDEOSTATE_IDLE;
+
+    }
+
+    result = vid->state;
+
   }
-  else if ((vid->state == VIDEOSTATE_PLAYING) &&
-          (STREAM_state(vid->videotap) == 0))
-  {
-    vid->state = VIDEOSTATE_IDLE;
-  }
-  return (enum VIDEOSTATE)vid->state;
+
+  return (VIDEOSTATE)result;
+
 }
 
 /* lines 248-256: (static data / macros / comments - no emitted code) */
 
 /* ---- VIDEO_updateframexy  (video.cpp:257, code lines 257-335) ---- */
-int VIDEO_updateframexy(int handle,int x,int y)
+int VIDEO_updateframexy(intptr_t handle,int x,int y)
+
 
 {
-  int result; /* SYM-CODEGEN-CARRIER: result -- direct videodecode testing rotates
-                 retail chunk/dropped ($s2/$s1) and is measured FAIL 17 (81/80) */
-  struct STREAMCHUNKHDR *chunk;
-  struct VIDEOSTRUCT *vid;
+
+
+  int result;
+
+  int endofstream;
+
+  STREAMCHUNKHDR *chunk;
+
+  VIDEOSTRUCT *vid;
+
   int dropped;
+
   int currenttime;
+
   SNDREQUESTSTATUS audiostatus;
-  vid = (struct VIDEOSTRUCT *)handle;
+
+  vid = (VIDEOSTRUCT *)handle;
   
+
   if (vid->id == 0x57444956   /* 'VIDW' */) {
-    if (vid->state != VIDEOSTATE_PLAYING) {
-      return 0;
-    }
-    currenttime = ticks * 10 - vid->reftime;
-    if (vid->displaytime > currenttime) {
-      return 0;
-    }
-    if (STREAM_isendofstream(vid->videotap) != 0) {
-      return 0;
-    }
-    while (1) {
-      chunk = STREAM_get(vid->videotap);
-      if (chunk == (struct STREAMCHUNKHDR *)0x0) {
-        return 0;
-      }
-      videoupdatetime(vid);
-      if (currenttime < vid->displaytime) {
-        result = videodecode(vid,chunk,x,y);
-        dropped = 0;
-        if (result == 0) goto VIDEOupdateFrame_incCounter;
-      }
-      else {
-VIDEOupdateFrame_incCounter:
-        dropped = 1;
-        vid->droppedframes = vid->droppedframes + 1;
-      }
-      STREAM_release(vid->videotap,chunk);
-      if (!dropped) {
-        return 1;
-      }
-      if (STREAM_isendofstream(vid->videotap) == 0) continue;
-      return 1;
-    }
-  }
-  else {
+
     result = 0;
+
+    if (vid->state == VIDEOSTATE_PLAYING) {
+
+      currenttime = ticks * 10 - vid->reftime;
+
+      result = 0;
+
+      if (vid->displaytime <= currenttime) {
+
+        endofstream = STREAM_isendofstream(vid->videotap);
+
+        result = 0;
+
+        while (endofstream == 0) {
+
+          chunk = (STREAMCHUNKHDR *)STREAM_get(vid->videotap,0,0);
+          if (chunk == (STREAMCHUNKHDR *)0x0) {
+
+            return 0;
+
+          }
+
+          videoupdatetime(vid);
+
+          if (currenttime < vid->displaytime) {
+
+            result = videodecode(vid,chunk,x,y);
+
+            dropped = 0;
+
+            if (result == 0) goto VIDEOupdateFrame_incCounter;
+
+          }
+
+          else {
+
+VIDEOupdateFrame_incCounter:
+
+            dropped = 1;
+
+            vid->droppedframes = vid->droppedframes + 1;
+
+          }
+
+          STREAM_release(vid->videotap,(intptr_t)chunk);
+          if (!dropped) {
+
+            return 1;
+
+          }
+
+          endofstream = STREAM_isendofstream(vid->videotap);
+
+          result = 1;
+
+        }
+
+      }
+
+    }
+
   }
+
+  else {
+
+    result = 0;
+
+  }
+
   return result;
+
 }
 
 /* lines 336-368: (static data / macros / comments - no emitted code) */
 
 /* ---- videoupdatetime  (video.cpp:369, code lines 369-371) ---- */
-void videoupdatetime(struct VIDEOSTRUCT *vid)
+void videoupdatetime(VIDEOSTRUCT *vid)
+
+
 
 {
-  vid->displaytimefrac = vid->displaytimefrac + vid->displaytimeincr;
-  vid->displaytime = vid->displaytime + (vid->displaytimefrac >> 0x10);
-  vid->displaytimefrac = (u_int)(ushort)vid->displaytimefrac;
+
+  int acc;
+
+  
+
+  acc = vid->displaytimefrac + vid->displaytimeincr;
+
+  vid->displaytimefrac = acc;
+
+  vid->displaytime = vid->displaytime + (acc >> 0x10);
+
+  vid->displaytimefrac = (uint)(ushort)vid->displaytimefrac;
+
   return;
+
 }
 
 /* lines 372-374: (static data / macros / comments - no emitted code) */
 
 /* ---- videodecode  (video.cpp:375, code lines 375-423) ---- */
-int videodecode(struct VIDEOSTRUCT *vid,struct STREAMCHUNKHDR *chunk,int x,int y)
+int videodecode(VIDEOSTRUCT *vid,STREAMCHUNKHDR *chunk,int x,int y)
+
+
 
 {
+
+  int done;
+
   int timeout;
 
+  
+
   if (chunk->type == 0x4443546d) {
+
     vid->framewidth = (int)(short)chunk[1].size;
+
     vid->frameheight = (int)*(short *)((int)&chunk[1].size + 2);
+
     mdec(vid->mdechandle,(char *)(chunk + 1),x,y);
-    timeout = ticks_a[0] + timerhz * 4;
-    /* MATCH (allocno ref dial, -dg receipts): the poll step sits in two nested
-       scopes.  gcc-2.8 weights REG_N_REFS by loop_depth, so the in-loop
-       `vid->mdechandle` read counts 4x instead of 2x -> vid 8 refs / live 52 =>
-       priority 4615 vs timeout 3/9 => 3333, so `vid` is allocated FIRST and takes
-       $s0 with timeout in $s1 (SYM: vid REGPARM $10=s0, timeout REG $11=s1).
-       Flat (unwrapped) the numbers invert (vid 6/52 = 2307 < 3333) and the whole
-       function comes out as a clean s0<->s1 role swap, 18 diffs at 43/43 insns.
-       SYM shows 4 nested Block records inside this loop body, so nested scopes
-       are real here; the exact nesting SITE is a codegen dial, not SYM-placed. */
+
+    timeout = ticks + timerhz * 4;
+
     do {
-      do { do {
-        if (mdecdone(vid->mdechandle) != 0) {
-          return 1;
-        }
-        systemtask(0);
-      } while (0); } while (0);
+
+      done = mdecdone(vid->mdechandle);
+
+      if (done != 0) {
+
+        return 1;
+
+      }
+
+      systemtask(0);
+
     } while (ticks <= timeout);
+
     mdecreset();
+
   }
+
   return 0;
+
 }
 
 /* end of video.cpp */
+#endif

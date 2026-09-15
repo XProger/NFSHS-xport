@@ -1,30 +1,23 @@
 /* game/common/aiinit_externs.h - reconstructed externs. NOT original.
  * Harvested from sibling *_externs.h + *.cpp defs + disasm-v2 (AI/Control demangled). */
-#ifndef _GAME_COMMON_AIINIT_EXTERNS_H_
-#define _GAME_COMMON_AIINIT_EXTERNS_H_
-
-extern "C" {
-int fixedmult(...);
-int loadfileadrz(...);
-void *memset(...);
-int purgememadr(...);
-int rdiv(...);
-int sprintf(...);
-}
+#ifndef _GAME_COMMON_CAMERA_EXTERNS_H_
+#define _GAME_COMMON_CAMERA_EXTERNS_H_
+#include "../../nfs4_types.h"
+#include "../../lib/libfns.h"
 
 /* AIDataRecord_AccTable_t / _CurveSpeedTable_t ctors now via `new Class(...)` (aidatarecord.obj) -- flat ctor externs removed */
+extern "C" { CARDINFO_def *MCRD_getcard(...); }
+extern AIPhysic_Config_t AIPhysicConfig;
+extern AISpeeds_tLeaderBoard leaderBoard;
 extern AITrigger_TriggerManager *triggerManagerTraffic;
+extern AI_tInfo AI_Info;
 extern Car_tObj *Cars_gList[];
-extern Car_tObj *Cars_gHumanRaceCarList[];
-extern Car_tObj *Cars_gAIRaceCarList[];
-extern int AIInit_GameSetupWords[] asm("GameSetup_gData");
-extern Car_tObj *AIInit_leaderBoardCars[] asm("leaderBoard");
-extern int AIInit_AIInfoWords[] asm("AI_Info");
-extern int AIInit_AIPhysicConfigWords[] asm("AIPhysicConfig");
-extern int AIInit_accelerationScaleWords[] asm("AITune_accelerationScale");
-extern void AITrigger_Init(AITrigger_TriggerManager *,char *)
-  asm("Init__24AITrigger_TriggerManagerPc");
+extern Car_tObj *Cars_gHumanRaceCarList[9];   /* cars.obj (byte-match backport) */
+extern Car_tObj *Cars_gAIRaceCarList[9];      /* cars.obj */
+extern "C" extern GameSetup_tData   GameSetup_gData;
+extern "C" char             *Paths_Paths[];   /* 0x80116468 (paths.obj) */
 extern Udff_tInfo * Udff_Opena(char *name,char *mem,int abortFlag);
+extern accelscale_t AITune_accelerationScale[];
 extern int            Cars_gNumCars;
 extern int   Udff_GetInt(Udff_tInfo *handle);
 extern int AISpeeds_GetUpgradeAccMult(int carIndex);
@@ -48,10 +41,10 @@ extern void AITune_StartUp1(void);
 extern void AITune_StartUp2(void);
 extern void Udff_Close(Udff_tInfo *handle);
 extern void Udff_GetBuffer(Udff_tInfo *handle,char *mem,int size);
-int __builtin_delete(...);
-int __builtin_new(...);
+void __builtin_delete(void *deleteMe);
+void *__builtin_new(unsigned int size);
 void AI_CleanUp(void);
 void AI_StartUp(void);
 /* AIDataRecord_t::StartUp1/2 + CleanUp1/2 (static), AITrigger_TriggerManager::Init, AIDataRecord_CurveSpeedTable_t::Upgrade now called as C++ members -- flat externs removed */
 
-#endif /* _GAME_COMMON_AIINIT_EXTERNS_H_ */
+#endif /* _GAME_COMMON_CAMERA_EXTERNS_H_ */

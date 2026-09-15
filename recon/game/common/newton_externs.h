@@ -1,6 +1,7 @@
+#include "../../lib/libfns.h"
 /* newton_externs.h -- cross-TU declarations for game/common/newton.cpp (Newton physics integrator).
  * Harvested from sealed sibling *_externs.h (compile-proven) + SYM Demangled/Globals.
- * newton's OWN data (divTable/fudgeTable/swap/testSimRoadInfo/newtestSimRoadInfo/dummy_124/
+ * newton's OWN file-statics (divTable/fudgeTable/swap/testSimRoadInfo/newtestSimRoadInfo/dummy_124/
  * dummy_133) are declared `static` inside newton.cpp, NOT here. */
 #ifndef NEWTON_EXTERNS_H
 #define NEWTON_EXTERNS_H
@@ -18,15 +19,15 @@ extern int   BWorldSm_FindClosestQuadRez(coorddef *c, BWorldSm_Pos *pos, int rez
 extern int   BWorldSm_FindClosestTriangleRez(coorddef *c, BWorldSm_Pos *pos, int rez);
 extern int   BWorldSm_FindEdgeOff(coorddef *c, BWorldSm_Pos *a, BWorldSm_Pos *b, int *edge);
 extern void  BWorldSm_SetSlice(int slice, BWorldSm_Pos *pos);
-extern bool BWorldSm_TunnelFlagSm(BWorldSm_Pos *pos);
-extern void *BWorldSm_UNormal(BWorldSm_Pos *pos);
-extern void *BWorldSm_UForward(BWorldSm_Pos *pos);
+extern void *BWorldSm_TunnelFlagSm(BWorldSm_Pos *pos);
+extern "C" { extern void *BWorldSm_UNormal(BWorldSm_Pos *pos); }
+extern "C" { extern void *BWorldSm_UForward(BWorldSm_Pos *pos); }
 extern int   BWorld_CheckChunkVisible(BWorldSm_Pos *a, BWorldSm_Pos *b);
-extern char *Newton_BWorldSmSlices asm("BWorldSm_slices");
+extern Trk_NewSlice  *BWorldSm_slices;
 extern int            gNumSlices;
 
 /* ---- Collide ---- */
-extern void  Collide_TestWithPlane(BO_tNewtonObj *n, coorddef *normal, coorddef *pos);
+extern "C" { extern int   Collide_TestWithPlane(void *n, coorddef *normal, coorddef *pos); }
 
 /* ---- Physics (physics.obj) ---- */
 extern int   Physics_AttenuateVelocity(Car_tObj *car, int impulse, matrixtdef *m);
@@ -37,25 +38,25 @@ extern void  Physics_SetCurrentWallType(int type);
 
 /* ---- AI ---- */
 extern void  AIPhysic_ProcessBarrierCollision(Car_tObj *car);
-extern int Newton_SpikeBeltWords[] asm("AICop_spikeBelt");
+extern AICop_spikeBelt_t AICop_spikeBelt;
 
 /* ---- Cars ---- */
 extern void  Cars_SetCarUpForHiRezSim(Car_tObj *car);
 extern Car_tObj *Cars_gHumanRaceCarList[];
-extern int       Cars_gNumHumanRaceCars;
+extern "C" extern int       Cars_gNumHumanRaceCars;
 
 /* ---- Force feedback ---- */
 extern void  Force_HitWall(int impulse);
 extern int   Force_IsForceOn(Car_tObj *car);
 
 /* ---- Scheduler ---- */
-extern int   Sched_ExecuteCheck(int a, int b, int c, int d, int *e, int *f, int *g, int h);
+extern "C" { extern int   Sched_ExecuteCheck(int a, int b, int c, int d, int *e, int *f, char *g, int h); }
 
 /* ---- globals ---- */
-extern int Newton_GameSetupWords[] asm("GameSetup_gData");
-extern int Newton_SimGlobalWords[] asm("simGlobal");
+extern "C" extern GameSetup_tData     GameSetup_gData;
+extern "C" Sim_tSimGlobalVar   simGlobal;
 extern u_int               fastRandom, randSeed, randtemp;   /* fastrand.obj PRNG state */
-extern int                 generic128HzClock, stackSpeedUpEnbabledFlag;
-extern u_long              gWSavePtr;
+extern "C" extern int                 generic128HzClock, stackSpeedUpEnbabledFlag;
+extern intptr_t            gWSavePtr;
 
 #endif /* NEWTON_EXTERNS_H */

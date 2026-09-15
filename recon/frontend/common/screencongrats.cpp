@@ -6,6 +6,7 @@
  *   + a few RECT/fade locals were not recovered by the decompiler (noted inline).
  */
 #include "screencongrats.h"
+#include "../../mips_semantics.h"
 
 /* ScreenCongrats.obj-OWNED globals -- DEFINED here (self-contained; .bss zero; SYM-typed) */
 tScreenPinkSlipCongrats *screenPinkSlipCongrats;   /* @0x80052944  (bss(zero)) */
@@ -21,7 +22,7 @@ void tScreenCongrats::Cleanup()
 {
   
   CleanupSpinningCarsMenu();
-  this->tScreen::Cleanup();
+  this->_base_tScreen.Cleanup();
   return;
 }
 
@@ -30,76 +31,76 @@ void tScreenCongrats::GetShapeInfo(short &numPermShapes,short &numSwapShapes,cha
                char **swapFileName)
 
 {
-  /* MATCH (W69, 63 -> PASS): SYM fixes tourneyInfo=$s4, j=$s2, i=$s0,
-     fsize=64 and mask=$80ff0000.  Build tourneyInfo before the zero stores,
-     express both message choices directly, and keep the racer bound short;
-     the decompiler's prefix/ranking locals changed statement order and the
-     $s4/$s5 allocation.  The trophy test branches away to the switch arm. */
-  short numRanked; /* SYM-CODEGEN-CARRIER: numRanked -- spelling the bound directly
-                      is measured FAIL 100 (156/150), grows the frame, and rotates
-                      every saved register; this short carrier preserves retail. */
+  byte tournOffset;
+  tTournamentDefinition *def;
+  short ranking;
+  int numRanked;
+  u_short numShapes;
+  char *prefix;
   int i;
-  int j;
+  int place;
   tTourneyInfo *tourneyInfo;
-
-  tourneyInfo = &(tournamentManager.fDefinition)->fTournaments
-      [(uint)(tournamentManager.fDefinition)->fTiers[tournamentManager.fTier].fTournOffset +
-       tournamentManager.fTournament];
+  
+  def = tournamentManager.fDefinition;
+  place = tournamentManager.fTournament;
+  tournOffset = (tournamentManager.fDefinition)->fTiers[tournamentManager.fTier].fTournOffset;
   this->fNumSmallSpinShapes = 0;
   this->fNumSpinShapes = 0;
-  numPermShapes = this->congratsMessage == kScreenCongrats_Congrats ? 0x2b : 0x16;
-  /* 🔴 CORRECTNESS: the "" here were stale Ghidra rodata placeholders -- the
-     oracle sprintf()s into fPermFileNameBuf and hands that buffer back.
-     Writing through a string literal was a real runtime bug. */
-  sprintf(fPermFileNameBuf,"%s%d",
-          this->congratsMessage == kScreenCongrats_Congrats ? "zcong" : "zelim",
-          (uint)(byte)frontEnd.language);
-  *permFileName = fPermFileNameBuf;
-  if (2 <= (u_int)(this->trophy - kTrophyCar)) {
-    j = 900;
-    numRanked = (short)((short)tournamentManager.fNumRacers +
-                        (tourneyInfo->fKnockout != '\0'));
-    i = 1;
-    if (0 < numRanked) {
-      do {
-        if (PlayerRanking(&tournamentManager,(short)i) == 0) {
-          j = i;
-        }
-        i = i + 1;
-      } while (i <= numRanked);
-    }
-    GetTrophyName(&tournamentManager,tourneyInfo,ts_Large,congratsSwapFileName,j);
-    *swapFileName = congratsSwapFileName;
-    numSwapShapes = 0x20;
-    this->fNumSpinShapes = 0x20;
+  tourneyInfo = def->fTournaments + (uint)tournOffset + place;
+  numShapes = 0x16;
+  if (this->congratsMessage == kScreenCongrats_Congrats) {
+    numShapes = 0x2b;
+  }
+  numPermShapes = numShapes;
+  if (this->congratsMessage == kScreenCongrats_Congrats) {
+    prefix = "zcong";
   }
   else {
-    /* MATCH: a real switch -- the oracle chains `beq` to OUT-OF-LINE case blocks
-       with a `j` to the default (gcc's dispatch lowering); an if/else-if chain
-       inlines the bodies at the branch instead. */
-    switch (this->smallSpinningThing) {
-    case kSpinningGold:
+    prefix = "zelim";
+  }
+  sprintf(fPermFileNameBuf,"%s%d",prefix,(uint)(byte)frontEnd.language);
+  *permFileName = fPermFileNameBuf;
+  if (this->trophy - kTrophyCar < 2) {
+    if (this->smallSpinningThing == kSpinningGold) {
       numSwapShapes = 0x20;
       this->fNumSmallSpinShapes = 0x20;
       GetTrophyName(&tournamentManager,tourneyInfo,ts_Small,congratsSwapFileName,-1);
       *swapFileName = congratsSwapFileName;
-      break;
-    case kSpinningMemCard:
+    }
+    else if (this->smallSpinningThing == kSpinningMemCard) {
       numSwapShapes = 10;
       this->fNumSmallSpinShapes = 10;
       *swapFileName = "congb";
-      break;
-    default:
+    }
+    else {
       *swapFileName = "";
       numSwapShapes = 0;
-      break;
     }
+  }
+  else {
+    place = 900;
+    numRanked = (int)(((int)(short)tournamentManager.fNumRacers + (uint)(tourneyInfo->fKnockout != '\0')) *
+                 0x10000) >> 0x10;
+    i = 1;
+    if (0 < numRanked) {
+      do {
+        ranking = PlayerRanking(&tournamentManager,(short)i);
+        if (ranking == 0) {
+          place = i;
+        }
+        i = i + 1;
+      } while (i <= numRanked);
+    }
+    GetTrophyName(&tournamentManager,tourneyInfo,ts_Large,congratsSwapFileName,place);
+    *swapFileName = congratsSwapFileName;
+    numSwapShapes = 0x20;
+    this->fNumSpinShapes = 0x20;
   }
   return;
 }
 
 /* ---- tScreenCongrats::GetCar  (screencongrats.cpp:121) ---- */
-bool tScreenCongrats::GetCar(tCarInfo &carInfo)
+int tScreenCongrats::GetCar(tCarInfo &carInfo)
 
 {
   
@@ -112,206 +113,225 @@ bool tScreenCongrats::GetCar(tCarInfo &carInfo)
 void tScreenCongrats::DrawBackground()
 
 {
-  /* MATCH W64 PASS (54 -> 0, 541 instructions).  Retail source shapes recovered here include base-first
-     virtual-thunk arithmetic, explicit stripe defaults, signed division by
-     4 in the subtractive spin timer, and the showroom-flag side effect in DrawCar's
-     brightness argument.  In the regular spin block, the scoped tick value
-     reproduces retail's $a0 lifetime; the void fence prevents speculative
-     delay-slot filling at the block boundary, and the read-only scale fence
-     anchors the $s0 assignment before the timer loads.  Writing the tick field
-     before the enable field lets sched2 produce retail's load/store order.
-     A zero-instruction fence after the eliminated-message clamp prevents GCC
-     from cross-jumping the extra-spin framenum store into that later path. */
-  int fJustFadeOff;
-  static u_long carRotate;
+  static u_long carRotate;   /* [SYM] STAT (rotation accumulator, persists across calls) */
+  bool bDrawSpin;
+  int j;
+  int wordX;
+  int wordY;
+  int thisDelta;
+  tTrophyClass trophyClass;
+  int i;
+  __vtbl_ptr_type (*vtbl) [10];
+  int fadeAmt;
+  int bannerframe;
   tDrawShapeExtended drawFlags;
   tDrawShapeExtended drawFlags2;
-  int StripeRGB;
-  int bannerframe;
   tDrawShapeExtended drawFlags3;
-  /* SYM-CODEGEN-CARRIER: vtbl -- the retail extended virtual call's implicit
-     dispatch temporary has no SYM source local.  The manual
-     non-virtual ABI model needs this cached row pointer: direct
-     this->_vf[1][1] dispatch is byte-identical, but fails
-     audit_vtable_indexing as unsafe row indexing. */
-  __vtbl_ptr_type (*vtbl) [10];
-
-  fJustFadeOff = 0;
-  if (this->fTransitionOff != 0) {
-    fJustFadeOff = this->fScreenFadeVal;
+  
+  drawFlags.custom_shapes = (this->_base_tScreen).fSwapShapes.fShapes;
+  drawFlags2.custom_shapes = (this->_base_tScreen).fSwapShapes.fShapes;
+  fadeAmt = 0;
+  if ((this->_base_tScreen).fTransitionOff != 0) {
+    fadeAmt = (this->_base_tScreen).fScreenFadeVal;
   }
-  drawFlags.custom_shapes = this->fSwapShapes.fShapes;
-  drawFlags2.custom_shapes = this->fSwapShapes.fShapes;
-  vtbl = this->_vf;
-  carRotate += 3;
-  (*vtbl[1][1].pfn)
-      ((char *)((int)this->fPermShapes.fFilename + (vtbl[1][1].delta + -0x14)));
-  if ((((this->trophy == kTrophyCar) && (this->starttick == -1)) ||
-      ((this->fGotCar == 0) && (this->trophy == kTrophyCar))) ||
-     ((this->trophy == kTrophyCar) &&
-      ((-1 < R3DCar_aSyncLoading) || (ticks[0] - this->fEnterTick < 0x3c)))) {
-    this->starttick = ticks[0];
+  vtbl = (this->_base_tScreen)._vf;
+  thisDelta = vtbl[1][1].delta;
+  carRotate = carRotate + 3;
+  NFS4_VCALL_AUTO(vtbl[1][1].pfn, (this->_base_tScreen).fPermShapes.fFilename + thisDelta + -0x14);
+  trophyClass = (tTrophyClass)this->trophy;
+  if ((((trophyClass == kTrophyCar) && (this->starttick == -1)) ||
+      ((this->fGotCar == 0 && (trophyClass == kTrophyCar)))) ||
+     ((trophyClass == kTrophyCar && ((-1 < R3DCar_aSyncLoading || (ticks - this->fEnterTick < 0x3c)))))) {
+    this->starttick = ticks;
   }
   else {
-    bool scale;
-
     if (this->starttick == -1) {
-      this->starttick = ticks[0];
+      this->starttick = ticks;
     }
     if (this->CashAwarded != -1) {
-      int colf;
-      int colb;
-
-      if ((1000 < ticks[0] - this->starttick) || (this->fStartCountdownNOW != 0)) {
+      if ((1000 < ticks - this->starttick) || (this->fStartCountdownNOW != 0)) {
         if (this->CashAwarded != 0) {
           AudioCmn_PlayFESFX(0x15);
         }
-        this->CashAwarded -= this->fCountSpeed;
-        if (this->CashAwarded < 0) {
+        i = this->CashAwarded - this->fCountSpeed;
+        this->CashAwarded = i;
+        if (i < 0) {
           this->CashAwarded = 0;
           this->fCountedDown = 1;
         }
       }
-      colf = CalcFadeVal(kRGBVals[(byte)textDefinitions[0xb][5]],this->fScreenFadeVal);
-      colb = CalcFadeVal(0x232323,this->fScreenFadeVal);
-      FETextRender_MenuTextFade((int)this->fScreenFadeVal,0x317,textState_Hilighted,
-                                textType_TrackRecords);
-      DrawMoney(TextSys_WordX(0x318),TextSys_WordY(0x318),6,this->CashAwarded,colf,colb);
-      FETextRender_MenuTextFade((int)this->fScreenFadeVal,0x316,textState_Hilighted,
-                                textType_TrackRecords);
-      DrawMoney(TextSys_WordX(0x319),TextSys_WordY(0x319),9,
-                this->TotalCash - this->CashAwarded,colf,colb);
+      i = CalcFadeVal(kRGBVals[(byte)textDefinitions[0xb][5]],fadeAmt);
+      j = CalcFadeVal(0x232323,fadeAmt);
+      FETextRender_MenuTextFade((int)(this->_base_tScreen).fScreenFadeVal,0x317,textState_Hilighted,textType_TrackRecords
+                );
+      wordX = TextSys_WordX(0x318);
+      wordY = TextSys_WordY(0x318);
+      DrawMoney
+                (wordX,wordY,6,this->CashAwarded,i,j);
+      FETextRender_MenuTextFade
+                ((int)(this->_base_tScreen).fScreenFadeVal,0x316,textState_Hilighted,textType_TrackRecords
+                );
+      wordX = TextSys_WordX(0x319);
+      wordY = TextSys_WordY(0x319);
+      DrawMoney
+                (wordX,wordY,9,this->TotalCash - this->CashAwarded,i,j);
     }
-    if ((this->fSpeechToPlay != 0) && (0x80 < ticks[0] - this->starttick)) {
+    if ((this->fSpeechToPlay != 0) && (0x80 < ticks - this->starttick)) {
       FeAudio_AsyncPlaySpeech(2,this->fSpeechToPlay);
       this->fSpeechToPlay = 0;
     }
-    scale = false;
+    bDrawSpin = false;
     if (this->congratsMessage == kScreenCongrats_Congrats) {
-      drawFlags.tint[0] = CalcFadeVal(0xbebe,this->fScreenFadeVal);
-      drawFlags2.tint[0] = CalcFadeVal(0x808080,fJustFadeOff);
-      if (this->InExtraSpin != 0) {
-        this->framenum = (ticks[0] - this->InExtraSpinTick) / 6 + 0x15;
-        scale = true;
-        if (0x29 < this->framenum) {
+      drawFlags.tint[0] = CalcFadeVal(0xbebe,fadeAmt);
+      drawFlags2.tint[0] = CalcFadeVal(0x808080,fadeAmt);
+      if (this->InExtraSpin == 0) {
+        j = (ticks - this->starttick) / 2;
+        this->framenum = j;
+        i = ticks;
+        if (0x13 < j) {
+          bDrawSpin = true;
+          wordX = this->starttick;
+          this->framenum = 0x14;
+          j = ticks;
+          if (wordX < 0) {
+            wordX = wordX + 3;
+          }
+          i = i - (wordX >> 2);
+          bannerframe = (int)((unsigned long long)((long long)i * 0x57619f1) >> 0x20);
+          if (i % 0x5dc < 0x2d) {
+            this->InExtraSpin = 1;
+            this->InExtraSpinTick = j;
+          }
+        }
+      }
+      else {
+        j = ticks - this->InExtraSpinTick;
+        i = j >> 0x1f;
+        bannerframe = j / 6 + i;
+        i = (bannerframe - i) + 0x15;
+        this->framenum = i;
+        bDrawSpin = true;
+        if (0x29 < i) {
           this->InExtraSpin = 0;
           this->framenum = 0x14;
         }
       }
-      else {
-        this->framenum = (ticks[0] - this->starttick) / 2;
-        if (0x13 < this->framenum) {
-          /* SYM-CODEGEN-CARRIER: spinTicks -- retail records no source local,
-             but the scoped tick copy is required for its reload/value split.
-             Reading ticks[0] directly is FAIL 13 (540/541). */
-          int spinTicks;
-
-          __asm__("" : : "i"(0));
-          scale = true;
-          __asm__("" : : "r"(scale));
-          spinTicks = ticks[0];
-          this->framenum = 0x14;
-          if ((spinTicks - this->starttick / 4) % 0x5dc < 0x2d) {
-            this->InExtraSpinTick = ticks[0];
-            this->InExtraSpin = 1;
-          }
-        }
-      }
     }
     else {
-      drawFlags.tint[0] = CalcFadeVal(0x646464,fJustFadeOff);
-      drawFlags2.tint[0] = CalcFadeVal(0x808080,fJustFadeOff);
-      this->framenum = (ticks[0] - this->starttick) / 4;
-      if (0x14 < this->framenum) {
+      drawFlags.tint[0] = CalcFadeVal(0x646464,fadeAmt);
+      drawFlags2.tint[0] = CalcFadeVal(0x808080,fadeAmt);
+      i = ticks - this->starttick;
+      if (i < 0) {
+        i = i + 3;
+      }
+      this->framenum = i >> 2;
+      if (0x14 < i >> 2) {
         this->framenum = 0x14;
       }
-      __asm__("" : : "i"(0));
     }
-    if (scale) {
-      ScaleShapeExtended(this->framenum,0x410,0,
-                         (this->congratsMessage == kScreenCongrats_Eliminated) ? 0xA : 0,
-                         0,0,&drawFlags);
+    if (bDrawSpin) {
+      ScaleShapeExtended    /* @0x80048584 idx=framenum(132) flags=0x410 x=0 y=(off100==1?0xA:0) */
+                (this->framenum,0x410,0,
+                 (this->congratsMessage == kScreenCongrats_Eliminated) ? 0xA : 0,0,0,&drawFlags);
     }
     else {
-      DrawShapeExtended(this->framenum,0x410,0,
-                        (this->congratsMessage == kScreenCongrats_Eliminated) ? 0xA : 0,
-                        0,0,&drawFlags);
+      DrawShapeExtended     /* @0x800485c0 idx=framenum flags=0x410 x=0 y=(off100==1?0xA:0) */
+                (this->framenum,0x410,0,
+                 (this->congratsMessage == kScreenCongrats_Eliminated) ? 0xA : 0,0,0,&drawFlags);
     }
-    if ((uint)(this->trophy - kTrophyCar) >= 2) {
-      ScaleShapeExtended((ticks[0] / 12) % 0x20,0x610,0x46,0xf,0,0,&drawFlags2);
+    if (1 < this->trophy - kTrophyCar) {
+      bannerframe = ticks / 6 + (ticks >> 0x1f);
+      ScaleShapeExtended    /* @0x80048630 idx=(ticks/6)%32 flags=0x610 x=0x46 y=0xF */
+                ((ticks / 6) % 0x20,0x610,0x46,0xF,0,0,&drawFlags2);
     }
-    if ((uint)this->trophy >= (uint)kTrophyCar) {
-      switch (this->smallSpinningThing) {
-      case kSpinningGold:
-        ScaleShapeExtended((ticks[0] >> 3) % this->fNumSmallSpinShapes,
-                           0x610,0x29,0xbe,0,0,&drawFlags2);
-        break;
-      case kSpinningMemCard:
+    if (kTrophyBronze < this->trophy) {
+      if (this->smallSpinningThing == kSpinningGold) {
+        if (this->fNumSmallSpinShapes == 0) {
+          trap(0x1c00);
+        }
+        if ((this->fNumSmallSpinShapes == -1) && (ticks >> 3 == -0x80000000)) {
+          trap(0x1800);
+        }
+        ScaleShapeExtended    /* @0x800486c0 idx=(ticks>>3)%fNumSmallSpinShapes flags=0x610 x=0x29 y=0xBE */
+                  ((ticks >> 3) % this->fNumSmallSpinShapes,0x610,0x29,0xBE,0,0,&drawFlags2);
+      }
+      else if (this->smallSpinningThing == kSpinningMemCard) {
         drawFlags.tint[0] = 0x551e00;
-        DrawShapeExtended((ticks[0] / 0x14) % this->fNumSmallSpinShapes,
-                          0x610,-0xc1,0x56,0,0,&drawFlags);
-        break;
+        if (this->fNumSmallSpinShapes == 0) {
+          trap(0x1c00);
+        }
+        if ((this->fNumSmallSpinShapes == -1) && (ticks / 0x14 == -0x80000000)) {
+          trap(0x1800);
+        }
+        DrawShapeExtended     /* @0x80048744 idx=(ticks/20)%fNumSmallSpinShapes flags=0x610 x=-0xC1 y=0x56 */
+                  ((ticks / 0x14) % this->fNumSmallSpinShapes,0x610,-0xC1,0x56,0,0,&drawFlags);
       }
     }
   }
   if (this->congratsMessage == kScreenCongrats_Congrats) {
-    switch (this->trophy) {
-    case kTrophyGold:
-    case kTrophyCar:
-      StripeRGB = 0x3e44;
-      break;
-    case kTrophySilver:
-      StripeRGB = 0x212121;
-      break;
-    case kTrophyBronze:
-      StripeRGB = 0x3044;
-      break;
-    default:
-      StripeRGB = 0x30022;
-      break;
+    trophyClass = (tTrophyClass)this->trophy;
+    if (trophyClass == kTrophySilver) {
+      i = 0x212121;
+      goto DrawBgCongrats_emitShape;
     }
+    if ((int)trophyClass < 2) {
+      i = 0x30022;
+      if (trophyClass != kTrophyGold) goto DrawBgCongrats_emitShape;
+    }
+    else {
+      if (trophyClass == kTrophyBronze) {
+        i = 0x3044;
+        goto DrawBgCongrats_emitShape;
+      }
+      if (trophyClass != kTrophyCar) goto DrawBgCongrats_setFadeIdx;
+    }
+    i = 0x3e44;
   }
   else {
-    StripeRGB = 0x30022;
+DrawBgCongrats_setFadeIdx:
+    i = 0x30022;
   }
+DrawBgCongrats_emitShape:
+  /* loop base shape-index $s1 (oracle @0x800487b4-c4: off100==0 -> 0x2A, else 0x15) */
   bannerframe = (this->congratsMessage == kScreenCongrats_Congrats) ? 0x2A : 0x15;
-  drawFlags3.tint[0] = CalcFadeVal(StripeRGB,this->fScreenFadeVal);
-  if ((this->congratsMessage == kScreenCongrats_Congrats) &&
-      (this->trophy != kTrophyCar)) {
-    {
-      int i;
-
-      for (i = 1; i < 0x1e; i++) {
-        if ((i % 3) != 0) {
-          DrawShapeExtended(bannerframe,0x410,i * 2,0,
-                            this->fScreenFadeVal,1,&drawFlags3);
-        }
+  drawFlags3.tint[0] = CalcFadeVal(i,fadeAmt);
+  if ((this->congratsMessage == kScreenCongrats_Congrats) && (i = 1, this->trophy != kTrophyCar)
+     ) {
+    j = 0;
+    do {
+      if (i % 3 != 0) {
+        DrawShapeExtended    /* @0x80048840 loop1 idx=bannerframe flags=0x410 x=i*2 y=0 */
+                  (bannerframe,0x410,i * 2,0,
+                   (int)(this->_base_tScreen).fScreenFadeVal,1,&drawFlags3);
       }
-    }
-    {
-      int i;
-
-      for (i = 0x22; i < 0x3f; i++) {
-        if ((i % 3) != 0) {
-          DrawShapeExtended(bannerframe,0x410,i * 2,0,
-                            this->fScreenFadeVal,1,&drawFlags3);
-        }
+      i = i + 1;
+    } while (i < 0x1e);
+    i = 0x22;
+    do {
+      if (i % 3 != 0) {
+        DrawShapeExtended    /* loop2/3 idx=bannerframe flags=0x410 x=i*2 y=0 (@0x800488a4/0x80048910) */
+                  (bannerframe,0x410,i * 2,0,
+                   (int)(this->_base_tScreen).fScreenFadeVal,1,&drawFlags3);
       }
-    }
+      i = i + 1;
+    } while (i < 0x3f);
   }
   else {
-    int i;
-
-    for (i = 7; i < 0x28; i++) {
-      if ((i % 3) != 0) {
-        DrawShapeExtended(bannerframe,0x410,i * 2,0,
-                          this->fScreenFadeVal,1,&drawFlags3);
+    i = 7;
+    do {
+      if (i % 3 != 0) {
+        DrawShapeExtended    /* loop2/3 idx=bannerframe flags=0x410 x=i*2 y=0 (@0x800488a4/0x80048910) */
+                  (bannerframe,0x410,i * 2,0,
+                   (int)(this->_base_tScreen).fScreenFadeVal,1,&drawFlags3);
       }
-    }
+      i = i + 1;
+    } while (i < 0x28);
   }
   if ((this->trophy == kTrophyCar) && (this->fGotCar != 0)) {
-    DrawCar(this->fCarInfo,this->fCarX,this->fCarY,this->fCarCX,this->fCarCY,
-            (showRoomFlag[0] = 0, -0x80),true,carRotate,(tPlayer)this->fCarPlayer);
+    showRoomFlag = 0;
+    DrawCar
+              (&this->fCarInfo,this->fCarX,this->fCarY,this->fCarCY,this->fCarCX,-0x80,true,
+               carRotate,(tPlayer)this->fCarPlayer);
   }
   return;
 }
@@ -327,43 +347,23 @@ void tScreenCongrats::DrawForeground()
 void tScreenCongrats::CalculatePrizes()
 
 {
-  /* SYM-CODEGEN-CARRIER: carCYBits
-     SYM-CODEGEN-CARRIER: carCXBits
-     The function SYM records only `this`; these are semantic names for the
-     two raw float-constant quantities required by retail allocation, not
-     claims of recoverable source-local names.  Direct float assignments are
-     FAIL 35 at 30/29 because `this` is copied to $a1; direct raw field writes
-     without the quantities are FAIL 12 at 29/29.  Keeping fCarCX live through
-     the tail restores `this`=$a0, fCarCX=$a1, and fCarCY=$v1 and remains the
-     best measured shape at exact 29/29 with four scheduling-only diffs.
-     [SOURCE PASS 2026-08-26, 4->0, 29/29] Declare `carCXBits`, consume it at
-     a zero-byte source boundary, and only then declare `carCYBits`; this keeps
-     the CX `lui` at instruction zero instead of allowing the CY pair to win
-     the ready list.  Volatile lvalues on exactly fCarY/fCarCY preserve retail's
-     adjacent Y-before-CY stores.  Declaration swapping and comma staging were
-     neutral at FAIL 4; the bounded store ordering alone reached FAIL 2, and a
-     redundant fCarCX store was FAIL 6.  No hard register, emitted asm, extra
-     local, or post-compilation modification is used. */
-  unsigned long carCXBits = 0x40800000;
-  __asm__("" : : "r"(carCXBits));
-  unsigned long carCYBits = 0xc0eccccd;
-
-  this->congratsMessage = kScreenCongrats_Congrats;
   this->trophy = kTrophyNone;
+  this->CashAwarded = -1;
+  this->fCarX = 0x116;
+  this->congratsMessage = kScreenCongrats_Congrats;
+  this->fCarY = 0x3f;
+  this->fCarCY = -7.4;
   this->smallSpinningThing = kSpinningNone;
   this->fCarPlayer = 0;
   this->TotalCash = 0;
-  this->CashAwarded = -1;
-  this->fCarX = 0x116;
-  *(unsigned long *)&this->fCarCX = carCXBits;
-  *(volatile short *)&this->fCarY = 0x3f;
-  *(volatile unsigned long *)&this->fCarCY = carCYBits;
+  /* @0x80048A00/0x80048A04: fCarCX=4.0 is the bne delay-slot store and therefore
+   * executes whether congratsMessage is Eliminated or not on the R3000A. */
+  this->fCarCX = 4.0;
   if (this->congratsMessage == kScreenCongrats_Eliminated) {
     this->fCarX = 0x120;
     this->fCarY = 0x49;
     this->fCarCY = -8.2;
   }
-  __asm__("" : : "r"(carCXBits));
   return;
 }
 
@@ -371,35 +371,39 @@ void tScreenCongrats::CalculatePrizes()
 void tScreenCongrats::Initialize()
 
 {
-  /* SYM-CODEGEN-CARRIER: vtbl -- retail SYM has no source local here; the original
-     C++ virtual-call syntax produced its vtable temporaries implicitly.  The
-     reconstruction models the ABI through _vf, so this cache is the safe
-     source-level surrogate.  Direct _vf[1][0]/_vf[1][2] access remains byte-
-     exact (PASS 49/49) but is rejected by audit_vtable_indexing.py four times. */
   __vtbl_ptr_type (*vtbl) [10];
-
-  this->PrepareInitialize(ticks[0]);
+  int tick;
+  int cashAwarded;
+  
+  tick = ticks;
+  this->fSpeechToPlay = 0;
+  this->starttick = -1;
+  this->framenum = -1;
+  this->InExtraSpin = 0;
+  this->fEnterTick = tick;
   SetLicensePlate();
-  vtbl = this->_vf;
-  (*vtbl[1][0].pfn)((char *)this + vtbl[1][0].delta);
-  vtbl = this->_vf;
-  this->fGotCar = (*(bool (*)(...))vtbl[1][2].pfn)
-                    ((char *)this + vtbl[1][2].delta,
+  vtbl = (this->_base_tScreen)._vf;
+  NFS4_VCALL_AUTO(vtbl[1][0].pfn, (this->_base_tScreen).fPermShapes.fFilename + vtbl[1][0].delta + -0x14);
+  vtbl = (this->_base_tScreen)._vf;
+  tick = NFS4_VCALL_AUTO(vtbl[1][2].pfn, (this->_base_tScreen).fPermShapes.fFilename + vtbl[1][2].delta + -0x14,
                      &this->fCarInfo);
-  /* MATCH: use the field directly in the comparison and division. GCC CSEs the
-     load later, after lowering signed /64 to retail's bgez/addiu/sra sequence;
-     a cached local lets its value-range pass incorrectly remove that sequence. */
-  if (this->CashAwarded > 0) {
-    this->fCountedDown = 0;
-    this->fStartCountdownNOW = 0;
-    this->fCountSpeed = this->CashAwarded / 0x40;
-  }
-  else {
+  cashAwarded = this->CashAwarded;
+  this->fGotCar = tick;
+  if (cashAwarded < 1) {
     this->fCountedDown = 1;
     this->fStartCountdownNOW = 1;
-    this->fCountSpeed = 1000;
+    cashAwarded = 1000;
   }
-  this->tScreen::Initialize();
+  else {
+    this->fCountedDown = 0;
+    this->fStartCountdownNOW = 0;
+    if (cashAwarded < 0) {
+      cashAwarded = cashAwarded + 0x3f;
+    }
+    cashAwarded = cashAwarded >> 6;
+  }
+  this->fCountSpeed = cashAwarded;
+  this->_base_tScreen.Initialize();
   return;
 }
 
@@ -407,14 +411,12 @@ void tScreenCongrats::Initialize()
 void tScreenCongrats::ProcessInput(tPlayer p,tInputKeyType &keyval,tMenuCommand &c)
 
 {
-  extern SPEECHINFO ginfo;   /* global @0x800514e8 (feaudio.cpp); oracle reads ginfo+0x10 as lhu */
-  /* SYM-CODEGEN-CARRIER: bConsumeKey -- collapsing this temporary is measured
-     FAIL 5 (19/22) and removes retail's explicit normalized-boolean branch. */
   bool bConsumeKey;
-
+  
   if (keyval != kInput_KeyType_Circle) {
     bConsumeKey = false;
-    if ((*(u_short *)((char *)&ginfo + 0x10) != 0) || (ticks[0] - this->starttick < 0x96)) {
+    if ((ginfo.areLoading != 0 || ginfo.soundIsPlaying != 0) ||
+        (ticks - this->starttick < 0x96)) {
       bConsumeKey = true;
     }
     if (bConsumeKey) {
@@ -424,49 +426,51 @@ void tScreenCongrats::ProcessInput(tPlayer p,tInputKeyType &keyval,tMenuCommand 
   return;
 }
 
+/* ---- tScreenCongrats::~tScreenCongrats  (screencongrats.cpp:109) ---- */
+tScreenCongrats::~tScreenCongrats()
+
+{
+  return;
+}
+
 /* ---- tScreenPinkSlipCongrats::DrawCongratsMessage  (screencongrats.cpp:432) ---- */
 void tScreenPinkSlipCongrats::DrawCongratsMessage()
 
 {
-  /* SYM 8c @0x80048B48: the ONLY locals are `RECT r` (AUTO -0x120) and
-     `char buffer[250]` (AUTO -0x118); `this` is REGPARM $13 = $s3.  The four
-     char* temps the earlier recon carried (fmt/name1/word/name2) are Ghidra
-     fictions -- retail spells the four helper calls INLINE in the sprintf
-     argument list, so their results live in whatever callee-saved regs the
-     allocator hands out ($s2/$s1/$s0), and `this` keeps $s3.  (W55-A15) */
-  RECT r;
+  char *fmt;
+  char *name1;
+  char *word;
+  char *name2;
+  int otherPlayer;
+  RECT r = {0x29,0x3c,0x1a4,0xc8};
   char buffer [250];
-
-  /* @0x80048B54-70: oracle materializes a real RECT{x=0x29,y=0x3C,w=0x1A4,h=0xC8} local. */
-  r.x = 0x29;
-  r.y = 0x3c;
-  r.w = 0x1a4;
-  r.h = 200;
-  /* @0x80048B88-90: oracle's compare is `sltiu` (unsigned) -- the range-check idiom. */
-  if ((uint)((byte)frontEnd.language - 2) < 2) {
-    sprintf(buffer,TextSys_Word(0x275),PlayerName((int)this->fWinner),
-               TextSys_Word((signed char)this->fCarInfo.fCarID + 0x121),
-               PlayerName(1 - this->fWinner),this->fWinner + 1);
+  
+  if ((byte)frontEnd.language - 2 < 2) {
+    fmt = TextSys_Word(0x275);
+    name1 = PlayerName((int)this->fWinner);
+    word = TextSys_Word((this->_base_tScreenCongrats).fCarInfo.fCarID + 0x121);
+    otherPlayer = 1 - this->fWinner;
+    name2 = PlayerName(otherPlayer);
   }
   else {
-    sprintf(buffer,TextSys_Word(0x275),PlayerName((int)this->fWinner),
-               PlayerName(1 - this->fWinner),
-               TextSys_Word((signed char)this->fCarInfo.fCarID + 0x121),
-               this->fWinner + 1);
+    fmt = TextSys_Word(0x275);
+    name1 = PlayerName((int)this->fWinner);
+    otherPlayer = 1 - this->fWinner;
+    word = PlayerName(otherPlayer);
+    name2 = TextSys_Word((this->_base_tScreenCongrats).fCarInfo.fCarID + 0x121);
   }
-  /* @0x80048C34: WordWrapText's 1st arg is `addiu a0,sp,0x20` = BUFFER, not sprintf's
-     return value (the old `fmt = (char *)sprintf(...)` funnel was a transcription bug). */
-  FETextRender_WordWrapText(buffer,r,textState_Selected,textType_PostGame);
+  sprintf(buffer,fmt,name1,word,name2,this->fWinner + 1);
+  FETextRender_WordWrapText
+            (buffer,&r,textState_Selected,textType_PostGame);
   return;
 }
 
 /* ---- tScreenPinkSlipCongrats::GetCar  (screencongrats.cpp:456) ---- */
-bool tScreenPinkSlipCongrats::GetCar(tCarInfo &carInfo)
+int tScreenPinkSlipCongrats::GetCar(tCarInfo &carInfo)
 
 {
-
-  GetPinkSlipsCar(&carManager,
-             (ushort)(byte)frontEnd.pinkSlipsCar[1 - this->fWinner],&carInfo,
+  
+  GetPinkSlipsCar(&carManager,(ushort)(byte)frontEnd.pinkSlipsCar[1 - this->fWinner],&carInfo,
              1 - this->fWinner);
   carInfo.fColor = carInfo.fColorOrder[carInfo.fColor];
   return 1;
@@ -476,72 +480,35 @@ bool tScreenPinkSlipCongrats::GetCar(tCarInfo &carInfo)
 void tScreenPinkSlipCongrats::CalculatePrizes()
 
 {
-  /* SYM-CODEGEN-CARRIER: player -- SYM omits this source local, but folding
-     the winner-derived value into the two CarIO calls is measured FAIL71
-     (65/68 instructions) and changes the frame/saved-register allocation. */
+  __vtbl_ptr_type (*vtbl)[10];
   int player;
-  /* SYM-CODEGEN-CARRIER: speechId2 -- the documented three-step in-place
-     mutation is required for retail's $v1 lifetime and unmerged arm stores. */
-  int speechId2;
   tCarInfo carinfo;
-
-  /* MATCH (W54-A7, from the SYM SLD line map of 0x80048CDC..0x80048DEC):
-     retail's statement order is EXACTLY 464 TotalCash / 465 CashAwarded /
-     466 congratsMessage / 467 trophy / 468 smallSpinningThing /
-     469 fCarPlayer / 471 player.  There is NO `winner` local: line 469 and
-     line 471 each RE-READ this->fWinner (two `lh 0x184` + two `subu`). */
-  this->TotalCash = 0;
-  this->CashAwarded = -1;
-  this->congratsMessage = kScreenCongrats_Congrats;
-  this->trophy = kTrophyCar;
-  this->smallSpinningThing = kSpinningMemCard;
-  this->fCarPlayer = 1 - this->fWinner;
-
-  player = 1 - this->fWinner;
+  short winner;
+  
+  winner = this->fWinner;
+  (this->_base_tScreenCongrats).trophy = kTrophyCar;
+  (this->_base_tScreenCongrats).smallSpinningThing = kSpinningMemCard;
+  winner = this->fWinner;
+  (this->_base_tScreenCongrats).TotalCash = 0;
+  (this->_base_tScreenCongrats).CashAwarded = -1;
+  (this->_base_tScreenCongrats).congratsMessage = kScreenCongrats_Congrats;
+  player = 1 - winner;
+  (this->_base_tScreenCongrats).fCarPlayer = 1 - winner;
   CarIO_CleanUpLicense(player);
-  CarIO_CreateLicense((char *)((int)&frontEnd + (1 - player) * 8 + 900),0,player);
-  (*(*this->_vf)[12].pfn)
-            /* MATCH: explicit int-cast with the BASE first -> oracle `addu $a0,$s3,$a0`
-               (the natural `p + delta` form emits the operands the other way round). */
-            ((char *)((int)this->fPermShapes.fFilename +
-                      ((*this->_vf)[12].delta + -0x14)),&carinfo);
-  /* @0x80048D74: oracle `lb v1,0xD1(sp)` reads fSpeechCarID as SIGNED (matches its use in a real
-   * `==-1` compare below); tCarInfo::fSpeechCarID is a shared-header plain `char` (platform default
-   * unsigned on this toolchain, hence a stray `lbu` -- cast to `signed char` here, in-TU only).
-   * @0x80048D7C: oracle's `beq v1,s2,.L(==-1 case)` computes the `!=-1` (else) body INLINE on the
-   * fallthrough and jumps PAST the ==-1 body -- invert the branch polarity to match. */
-  speechId2 = (signed char)carinfo.fSpeechCarID;
-  if (speechId2 != -1) {
-    /* @0x80048D84-8C: oracle adds 0x13 to fWinner FIRST (`lh v0,388;addiu v0,19`), THEN adds the
-     * doubled speech-car-id (`addu v1,v1,v0`) -- explicit grouping to match that addition order. */
-    /* MATCH (W57-A7 SEAL, 3 -> PASS 68/68): a THREE-STEP IN-PLACE MUTATION CHAIN on ONE
-       local is the whole lever -- `speechId2 = (signed char)fSpeechCarID;` before the test,
-       then `speechId2 = speechId2 * 2;` and `speechId2 = speechId2 + base;` inside the arm.
-       Each `x = x <op> y` keeps the SAME pseudo as dest, so the load lands in $v1, the sll is
-       in-place (`sll v1,v1,1`, reorg steals it into the beq slot), and the sum's dest is that
-       dying $v1 (`addu v1,v1,v0`).  Because arm-1's value then lives in $v1 while the else
-       arm's lives in $v0, post-reload cross_jump CANNOT merge the two `sw ...,0x174` stores
-       (rtx_renumbered_equal_p on different hard regs) -> retail's per-arm store, arm-1's copy
-       riding the `j` delay slot.  `base` MUST stay its own statement (fold's constant
-       reassociation is statement-granular: inlining `(fWinner + 0x13)` re-associates to
-       `(id2 + 0x13) + fWinner` -> 9-14 diffs).  Falsified at the pre-mutation basin: <<1 vs *2,
-       both operand orders, flat 3-term forms, a named product temp, a named speech
-       accumulator, void-tail fences in/after the else arm. */
-    /* SYM-CODEGEN-CARRIER: base -- folding this expression reassociates the
-       three-term sum and has been measured at 9-14 instruction diffs. */
-    int base = this->fWinner + 0x13;
-
-    speechId2 = speechId2 * 2;
-    speechId2 = speechId2 + base;
-    this->fSpeechToPlay = speechId2;
+  CarIO_CreateLicense(frontEnd.licensePlate[1 - player],0,player);
+  vtbl = (this->_base_tScreenCongrats)._base_tScreen._vf;
+  NFS4_VCALL_AUTO(vtbl[1][2].pfn, (this->_base_tScreenCongrats)._base_tScreen.fPermShapes.fFilename +
+             vtbl[1][2].delta + -0x14,&carinfo);
+  if (carinfo.fSpeechCarID == -1) {
+    (this->_base_tScreenCongrats).fSpeechToPlay = this->fWinner + 0x17;
   }
   else {
-    this->fSpeechToPlay = this->fWinner + 0x17;
+    (this->_base_tScreenCongrats).fSpeechToPlay = carinfo.fSpeechCarID * 2 + this->fWinner + 0x13;
   }
-  this->fCarX = 0x116;
-  this->fCarY = 0x4b;
-  this->fCarCX = 4.0;
-  this->fCarCY = -7.4;
+  (this->_base_tScreenCongrats).fCarX = 0x116;
+  (this->_base_tScreenCongrats).fCarY = 0x4b;
+  (this->_base_tScreenCongrats).fCarCX = 4.0;
+  (this->_base_tScreenCongrats).fCarCY = -7.4;
   return;
 }
 
@@ -550,13 +517,13 @@ void tScreenPinkSlipCongrats::Initialize()
 
 {
   this->fWinner = -1;
-  if ((int)(((byte)frontEnd.pinkSlipsNumTracks >> 1) + 1) <= (int)(byte)frontEnd.pinkSlipsWins[0]) {
-    this->fWinner = 0;
-  }
-  else {
+  if ((byte)frontEnd.pinkSlipsWins[0] < (byte)(((byte)frontEnd.pinkSlipsNumTracks >> 1) + 1)) {
     this->fWinner = 1;
   }
-  this->tScreenCongrats::Initialize();
+  else {
+    this->fWinner = 0;
+  }
+  this->_base_tScreenCongrats.Initialize();
   return;
 }
 
@@ -566,7 +533,14 @@ void tScreenPinkSlipCongrats::Cleanup()
 {
   
   CleanupSpinningCarsMenu();
-  this->tScreen::Cleanup();
+  this->_base_tScreenCongrats._base_tScreen.Cleanup();
+  return;
+}
+
+/* ---- tScreenPinkSlipCongrats::~tScreenPinkSlipCongrats  (screencongrats.cpp:141) ---- */
+tScreenPinkSlipCongrats::~tScreenPinkSlipCongrats()
+
+{
   return;
 }
 
@@ -574,23 +548,25 @@ void tScreenPinkSlipCongrats::Cleanup()
 void tScreenTournamentTrophy::ProcessInput(tPlayer p,tInputKeyType &keyval,tMenuCommand &c)
 
 {
-  if ((keyval == kInput_KeyType_Cross) && (this->fCountedDown == 0)) {
+  if ((keyval == kInput_KeyType_Cross) && ((this->_base_tScreenCongrats).fCountedDown == 0)) {
     keyval = kInput_KeyType_AlreadyProcessed;
-    this->fStartCountdownNOW = 1;
+    (this->_base_tScreenCongrats).fStartCountdownNOW = 1;
   }
-  this->tScreenCongrats::ProcessInput(p,keyval,c);
+  this->_base_tScreenCongrats.ProcessInput(p,keyval,c);
   return;
 }
 
 /* ---- tScreenTournamentTrophy::GetCar  (screencongrats.cpp:531) ---- */
-bool tScreenTournamentTrophy::GetCar(tCarInfo &carInfo)
+int tScreenTournamentTrophy::GetCar(tCarInfo &carInfo)
 
 {
+  tCarInfo *srcCar;
   tAwardInformation tInfo;
   
-  if (this->congratsMessage == kScreenCongrats_Congrats) {
+  if ((this->_base_tScreenCongrats).congratsMessage == kScreenCongrats_Congrats) {
     GetAwardInformation(&tournamentManager,&tInfo);
-    blockmove(GetCarFromID(&carManager, (u_short)tInfo.fAwardCarModel),&carInfo,0xcc);
+    srcCar = GetCarFromID(&carManager, (u_short)tInfo.fAwardCarModel);
+    blockmove(srcCar,&carInfo,0xcc);
     carInfo.fUpgrades = tInfo.fAwardCarUpgrades;
     carInfo.fColor = tInfo.fAwardCarColor;
   }
@@ -605,104 +581,95 @@ bool tScreenTournamentTrophy::GetCar(tCarInfo &carInfo)
 void tScreenTournamentTrophy::DrawCongratsMessage()
 
 {
-  /* MATCH: locals + block scopes taken VERBATIM from the SYM 8c block
-     (fsize 1456, mask $801f0000 = ra,s0-s4):
-       fn scope  AUTO  r, tInfo, buffer1[500], buffer2[500], buffer[256], money[64]
-       blk @567  REG   firstmessage($s2), secondmessage($s3), tourneyInfo($s1)
-       blk @575  REG   placeoffset($s0)
-       blk @639  REG   yyy($s0)
-     Ghidra's word/word2/trophyClass are FABRICATED (absent from the SYM) --
-     they cost a 6th saved register ($s5) and 8 bytes of frame. */
+  char *word;
+  char *word2;
+  tTrophyClass trophyClass;
+  int fade;
+  int placeoffset;
+  tTourneyInfo *tourneyInfo;
+  int firstmessage;
+  int secondmessage;
   RECT r;
   tAwardInformation tInfo;
   char buffer1 [500];
   char buffer2 [500];
   char buffer [256];
   char money [64];
-
+  
   r.x = 0x29;
   r.y = 0x3c;
   r.w = 200;
   r.h = 400;
-  /* MATCH: the non-Congrats message is the ELSE arm (oracle `bnez $v0,.L800491DC`
-     branches FORWARD to a block sitting just before the epilogue). */
-  if (this->congratsMessage == kScreenCongrats_Congrats) {
-    int firstmessage;
-    int secondmessage;
-    tTourneyInfo *tourneyInfo;
-
-    secondmessage = firstmessage = 0;   /* oracle: `addu s2,zero,zero; addu s3,s2,zero` */
-    tourneyInfo = &(tournamentManager.fDefinition)->fTournaments
-             [(uint)(tournamentManager.fDefinition)->fTiers[tournamentManager.fTier].fTournOffset +
-              tournamentManager.fTournament];
-    /* fPrevBestPlacement/fTournamentID are shared-header plain `char` (unsigned by platform
-     * default); the oracle reads BOTH signed (`lb`) throughout -- cast at every read site. */
-    if ('\x03' < (signed char)tournamentManager.fPrevBestPlacement) {
-      int placeoffset;
-
-      firstmessage = (signed char)tourneyInfo->fTournamentID + 0x3b3;
-      /* MATCH: a real switch -- oracle is gcc's case TREE over {0},{1},{3}
-         (root ==1, slti 2, then ==0 / ==3) with bodies in source order 0,1,default. */
-      switch (this->trophy) {
-      case kTrophyGold:
-      case kTrophyCar:
-        placeoffset = 0;
-        break;
-      case kTrophySilver:
-        placeoffset = 1;
-        break;
-      default:
-        placeoffset = 2;
-        break;
-      }
-      sprintf(buffer1,TextSys_Word((signed char)tourneyInfo->fTournamentID + 0x3b3),
-              TextSys_Word(placeoffset + 0x3e1));
+  fade = (this->_base_tScreenCongrats)._base_tScreen.fScreenFadeVal;
+  if ((this->_base_tScreenCongrats).congratsMessage != kScreenCongrats_Congrats) {
+    firstmessage = TextSys_WordY(800);
+    word = TextSys_Word(800);
+    FETextRender_FullTextRGB(word,0x120,(short)((uint)((firstmessage + -10) * 0x10000) >> 0x10),0x414141,'\x03',2);
+    return;
+  }
+  firstmessage = 0;
+  secondmessage = 0;
+  tourneyInfo = (tournamentManager.fDefinition)->fTournaments +
+           (uint)(tournamentManager.fDefinition)->fTiers[tournamentManager.fTier].fTournOffset +
+           tournamentManager.fTournament;
+  if (tournamentManager.fPrevBestPlacement < '\x04') goto DrawCongrats_inlinedJoin084;
+  trophyClass = (tTrophyClass)(this->_base_tScreenCongrats).trophy;
+  firstmessage = tourneyInfo->fTournamentID + 0x3b3;
+  if (trophyClass == kTrophySilver) {
+    placeoffset = 1;
+  }
+  else if ((int)trophyClass < 2) {
+    if (trophyClass == kTrophyGold) {
+DrawCongrats_inlinedJoin048:
+      placeoffset = 0;
     }
-    if (((this->trophy == kTrophyGold) &&
-        ((signed char)tournamentManager.fPrevBestPlacement != '\x01')) ||
-       (this->trophy == kTrophyCar)) {
-      /* two separate sprintf calls -- gcc cross-jump-merges them into the oracle's
-         single `.L800490EC: jal sprintf` with only the $a0 setup per arm. */
-      if (firstmessage == 0) {
-        firstmessage = (signed char)tourneyInfo->fTournamentID + 0x3c6;
-        sprintf(buffer1,TextSys_Word(firstmessage));
-      }
-      else {
-        secondmessage = (signed char)tourneyInfo->fTournamentID + 0x3c6;
-        sprintf(buffer2,TextSys_Word(secondmessage));
-      }
-    }
-    /* @0x80049108/144/1C4: the oracle reads `this->fScreenFadeVal` (lh a0,0x5C(s4)) fresh
-     * right before EACH of the 3 calls below, not via a cached local. */
-    if (firstmessage != 0) {
-      FETextRender_WordWrapTextFade((int)this->fScreenFadeVal,buffer1,r,textState_Selected,
-                                    textType_PostGame);
-      r.y = r.y + (short)FETextRender_WordWrapHeight(r.w,buffer1);
-    }
-    if (secondmessage != 0) {
-      FETextRender_WordWrapTextFade
-                ((int)this->fScreenFadeVal,buffer2,r,textState_Selected,textType_PostGame);
-    }
-    GetAwardInformation(&tournamentManager,&tInfo);
-    if (tInfo.fAwardCarGarageFull != 0) {
-      r.x = 0x104;
-      r.y = 200;
-      r.w = 0xf0;
-      FeTools_FormatMoney(money,tInfo.fAwardCarBonusMoney);
-      sprintf(buffer,TextSys_Word(0x40),money);
-      FETextRender_WordWrapTextFade
-                ((int)this->fScreenFadeVal,TextSys_Word(0x40),r,textState_Selected,
-                 textType_PostGame);
+    else {
+      placeoffset = 2;
     }
   }
   else {
-    int yyy;
-
-    /* MATCH: the -10 bias is folded into the jal delay slot (oracle
-       `addiu $s0,$v0,-0xA`); computing it after the call costs a copy + addiu. */
-    yyy = TextSys_WordY(800) + -10;
-    FETextRender_FullTextRGB(TextSys_Word(800),0x120,(short)((uint)(yyy * 0x10000) >> 0x10),
-                             0x414141,'\x03',2);
+    if (trophyClass == kTrophyCar) goto DrawCongrats_inlinedJoin048;
+    placeoffset = 2;
+  }
+  word = TextSys_Word(tourneyInfo->fTournamentID + 0x3b3);
+  word2 = TextSys_Word(placeoffset + 0x3e1);
+  sprintf(buffer1,word,word2);
+DrawCongrats_inlinedJoin084:
+  trophyClass = (tTrophyClass)(this->_base_tScreenCongrats).trophy;
+  if (((trophyClass == kTrophyGold) && (tournamentManager.fPrevBestPlacement != '\x01')) ||
+     (trophyClass == kTrophyCar)) {
+    if (firstmessage == 0) {
+      firstmessage = tourneyInfo->fTournamentID + 0x3c6;
+      word = TextSys_Word(firstmessage);
+      word2 = buffer1;
+    }
+    else {
+      secondmessage = tourneyInfo->fTournamentID + 0x3c6;
+      word = TextSys_Word(secondmessage);
+      word2 = buffer2;
+    }
+    sprintf(word2,word);
+  }
+  if (firstmessage != 0) {
+    FETextRender_WordWrapTextFade(fade,buffer1,&r,textState_Selected,textType_PostGame);
+    firstmessage = FETextRender_WordWrapHeight(r.w,buffer1);
+    r.y = r.y + (short)firstmessage;
+  }
+  if (secondmessage != 0) {
+    FETextRender_WordWrapTextFade
+              (fade,buffer2,&r,textState_Selected,textType_PostGame);
+  }
+  GetAwardInformation(&tournamentManager,&tInfo);
+  if (tInfo.fAwardCarGarageFull != 0) {
+    r.x = 0x104;
+    r.y = 200;
+    r.w = 0xf0;
+    FeTools_FormatMoney(money,tInfo.fAwardCarBonusMoney);
+    word = TextSys_Word(0x40);
+    sprintf(buffer,word,money);
+    word = TextSys_Word(0x40);
+    FETextRender_WordWrapTextFade
+              (fade,word,&r,textState_Selected,textType_PostGame);
   }
   return;
 }
@@ -711,121 +678,106 @@ void tScreenTournamentTrophy::DrawCongratsMessage()
 void tScreenTournamentTrophy::CalculatePrizes()
 
 {
-  /* MATCH (2026-08-12, 115 -> PASS, exact 144/144): rebuilt from the
-     trusted SYM allocation contract (i=$s1, j=$s3, tInfo=sp+0x10,
-     tourneyInfo=$s5, this=$s2) and IDA/SLD control flow.  The decompiler's
-     ranking/numRanked/tourIndex/place locals caused the original whole-body
-     register cascade.  A void boundary after the spinner reset prevents
-     sched2 from hoisting the tournament-money address setup across that
-     store.  The separate m2c body exposed the signed manager halfword as its
-     own working value before the short sum; `ranked` plus a short `numRanked`
-     reproduces retail's `lh` and post-add 16-bit truncation (4 -> 2) without
-     changing allocation.  The final store group needs the 4.0f high half in
-     $a0 before the -7.4f pair while retaining the preceding delay-slot nop:
-     a pin-free identity fence on a block-local raw word plus a zero-insn
-     boundary does that; a short-lived `cashAwarded` working value sinks its
-     store behind both materializations.  No volatile or fixed-register pin. */
+  long money;
+  tTournamentDefinition *def;
+  short ranking;
+  int numRanked;
+  tTrophyClass trophyClass;
+  int tourIndex;
   int i;
-  int j;
+  int place;
   tAwardInformation tInfo;
-  tTourneyInfo *tourneyInfo;
-
-  this->congratsMessage = kScreenCongrats_Eliminated;
-  this->trophy = kTrophyNone;
-  this->smallSpinningThing = kSpinningMemCard;
+  
+  (this->_base_tScreenCongrats).congratsMessage = kScreenCongrats_Eliminated;
+  (this->_base_tScreenCongrats).trophy = kTrophyNone;
+  (this->_base_tScreenCongrats).smallSpinningThing = kSpinningMemCard;
   GetAwardInformation(&tournamentManager,&tInfo);
-  j = 900;
-  /* @0x800492A8-D4/0x80049380: oracle computes the tourneyInfo (fTournaments[tourIndex]) POINTER
-   * ONCE (kept live in s5) and reuses it for BOTH fKnockout checks below (numRanked's ".fKnockout"
-   * AND the later `def->fTournaments[tourIndex].fKnockout` re-test) -- one named local matches. */
-  tourneyInfo = &(tournamentManager.fDefinition)->fTournaments[
-      (uint)(tournamentManager.fDefinition)->fTiers[tournamentManager.fTier].fTournOffset +
-      tournamentManager.fTournament];
+  def = tournamentManager.fDefinition;
+  place = 900;
+  tourIndex = nfs4_mips_addu_s32(
+      (int)(u_char)(tournamentManager.fDefinition)->fTiers[tournamentManager.fTier].fTournOffset,
+      tournamentManager.fTournament);
+  numRanked = nfs4_mips_sign_extend(
+      (u_int)nfs4_mips_addu_s32(
+          (int)(short)tournamentManager.fNumRacers,
+          (int)((tournamentManager.fDefinition)->fTournaments[tourIndex].fKnockout != '\0')),
+      16);
   i = 1;
-  {
-    /* SYM-CODEGEN-CARRIER: knockout -- inlining the normalized fKnockout
-       value is FAIL 17 at 145/144 and changes its branch-free value web. */
-    int knockout = !!tourneyInfo->fKnockout;
-    /* SYM-CODEGEN-CARRIER: ranked -- direct use of the manager halfword is
-       count-exact FAIL 2 because GCC changes retail's signed lh to lhu. */
-    int ranked = *(short *)((char *)&tournamentManager + 0x10);
-    if (0 < (short)(ranked + knockout)) {
-      do {
-        if (PlayerRanking(&tournamentManager,(short)i) == 0) {
-          j = i;
-        }
-        i = i + 1;
-      } while (i <= (short)(ranked + knockout));
-    }
+  if (0 < numRanked) {
+    do {
+      ranking = PlayerRanking(&tournamentManager,(short)i);
+      if (ranking == 0) {
+        place = i;
+      }
+      i = i + 1;
+    } while (i <= numRanked);
   }
-  if (j == 1) goto first_place;
-  if (j <= 0) goto eliminated;
-  if (j >= 4) goto eliminated;
-  goto ranked_finish;
-
-first_place:
-  {
-    if (tInfo.fAwardCar != 0) {
-      this->trophy = kTrophyCar;
-      this->smallSpinningThing = kSpinningGold;
+  if (place == 1) {
+    if (tInfo.fAwardCar == 0) {
+      (this->_base_tScreenCongrats).trophy = kTrophyGold;
+      (this->_base_tScreenCongrats).smallSpinningThing = kSpinningNone;
     }
     else {
-      this->trophy = kTrophyGold;
-      this->smallSpinningThing = kSpinningNone;
+      (this->_base_tScreenCongrats).trophy = kTrophyCar;
+      (this->_base_tScreenCongrats).smallSpinningThing = kSpinningGold;
     }
-    this->fSpeechToPlay = 0xf;
-    this->congratsMessage = kScreenCongrats_Congrats;
-    goto prizes_done;
+    (this->_base_tScreenCongrats).fSpeechToPlay = 0xf;
+    (this->_base_tScreenCongrats).congratsMessage = kScreenCongrats_Congrats;
   }
-
-ranked_finish:
-  if (tourneyInfo->fKnockout != '\0') goto eliminated;
-  this->fSpeechToPlay = j + 0xe;
-  this->congratsMessage = kScreenCongrats_Congrats;
-  this->trophy = j == 2 ? kTrophySilver : kTrophyBronze;
-  goto prizes_done;
-
-eliminated:
-  this->congratsMessage = kScreenCongrats_Eliminated;
-  this->trophy = kTrophyCar;
-
-prizes_done:
-  this->smallSpinningThing = kSpinningNone;
-  __asm__("" : : "i"(0));
-  this->fCarPlayer = 0;
-  this->TotalCash = tournamentManager.fMoney;
+  else {
+    if (((place < 1) || (3 < place)) || (def->fTournaments[tourIndex].fKnockout != '\0')) {
+      (this->_base_tScreenCongrats).congratsMessage = kScreenCongrats_Eliminated;
+      trophyClass = kTrophyCar;
+    }
+    else {
+      (this->_base_tScreenCongrats).fSpeechToPlay = place + 0xe;
+      trophyClass = kTrophyBronze;
+      (this->_base_tScreenCongrats).congratsMessage = kScreenCongrats_Congrats;
+      if (place == 2) {
+        trophyClass = kTrophySilver;
+      }
+    }
+    (this->_base_tScreenCongrats).trophy = trophyClass;
+    (this->_base_tScreenCongrats).smallSpinningThing = kSpinningNone;
+  }
+  (this->_base_tScreenCongrats).fCarPlayer = 0;
+  money = tournamentManager.fMoney;
+  (this->_base_tScreenCongrats).TotalCash = tournamentManager.fMoney;
   if (tInfo.fCompletedGarageFull != 0) {
-    this->TotalCash -= tInfo.fCompletedBonusMoney;
+    (this->_base_tScreenCongrats).TotalCash =
+        nfs4_mips_subu_s32((int)money,(int)tInfo.fCompletedBonusMoney);
   }
-  /* SYM-CODEGEN-CARRIER: cashAwarded -- assigning the ternary directly is
-     count-exact FAIL 2 and hoists the fCarCX high-half materialization. */
-  long cashAwarded = tInfo.fTournMoney == 0 ? -1 : tInfo.fTournMoney;
-  __asm__("" : : "i"(0));
-  {
-    /* SYM-CODEGEN-CARRIER: carCXBits -- direct float/raw-field spellings are
-       documented above as FAIL 35/12; this boundary preserves retail's $a0. */
-    unsigned long carCXBits = 0x40800000;
-    __asm__("" : "=r"(carCXBits) : "0"(carCXBits));
-    this->CashAwarded = cashAwarded;
-    this->fCarX = 0x116;
-    this->fCarY = 0x3f;
-    this->fCarCY = -7.4;
-    *(unsigned long *)&this->fCarCX = carCXBits;
+  if (tInfo.fTournMoney == 0) {
+    tInfo.fTournMoney = -1;
   }
-  if (this->congratsMessage == kScreenCongrats_Eliminated) {
-    this->fCarX = 0x120;
-    this->fCarY = 0x49;
-    this->fCarCY = -8.2;
+  (this->_base_tScreenCongrats).CashAwarded = tInfo.fTournMoney;
+  (this->_base_tScreenCongrats).fCarX = 0x116;
+  (this->_base_tScreenCongrats).fCarY = 0x3f;
+  (this->_base_tScreenCongrats).fCarCY = -7.4;
+  (this->_base_tScreenCongrats).fCarCX = 4.0;
+  if ((this->_base_tScreenCongrats).congratsMessage == kScreenCongrats_Eliminated) {
+    (this->_base_tScreenCongrats).fCarX = 0x120;
+    (this->_base_tScreenCongrats).fCarY = 0x49;
+    (this->_base_tScreenCongrats).fCarCY = -8.2;
   }
   return;
 }
 
-/* ---- tScreenBeTheCopCongrats::GetCar  (screencongrats.cpp:746) ---- */
-bool tScreenBeTheCopCongrats::GetCar(tCarInfo &carInfo)
+/* ---- tScreenTournamentTrophy::~tScreenTournamentTrophy  (screencongrats.cpp:126) ---- */
+tScreenTournamentTrophy::~tScreenTournamentTrophy()
 
 {
+  return;
+}
+
+/* ---- tScreenBeTheCopCongrats::GetCar  (screencongrats.cpp:746) ---- */
+int tScreenBeTheCopCongrats::GetCar(tCarInfo &carInfo)
+
+{
+  tCarInfo *srcCar;
   
-  blockmove(GetCarFromID(&carManager, (ushort)(byte)frontEnd.congratsCopCar),&carInfo,0xcc);
+  srcCar = GetCarFromID(&carManager, (ushort)(byte)frontEnd.congratsCopCar);
+  blockmove(srcCar,&carInfo,0xcc);
   carInfo.fCountry = frontEnd.congratsCopCountry;
   return 1;
 }
@@ -835,12 +787,12 @@ void tScreenBeTheCopCongrats::CalculatePrizes()
 
 {
   
-  this->tScreenCongrats::CalculatePrizes();
-  this->trophy = kTrophyCar;
-  this->fCarX = 0x116;
-  this->fCarY = 0x4b;
-  this->fCarCX = 4.0;
-  this->fCarCY = -7.4;
+  this->_base_tScreenCongrats.CalculatePrizes();
+  (this->_base_tScreenCongrats).trophy = kTrophyCar;
+  (this->_base_tScreenCongrats).fCarX = 0x116;
+  (this->_base_tScreenCongrats).fCarY = 0x4b;
+  (this->_base_tScreenCongrats).fCarCX = 4.0;
+  (this->_base_tScreenCongrats).fCarCY = -7.4;
   return;
 }
 
@@ -848,43 +800,45 @@ void tScreenBeTheCopCongrats::CalculatePrizes()
 void tScreenBeTheCopCongrats::DrawCongratsMessage()
 
 {
-  RECT r;
-  short congrats;
+  uint padState;
+  char *fmt;
+  char *copWord;
+  int wordnum;
+  RECT r = {0x29,0x3c,0xc8,0xc8};
   char buffer [250];
+  
+  wordnum = 0x4c;
+  if ((byte)frontEnd.congratsCopCar == 0x1c) {
+    wordnum = 0x4d;
+  }
+  padState = PAD_state(4);
+  if ((padState & 0xffff) != 0) {
+    TextSys_Word((this->_base_tScreenCongrats).fCarInfo.fCarID + 0x121);
+  }
+  fmt = TextSys_Word(wordnum);
+  copWord = TextSys_Word((this->_base_tScreenCongrats).fCarInfo.fCarID + 0x121);
+  sprintf(buffer,fmt,copWord);
+  FETextRender_WordWrapText(buffer,&r,textState_Selected,textType_PostGame);
+  return;
+}
 
-  /* @0x80049540-58: oracle materializes a real RECT{x=0x29,y=0x3C,w=0xC8,h=0xC8} local (same idiom
-   * as TournamentTrophy's DrawCongratsMessage, h differs: 0xC8 here not 0x190) -- the prior recon's
-   * `(RECT*)(uint)(byte)congratsCopCar` cast was a bogus reuse of the field-compare value as the
-   * RECT pointer arg (dropped the real RECT init entirely). */
-  r.x = 0x29;
-  r.y = 0x3c;
-  r.w = 200;
-  r.h = 200;
-  /* @0x80049598/end: oracle's FETextRender_WordWrapText 3rd arg is a LITERAL `li a2,1` (=
-   * textState_Selected), not a read of an uninitialized `fade` local. */
-  congrats = 0x4c;
-  if (frontEnd.congratsCopCar == 0x1c) {
-    congrats = 0x4d;
-  }
-  if ((PAD_state(4) & 0xffff) != 0) {
-    /* fCarID is a shared-header plain `char` (unsigned by platform default); oracle reads it
-     * SIGNED (`lb`) here -- cast in-TU only, matches the fSpeechCarID precedent elsewhere. */
-    TextSys_Word((signed char)this->fCarInfo.fCarID + 0x121);
-  }
-  sprintf(buffer,TextSys_Word(congrats),
-          TextSys_Word((signed char)this->fCarInfo.fCarID + 0x121));
-  FETextRender_WordWrapText(buffer,r,textState_Selected,textType_PostGame);   /* MATCH: pass buffer (addr held in s0 across sprintf, 3.12#16), NOT sprintf's return */
+/* ---- tScreenBeTheCopCongrats::~tScreenBeTheCopCongrats  (screencongrats.cpp:151) ---- */
+tScreenBeTheCopCongrats::~tScreenBeTheCopCongrats()
+
+{
   return;
 }
 
 /* ---- tScreenTournamentCongrats::GetCar  (screencongrats.cpp:796) ---- */
-bool tScreenTournamentCongrats::GetCar(tCarInfo &carInfo)
+int tScreenTournamentCongrats::GetCar(tCarInfo &carInfo)
 
 {
+  tCarInfo *srcCar;
   tAwardInformation tInfo;
   
   GetAwardInformation(&tournamentManager,&tInfo);
-  blockmove(GetCarFromID(&carManager, (u_short)tInfo.fCompletedCar),&carInfo,0xcc);
+  srcCar = GetCarFromID(&carManager, (u_short)tInfo.fCompletedCar);
+  blockmove(srcCar,&carInfo,0xcc);
   return 1;
 }
 
@@ -892,18 +846,22 @@ bool tScreenTournamentCongrats::GetCar(tCarInfo &carInfo)
 void tScreenTournamentCongrats::CalculatePrizes()
 
 {
+  long cash;
   tAwardInformation tInfo;
   
   GetAwardInformation(&tournamentManager,&tInfo);
-  this->tScreenCongrats::CalculatePrizes();
-  this->trophy = kTrophyCar;
-  this->TotalCash = tournamentManager.fMoney;
-  this->CashAwarded = tInfo.fCompletedGarageFull != 0 ?
-      tInfo.fCompletedBonusMoney : -1;
-  this->fCarX = 0x116;
-  this->fCarY = 0x4b;
-  this->fCarCX = 4.0;
-  this->fCarCY = -7.4;
+  this->_base_tScreenCongrats.CalculatePrizes();
+  (this->_base_tScreenCongrats).trophy = kTrophyCar;
+  (this->_base_tScreenCongrats).TotalCash = tournamentManager.fMoney;
+  cash = -1;
+  if (tInfo.fCompletedGarageFull != 0) {
+    cash = tInfo.fCompletedBonusMoney;
+  }
+  (this->_base_tScreenCongrats).CashAwarded = cash;
+  (this->_base_tScreenCongrats).fCarX = 0x116;
+  (this->_base_tScreenCongrats).fCarY = 0x4b;
+  (this->_base_tScreenCongrats).fCarCX = 4.0;
+  (this->_base_tScreenCongrats).fCarCY = -7.4;
   return;
 }
 
@@ -911,76 +869,32 @@ void tScreenTournamentCongrats::CalculatePrizes()
 void tScreenTournamentCongrats::DrawCongratsMessage()
 
 {
-  RECT r;
+  char *word;
+  RECT r = {0x29,0x3c,0xc8,0x190};
   tAwardInformation tInfo;
-
-  /* @0x800496E0-FC/0x39F4C-58: oracle materializes a real RECT{x=0x29,y=0x3C,w=0xC8,h=0x190} local
-   * (same idiom as the sibling DrawCongratsMessage fns) then, inside the fCompletedGarageFull branch,
-   * OVERWRITES r.w/r.h to {0xB4,0x1AE} for the money-line rewrap -- the prior recon's uninitialized
-   * `RECT *r;`/`tMenuTextState fade;` dropped this entirely (real bug: NULL/garbage RECT ptr). */
-  r.x = 0x29;
-  r.y = 0x3c;
-  r.w = 200;
-  r.h = 400;
-  /* oracle's FETextRender_WordWrapText 3rd arg is a LITERAL `li a2,1` (=textState_Selected), not a
-   * read of an uninitialized `fade` local (both call sites). */
+  char buffer [256];
+  char money [64];
+  
   GetAwardInformation(&tournamentManager,&tInfo);
-  FETextRender_WordWrapText(TextSys_Word((int)tInfo.fCompletedText),r,
-                            textState_Selected,textType_PostGame);
+  word = TextSys_Word((int)tInfo.fCompletedText);
+  FETextRender_WordWrapText(word,&r,textState_Selected,textType_PostGame);
   if (tInfo.fCompletedGarageFull != 0) {
-    char buffer [256];
-    char money [64];
-
-    /* @0x39F4C-58: oracle overwrites r.y/r.w here (NOT r.w/r.h) -- confirmed via the exact sp
-     * offsets (0x12=r.y, 0x14=r.w), not a naive "next two fields" guess. */
     r.y = 0xb4;
     r.w = 0x1ae;
     FeTools_FormatMoney(money,tInfo.fCompletedBonusMoney);
-    sprintf(buffer,TextSys_Word(0x40),money);
-    FETextRender_WordWrapText(TextSys_Word(0x40),r,textState_Selected,
-                              textType_PostGame);
+    word = TextSys_Word(0x40);
+    sprintf(buffer,word,money);
+    word = TextSys_Word(0x40);
+    FETextRender_WordWrapText(word,&r,textState_Selected,textType_PostGame);
   }
   return;
 }
 
 /* ---- tScreenTournamentCongrats::~tScreenTournamentCongrats  (screencongrats.cpp:161) ---- */
-/* W65-A3 (calltarget): dtor made IMPLICIT (declaration dropped from
- * nfs4_types.h) so every derived dtor and every scope-exit collapses to
- * ___7tScreen the way retail does; the standalone symbol gcc then stops
- * emitting is supplied here, in place, with C linkage. */
-extern "C" void ___7tScreen(void *);
-extern "C" void ___25tScreenTournamentCongrats(void *thisp) { ___7tScreen(thisp); }
+tScreenTournamentCongrats::~tScreenTournamentCongrats()
 
-/* ---- tScreenBeTheCopCongrats::~tScreenBeTheCopCongrats  (screencongrats.cpp:151) ---- */
-/* W65-A3 (calltarget): dtor made IMPLICIT (declaration dropped from
- * nfs4_types.h) so every derived dtor and every scope-exit collapses to
- * ___7tScreen the way retail does; the standalone symbol gcc then stops
- * emitting is supplied here, in place, with C linkage. */
-extern "C" void ___7tScreen(void *);
-extern "C" void ___23tScreenBeTheCopCongrats(void *thisp) { ___7tScreen(thisp); }
-
-/* ---- tScreenPinkSlipCongrats::~tScreenPinkSlipCongrats  (screencongrats.cpp:141) ---- */
-/* W65-A3 (calltarget): dtor made IMPLICIT (declaration dropped from
- * nfs4_types.h) so every derived dtor and every scope-exit collapses to
- * ___7tScreen the way retail does; the standalone symbol gcc then stops
- * emitting is supplied here, in place, with C linkage. */
-extern "C" void ___7tScreen(void *);
-extern "C" void ___23tScreenPinkSlipCongrats(void *thisp) { ___7tScreen(thisp); }
-
-/* ---- tScreenTournamentTrophy::~tScreenTournamentTrophy  (screencongrats.cpp:126) ---- */
-/* W65-A3 (calltarget): dtor made IMPLICIT (declaration dropped from
- * nfs4_types.h) so every derived dtor and every scope-exit collapses to
- * ___7tScreen the way retail does; the standalone symbol gcc then stops
- * emitting is supplied here, in place, with C linkage. */
-extern "C" void ___7tScreen(void *);
-extern "C" void ___23tScreenTournamentTrophy(void *thisp) { ___7tScreen(thisp); }
-
-/* ---- tScreenCongrats::~tScreenCongrats  (screencongrats.cpp:109) ---- */
-/* W65-A3 (calltarget): dtor made IMPLICIT (declaration dropped from
- * nfs4_types.h) so every derived dtor and every scope-exit collapses to
- * ___7tScreen the way retail does; the standalone symbol gcc then stops
- * emitting is supplied here, in place, with C linkage. */
-extern "C" void ___7tScreen(void *);
-extern "C" void ___15tScreenCongrats(void *thisp) { ___7tScreen(thisp); }
+{
+  return;
+}
 
 /* end of screencongrats.cpp */

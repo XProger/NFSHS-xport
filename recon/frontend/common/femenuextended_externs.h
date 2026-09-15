@@ -1,11 +1,13 @@
 /* frontend/common/femenuextended_externs.h - reconstructed externs. NOT original. */
 #ifndef _FE_SCREENS_FEMENUEXTENDED_EXTERNS_H_
 #define _FE_SCREENS_FEMENUEXTENDED_EXTERNS_H_
-#include "femenuextended_types.h"
+#include "../../nfs4_types.h"
+#include "../../lib/libfns.h"
+extern "C" u_char *&Render_gPacketPtr, *&Render_gPalettePtr;
 extern tFEApplication *FEApp;
-extern tfrontEnd frontEnd;
-extern tPadModuleState gPadinfo;
-extern int ticks[];
+extern "C" extern tfrontEnd frontEnd;
+extern "C" tPadModuleState gPadinfo;
+extern "C" int ticks;
 extern tGlobalMenuDefs *menuDefs;
 /* class vtables (FEMenuExtended.obj-defined subclasses) */
 extern __vtbl_ptr_type tMenuItemGoToMenuNFS4Button_vtable[], tMenuItemNFS4LeftRightChoice_vtable[],
@@ -14,47 +16,24 @@ extern __vtbl_ptr_type tMenuItemGoToMenuNFS4Button_vtable[], tMenuItemNFS4LeftRi
   tMenuBlank_vtable[], tMenuOptions_vtable[];
 /* engine helpers (shared with FeMenuOptions) */
 int   CalcFadeVal(int, int);  int CalcFadeVal(int,int,int);  int CalcFadeVal(int,int,int,int);
-void  DrawShapeExtended(int,int,int,int,int,int,tDrawShapeExtended*);
+extern "C" { void  DrawShapeExtended(int,int,int,int,int,int,tDrawShapeExtended*); }
 void  ScaleShapeExtended(int,int,int,int,int,int,tDrawShapeExtended*);
 void  PSXDrawSquare(int,int,int,int,int);  void PSXDrawTransSquare(int,int,int,int,int,short);
 void  FeDraw_SetABRMode(int);  void Flare_2DHalo(int,int,int,int,int);
-int   TextSys_WordX(int);  int TextSys_WordY(int);  char *TextSys_Word(int);  int TextSys_WordFlags(int);
+extern "C" { int   TextSys_WordX(int);  int TextSys_WordY(int);  char *TextSys_Word(int);  int TextSys_WordFlags(int); }
 void  AudioCmn_PlayFESFX(int);  void AudioCmn_PlayFESFXVol(int,int);
-extern tTexture_ShapeInfo *gHelpShapes;  extern tPlayer gMenu_SubMenuPlayer;
-void  FETextRender_FullTextRGB(char*,short,short,int,char,short);
+extern "C" tTexture_ShapeInfo *gHelpShapes;  extern tPlayer gMenu_SubMenuPlayer;
+extern "C" { void  FETextRender_FullTextRGB(char*,short,short,int,char,short); }
 void  FETextRender_Title(short);
-void  FETextRender_WordWrapTextRGBJustify(char*,RECT&,int,int,int,bool);
-int   CalcTextFadeSelToHi(int, short, short)
-  __asm__("CalcTextFadeSelToHi__F13tMenuTextTypess");
-int   CalcTextFadeUnselToSel(int, short, short)
-  __asm__("CalcTextFadeUnselToSel__F13tMenuTextTypess");
-extern char textDefinitions[14][6];  extern int kRGBVals[];  extern int screenheight;
-extern int gFlip;  extern int Draw_gPlayer1View;
-void *Draw_GetDRAWENV(int,int);
+extern "C" { void  FETextRender_WordWrapTextRGBJustify(char*,RECT&,int,int,int,bool); }
+extern "C" { int   CalcTextFadeSelToHi(...);  int CalcTextFadeUnselToSel(...); }
+extern "C" char textDefinitions[6][14]; extern int kRGBVals[]; extern "C" int screenheight;
+extern "C" int gFlip; extern "C" int Draw_gPlayer1View;
+extern "C" { void *Draw_GetDRAWENV(int,int); }
 /* FEMenuExtended-specific helpers */
-/* W58-A1 (08A phantom fix): TRUE prototypes from configs/symbol_addrs.txt --
- * DrawShape_SubtractNFS4RectEdges__FR4RECT, DrawShape_NFS4RoundRectangle__FiR4RECTs.
- * The old `(...)` decls mangled every call site as `..__Fe` (never links). Byte-
- * neutral: a RECT& arg passes the same address in $a0 as the old RECT* did. */
-void  DrawShape_SubtractNFS4RectEdges(RECT &);  void DrawShape_NFS4RoundRectangle(int, RECT &, short);
-void  FETextRender_SetFont(int);  extern "C" int textpixels(char*);  void s_upper(char*);
-/* TRUE prototypes (2026-08-02, user-approved): the old variadic `(...)` decls mangled as
- * phantom symbols at the Font_SetBlitter(FontUpsideDownBlit) address-take sites -- byte-
- * neutral fix, reloc symbols now match font.cpp/psxfront.cpp definitions. */
-void  Font_SetBlitter(void (*)(int,int,void *,int,int,struct charactertbl *,int));
-void  Font_ReSetBlitter();
-void  FontUpsideDownBlit(int,int,void *,int,int,struct charactertbl *,int);
-extern int screenwidth;
-/* W58-A1 (08A phantom fix): CalcOnOffFade__F13tMenuTextTypesssRiT4 -- (tMenuTextType,
- * short,short,short,int&,int&); T4 = a repeat of param 4 (0-based) = int&. */
-int   CalcOnOffFade(int, short, short, short, int &, int &)
-  __asm__("CalcOnOffFade__F13tMenuTextTypesssRiT4");
-void  FETextRender_MenuTextPositionedJustify(short,short,short,short,int,int)
-  __asm__("FETextRender_MenuTextPositionedJustify__Fssss14tMenuTextState13tMenuTextType");
-
-extern "C" {
-void SetDrawArea(...);
-int sprintf(char *, const char *, ...);
-unsigned int strlen(const char *);
-}
+extern "C" { void  DrawShape_SubtractNFS4RectEdges(...);  void DrawShape_NFS4RoundRectangle(...); }
+extern "C" { void  FETextRender_SetFont(int);  int textpixels(char*);  void s_upper(char*); }
+extern "C" { void  Font_SetBlitter(...);  void Font_ReSetBlitter();  void FontUpsideDownBlit(...); }
+extern "C" void MenuNFS4_SetHelpPos(RECT *); extern "C" void CalcOnOffFade(tMenuTextType, short, short, short, int &, int &);  extern "C" int screenwidth;
+void  FETextRender_MenuTextPositionedJustify(short,short,short,short,tMenuTextState,tMenuTextType);
 #endif

@@ -6,7 +6,7 @@
  *
  *   PsyQ-SDK split (B-integration): under ccpsx (NFS4_PSYQ_HEADERS, set in nfs4_types.h),
  *   the PsyQ standard-library functions (libgpu/libgte/libetc/libapi/libpad) are supplied by the
- *   REAL PsyQ headers — declaring them here too would clash (return-type / macro / linkage), so they
+ *   REAL PsyQ headers � declaring them here too would clash (return-type / macro / linkage), so they
  *   are gated OFF. Under the modern-gcc pre-gate they stay ON as the varargs boundary decls.
  *   EA eaclib/syslib (FILE_*, SND*, fixed-point, loaders) + libc + libgcc soft-float are ALWAYS on
  *   (no PsyQ header declares them, so no conflict in either toolchain).
@@ -23,6 +23,7 @@ extern "C" {
  * ===================================================================== */
 #ifndef NFS4_PSYQ_HEADERS
 /* ---- libgpu (graphics) ---- */
+void AddPrim(void *ot, void *p);
 int ClearImage(...);   /* (RECT *rect, u_char r, u_char g, u_char b) */
 u_long * ClearOTagR(...);   /* (u_long *ot, int n) */
 void DrawOTag(...);   /* (u_long *) */
@@ -30,6 +31,7 @@ long DrawSync(...);   /* (long mode) */
 unsigned short GetClut(...);   /* (int,int) */
 int GetTPage(...);   /* (int,int,int,int) */
 int LoadImage(...);   /* (RECT * recp, u_long * p) */
+unsigned short LoadTPage(...); /* (u_long *pix,int tp,int abr,int x,int y,int w,int h) */
 int MoveImage(...);   /* (RECT *rect, int x, int y) */
 DISPENV * PutDispEnv(...);   /* (DISPENV *) */
 DRAWENV * PutDrawEnv(...);   /* (DRAWENV *) */
@@ -81,39 +83,42 @@ void PadStartCom(...);   /* (void) */
  * ===================================================================== */
 int CdDiskReady(...);   /* (int mode) -- EA wrapper, not PsyQ CdReady */
 int FILE_addbigsync(...);   /* (char *name, void *a, int b, int *handle) */
-int FILE_closesync(...);   /* (int h) */
+int FILE_closesync(int fd, int priority);
 int FILE_completeop(...);   /* (int oph) */
-void FILE_delbigsync(...);   /* (char *name, void *a, int b, int *handle) */
+void FILE_delbigsync(...);   /* (int a0, int a1) -- lib-source 2-arg (syncfile.cpp); prior 4-arg doc was wrong */
 void FILE_init(...);   /* (int a, int b, int c) */
-int FILE_opensync(...);   /* (char *name, int mode, int prio, void *cb) */
+int FILE_opensync(...);   /* (char *name, int mode, int prio, int *handleOut) -- disasm-verified a3 = &handle out-ptr */
 int FILE_operror(...);   /* (int oph) */
 int FILE_opstatus(...);   /* (int oph) */
-int FILE_read(...);   /* (int arg0) */
-int FILE_readsync(...);   /* (int h, void *dst, int n) */
-void PAD_restore(...);
-u_short PAD_state(int);   /* SYM: USHORT PAD_state(int padID) — was a bogus u_int(...) import decl */
-void PAD_update(...);
+unsigned int FILE_read(intptr_t handle, unsigned int offset, intptr_t dest,
+                       int length, unsigned int priority, intptr_t callbackParam);
+int FILE_readsync(intptr_t handle, unsigned int offset, intptr_t dest,
+                  int length, int priority);
+int FILE_sizesync(int handle, int priority);
+void PAD_restore(void);
+u_short PAD_state(int port);
+void PAD_update(void);
 int SND3dpos(...);   /* (u_int tag, u_int x, int y) */
 int SNDSTRM_autovol(...);   /* (int handle, int ticks, int flag) */
-int SNDSTRM_create(...);   /* (int *priority,int numReq,int pktArg,int objbuf,int memsize) -> stream handle; def in eaclib sndpsxz/spvoices.cpp */
+int SNDSTRM_create(int *opts, int numRequests, int packetArg, void *buffer, int size);
 int SNDSTRM_destroy(...);   /* (int handle) */
 int SNDSTRM_getvol(...);   /* (int handle) */
 int SNDSTRM_overhead(...);   /* (int a, int b) */
-int SNDSTRM_purge(...);   /* (int handle) */
-int SNDSTRM_queuefile(...);   /* (u_int handle,int name,char *filename,long off) -> queue handle; real def eaclib sndpsxz/spvoices.c returns int (w30-a7: was void, mismatched the real definition -- AudioMus_QueueRequestedSong stores its return into requesthandle) */
-int SNDSTRM_requeststatus(...);   /* (int req, u_int statusptr) */
+void SNDSTRM_purge(...);   /* (int handle) */
+int SNDSTRM_queuefile(int handle, int priority, char *name, long offset);
+int SNDSTRM_requeststatus(unsigned int req, SNDREQUESTSTATUS *status);
 void SNDSTRM_setgreedylevel(...);   /* (int handle, int level) */
 void SNDSTRM_setgreedystate(...);   /* (int handle, int state) */
 void SNDSTRM_setpriority(...);   /* (int handle, int prio, int n) */
-int SNDSTRM_status(...);   /* (int handle, int statusptr) */
+int SNDSTRM_status(int handle, SNDSTREAMSTATUS *status);
 int SNDSTRM_vol(...);   /* (int handle, int vol) */
 int SNDSYS_getopts(...);   /* (void * outOpts) */
-void SNDSYS_init(...);   /* (void *, int, int) */
-void SNDSYS_restore(...);   /* (int arg0) */
+void SNDSYS_init(...);   /* (int membase, int memsize) -- lib-source 2-arg (ssysinit.cpp) */
+void SNDSYS_restore(...);   /* (void) -- disasm-verified: only call site (Audio_DeInitDriver 0xabc9c) sets no a0 (was mis-doc'd 1-arg) */
 int SNDSYS_setopts(...);   /* (void * newOpts) */
-int SNDSYS_vectortoreal(...);   /* (void) */
+void SNDSYS_vectortoreal(...);   /* (void) */
 void SNDautovol(...);   /* (void *, int, int) */
-int SNDbankadd(...);   /* (void *, void *) */
+int SNDbankadd(int *bank_out, intptr_t bankData);
 void SNDbankheadercopy(...);   /* (void *, int) */
 int SNDbankheadersize(...);   /* (int) */
 int SNDbankremove(...);   /* (int) */
@@ -136,21 +141,25 @@ void  * SetSp(...);   /* (void *sp) -- EA, not PsyQ */
 double __adddf3(...);   /* (double, double) */
 double __divdf3(...);   /* (double, double) */
 float __divsf3(...);   /* (float a, float b) */
-double __extendsfdf2(...);   /* (float) */
-int __fixsfsi(...);   /* (float a) */
+// Explicit single-precision libgcc calls must not use ellipsis: it promotes
+// their operands to double (FRONT.BIN 80012DCC..80012DF8 passes single words).
+double __extendsfdf2(float);
+int __fixsfsi(float a);
 double __floatsidf(...);   /* (int) */
 float __floatsisf(...);   /* (int) */
 int __ltdf2(...);   /* (double, double) */
 void __main(...);   /* (void) */
-float __mulsf3(...);   /* (float,float) */
+float __mulsf3(float, float);
 float __truncdfsf2(...);   /* (double) */
-int addsystemtask(...);   /* (void (*fn)(void), void *a, void *b) */
+int addsystemtask(intptr_t taskFn, int period, int delay);
 int addtimer(...);   /* (void (*proc)(void)) */
-void asyncidle(...);   /* (void * arg0) */
+int asyncidle(void);   /* nullfunc.asm @0x800F6114: delay slot clears v0 */
 unsigned int asyncloadfile(...);   /* (char*, void*) */
 unsigned int asyncloadfileat(...);   /* (char*, char*) */
 int asyncloadsegment(...);   /* (char *, void *, int) */
+#if !defined(_MSC_VER)
 int atoi(...);   /* (const char *s) */
+#endif
 int bigcount(...);   /* (void *big) */
 void blockclear(...);   /* (void*, int) */
 void blockfill(...);   /* (void *dst, int size, int val) */
@@ -160,35 +169,29 @@ int ccos(...);   /* (int) */
 unsigned long crc16(...);   /* (void*, int) */
 void crossproduct(...);   /* (coorddef *, coorddef *, coorddef *) */
 int csin(...);   /* (int) */
-int delsystemtask(...);   /* (int fn) */
+intptr_t delsystemtask(intptr_t taskFn);
 int deltimer(...);   /* (void (*proc)(void)) */
 int fastintcos(...);   /* (int angle) */
 int fastintsin(...);   /* (int angle) */
 int filesize(...);   /* (char*) */
-int fixedatan(...);   /* (int y, int x) */
+int fixedatan(int y, int x);
 int fixedcos(...);   /* (int angle) */
-/* fixeddiv and rdiv are the SAME function at VA 0x800E4404 (two SYM names / aliases).
-   Both are declared so a TU may use whichever name its oracle .s records; they link to the
-   identical address, so `jal fixeddiv` and `jal rdiv` produce byte-identical code (verify_asm's
-   reloc-name leniency treats them as equal). Keep BOTH declared to avoid unresolved-symbol
-   breakage in any TU that uses either spelling. */
-int fixeddiv(...);   /* (int a, int b) — alias of rdiv @0x800E4404 */
-int rdiv(...);   /* (int a, int b) — reciprocal divide @0x800E4404 (== fixeddiv) */
-int fixedmult(...);   /* (int, int) */
+int fixeddiv(...);   /* (int a, int b) */
+int fixedmult(int a, int b);
 int fixedsin(...);   /* (int angle) */
-void fixedsincos(...);   /* (int a, int *s, int *c) */
+void fixedsincos(int angle, int *s, int *c);
 int fixedsqrt(...);   /* (int x) */
-void fixedxformx(...);   /* (void *m, int angle) */
-int fixedxformy(...);   /* (void *m, int angle) */
-void fixedxformz(...);   /* (void *m, int angle) */
-char * getasyncreadadr(...);   /* (unsigned int, void*) */
+void fixedxformx(void *m, int angle);
+void fixedxformy(void *m, int angle);
+void fixedxformz(void *m, int angle);
+char * getasyncreadadr(...);   /* (int id) -- lib-source 1-arg (nasync.cpp) */
 int getasyncreadstatus(...);   /* (unsigned int) */
-charactertbl * getcharacter(...);   /* (int code) */
+charactertbl *getcharacter(unsigned int code);
 int geti(...);   /* (void *p, int n) */
 long getm(...);   /* (void *p, int n) */
 int gettick(...);
-short * iSNDserveradd100hzclient(...);   /* (int cb) */
-int iSNDserverremove100hzclient(...);   /* (int cb) */
+short *iSNDserveradd100hzclient(void (*cb)(void));
+int iSNDserverremove100hzclient(void (*cb)(void));
 void iSPCH_EACseedrandom(...);   /* (int arg0) */
 void initasync(...);   /* (int reqs, int bufsize, int flag) */
 void initjoy(...);   /* (int mode) */
@@ -197,46 +200,51 @@ void initmemadr(...);   /* (void *base, int size) */
 void inittimer(...);   /* (int hz) */
 int intarccos(...);   /* (int cosval) */
 int intatan(...);   /* (int dx, int dz) */
-int intsincos(...);   /* (int angle) */
+int intsincos(...);   /* (int angle, int *psin, int *pcos) -- disasm-verified 3-arg (eaclib isincos.cpp:58 @0x800eadbc); psin/pcos are OUT-ptrs */
 int isqrt(...);   /* (int v) */
 int largestunused(...);   /* (void) */
-int loadbigfileheader(...);   /* (char *name, void *hdr) */
-void     * loadfileadr(...);   /* (char *, int) */
-char * loadfileadrz(...);   /* (char *name, int flag) */
-void * loadfileatadr(...);   /* (char *name, void *addr) */
-int loadfileatadrz(...);   /* (char *filename, void *loadAddr) */
+void *loadbigfileheader(char *name, int memclass);
+void *loadfileadr(char *name, int memclass);
+void *loadfileadrz(char *name, int memclass);
+void *loadfileatadr(char *name, void *address);
+void *loadfileatadrz(char *name, void *address);
 void * loadpackadr(...);   /* (char *name, void *dst) */
 void * loadpackadrz(...);   /* (char *name, void *dst) */
 int loadshapeadr(...);   /* (char *name, void *dst) */
-void * locatebig(...);   /* (char *big, char *name, int from) */
-void *locatebigentry(...);   /* (char *bigfile, char *name, int a, int *b, int sizeOut) */
-void *locatebigentryz(...);   /* (void * arg0) */
-void *locateshape(...);   /* (void *base, const char *tag, int n) */
+void * locatebig(...);   /* (void *buf, char *name) -- lib-source 2-arg (locatbig.cpp @0x800E6218); callers' 3rd 'from' arg = harmless over-supply */
+void *locatebigentry(...);   /* (char *bigfile, char *name, int index, long *offsetOut, long *sizeOut) -- disasm-verified a3=&offset stk=&size out-ptrs */
+void *locatebigentryz(...);   /* (void *big, char *name, int index, int *offsetOut, int *sizeOut) -- disasm-verified 5-arg (copspeak:539/554/602/629), out-ptrs like locatebigentry */
+void *locateshape(...);   /* (void *base, const char *tag) -- disasm-verified 2-arg (body reads only a0/a1; was 3) */
 void *locateshapez(...);   /* (char *buf, char *name) */
+#if !defined(_MSC_VER)
 void * memcpy(...);   /* (void *dest, void *src, uint n) */
 void * memset(...);   /* (void *, int, int) */
-void movfxya(...);   /* (void *, int, int) */
-void padinit(...);
+#endif
+intptr_t movfxya(...);   /* (unsigned char *shape, int x, int y) */
+void padinit(void);
 int purgememadr(...);   /* (char *p) */
+#if !defined(_MSC_VER)
 int puts(...);   /* (const char *s) */
 void qsort(...);   /* (void*, int, int, int(*)(char*, char*)) */
 int rand(...);
+#endif
 int random(...);   /* (void) */
 void reorthogonalize(...);   /* (matrixtdef *m) */
 void  * reservememadr(...);   /* (const char *, int, int) */
-void resizememadr(...);   /* (void *, int) */
+void *resizememadr(void *userptr, int newsize);
 void restoregp(...);   /* (int arg0) */
 int rinverse(...);   /* (int x) */
 void savegp(...);   /* (int *arg0) */
 void seedrandom(...);   /* (int seed) */
 void setasyncfile(...);   /* (char *) */
 void setdirectory(...);   /* (char *path) */
-void setfont(...);   /* (char *f) */
+FontDecoder setfont(intptr_t fontId);
 void settrans(...);   /* (int on) */
 int shapedepth(...);   /* (void *shp) */
 void shapename(...);   /* (void *, int, char *) */
 void *shapepointer(...);   /* (void*, int) */
 int shapetoclutid(...);   /* (void * shape) */
+#if !defined(_MSC_VER)
 int sprintf(...);   /* (char *, const char *, ...) */
 char * strcat(...);   /* (char *, const char *) */
 char * strchr(...);   /* (char*, int) */
@@ -246,14 +254,15 @@ unsigned int strlen(...);   /* (char *) */
 int strncmp(...);   /* (const char *, const char *, unsigned) */
 char  * strncpy(...);   /* (char *, char *, int) */
 char * strstr(...);   /* (const char *haystack, const char *needle) */
-int systemtask(...);   /* (int taskFlag) */
+#endif
+extern "C" { unsigned int systemtask(int taskFlag); }
 void timedwait(...);   /* (int) */
 void transform(...);   /* (void *src, void *mtx, void *dst) */
 void transpose(...);   /* (matrixtdef *, matrixtdef *) */
-long unbtree(...);   /* (void *src, void *dst, int reverse) */
+long unbtree(...);   /* (unsigned char *src, unsigned char *dst) -- lib-source 2-arg (unbtree.cpp) */
 long unhuff(...);   /* (void *src, void *dst, int reverse) */
 long unrefpack(...);   /* (void *src, void *dst, int reverse) */
-void vramfxya(...);   /* (void * shape_data, short x_scale, short y_scale, short angle, int flags) */
+void vramfxya(...);   /* (void *shape, short imgX, short imgY, short clutX, short clutY) */
 void waitdraw(...);   /* (void) */
 int wildcard(...);   /* (u_char *str, char *pattern) */
 int xformy(...);   /* (matrixtdef *m, int angle) */

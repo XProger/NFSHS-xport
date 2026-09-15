@@ -2,10 +2,10 @@
  *   Player-action submission + reaction-table processing. SYM-v3 locals; vs disasm-v2.txt.
  *   NOT original source; SYM-faithful, recompilable C++.
  */
-#include "aiinit_types.h"
+#include "../../nfs4_types.h"
 #include "aiinit_externs.h"
 
-extern int D_8005523C[];   /* nonstandard-car table @0x8005523C (shared rodata) */
+static const int kAIInitNonStandardTable[50] = { 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
 
 
 /* ---- aiinit.obj-owned globals (.bss zero) ---- */
@@ -44,13 +44,13 @@ void AIInit_StartUp1(void)
   int *piVar3;
   
   AI_TrafficStartUp();
-  inverseLaneWidthTable[0] = 0;
   iVar2 = 1;
-  piVar3 = inverseLaneWidthTable + 1;
+  inverseLaneWidthTable[0] = 0;
+  piVar3 = inverseLaneWidthTable;
   do {
-    iVar1 = rdiv(0x10000,iVar2 << 0xe);
-    *piVar3 = iVar1;
     piVar3 = piVar3 + 1;
+    iVar1 = fixeddiv(0x10000,iVar2 << 0xe);
+    *piVar3 = iVar1;
     iVar2 = iVar2 + 1;
   } while (iVar2 < 0x50);
   AITune_StartUp1();
@@ -62,25 +62,36 @@ void AIInit_StartUp1(void)
 /* ---- AIInit_StartUp2__Fv  [@0x80066c24] ---- */
 void AIInit_StartUp2(void)
 {
-  {
-    int carLoop;
-    AISpeeds_StartUp();
-    AIInit_LoadConfigs();
-    for (carLoop = 0; carLoop < Cars_gNumCars; carLoop = carLoop + 1) {
-      AIScript_Startup(&Cars_gList[carLoop]->script);
-    }
+  int carLoop;
+  Car_tObj*carObj;
+  bool bVar1;
+  Car_tObj *pCVar2;
+  int iVar3;
+  Car_tObj **ppCVar4;
+  
+  AISpeeds_StartUp();
+  iVar3 = 0;
+  AIInit_LoadConfigs();
+  if (0 < Cars_gNumCars) {
+    ppCVar4 = Cars_gList;
+    do {
+      pCVar2 = *ppCVar4;
+      ppCVar4 = ppCVar4 + 1;
+      AIScript_Startup(&pCVar2->script);
+      iVar3 = iVar3 + 1;
+    } while (iVar3 < Cars_gNumCars);
   }
-  {
-    int carLoop;
-    AIPerson_Startup();
-    AIDataRecord_t::StartUp2();
-    AIPhysic_StartUp();
-    AITune_StartUp2();
-    for (carLoop = 0; carLoop < Cars_gNumCars; carLoop = carLoop + 1) {
-      Car_tObj *carObj = Cars_gList[carLoop];
-      AIPhysic_InitCar(carObj);
-      AIInit_InitAICar2(carObj);
-    }
+  iVar3 = 0;
+  AIPerson_Startup();
+  AIDataRecord_t::StartUp2();
+  AIPhysic_StartUp();
+  AITune_StartUp2();
+  ppCVar4 = Cars_gList;
+  while (bVar1 = iVar3 < Cars_gNumCars, iVar3 = iVar3 + 1, bVar1) {
+    pCVar2 = *ppCVar4;
+    ppCVar4 = ppCVar4 + 1;
+    AIPhysic_InitCar(pCVar2);
+    AIInit_InitAICar2(pCVar2);
   }
   return;
 }
@@ -95,40 +106,44 @@ void AIInit_Reset1(void)
 /* ---- AIInit_Reset2__Fv  [@0x80066d08] ---- */
 void AIInit_Reset2(void)
 {
-  if (AIInit_GameSetupWords[0] != RaceType_Id3) {
-    AIInit_useSpreadForce = 1;
+  int carLoop;
+  Car_tObj *pCVar1;
+  int iVar2;
+  Car_tObj **ppCVar3;
+  
+  AIInit_useSpreadForce = (int)(GameSetup_gData.raceType != 3);
+  iVar2 = 0;
+  if (0 < Cars_gNumCars) {
+    ppCVar3 = Cars_gList;
+    do {
+      pCVar1 = *ppCVar3;
+      ppCVar3 = ppCVar3 + 1;
+      AIScript_Startup(&pCVar1->script);
+      iVar2 = iVar2 + 1;
+    } while (iVar2 < Cars_gNumCars);
   }
-  else {
-    AIInit_useSpreadForce = 0;
-  }
-  {
-    int carLoop;
-    for (carLoop = 0; carLoop < Cars_gNumCars; carLoop = carLoop + 1) {
-      AIScript_Startup(&Cars_gList[carLoop]->script);
-    }
-  }
-  AIInit_leaderBoardCars[1] = Cars_gHumanRaceCarList[0];
-  AIInit_leaderBoardCars[0] = Cars_gHumanRaceCarList[0];
-  AIInit_leaderBoardCars[3] = Cars_gAIRaceCarList[0];
-  AIInit_leaderBoardCars[2] = Cars_gAIRaceCarList[0];
+  leaderBoard.leadHumanRacer = Cars_gHumanRaceCarList[0];   /* byte-match backport: was (Car_tObj*)0x0 */
+  leaderBoard.leadRacer = Cars_gHumanRaceCarList[0];
+  leaderBoard.lastAIRacer = Cars_gAIRaceCarList[0];
+  leaderBoard.leadAIRacer = Cars_gAIRaceCarList[0];
   AIPhysic_Reset();
-  AIInit_AIInfoWords[2] = 0;
-  AIInit_AIInfoWords[1] = 0;
-  AIInit_AIInfoWords[0] = 0;
-  AIInit_AIInfoWords[5] = 0;
-  AIInit_AIInfoWords[4] = 0;
-  AIInit_AIInfoWords[3] = 0;
-  AIInit_AIInfoWords[8] = 0;
-  AIInit_AIInfoWords[7] = 0;
-  AIInit_AIInfoWords[6] = 0;
-  AIInit_AIInfoWords[11] = 0;
-  AIInit_AIInfoWords[10] = 0;
-  AIInit_AIInfoWords[9] = 0;
-  AIInit_AIInfoWords[14] = 0;
-  AIInit_AIInfoWords[13] = 0;
-  AIInit_AIInfoWords[12] = 0;
-  AIInit_AIInfoWords[15] = 0;
-  AIInit_AIInfoWords[17] = 0;
+  AI_Info.blockingCars[2] = (Car_tObj *)0x0;
+  AI_Info.blockingCars[1] = (Car_tObj *)0x0;
+  AI_Info.blockingCars[0] = (Car_tObj *)0x0;
+  AI_Info.blockingCarsDist[2] = 0;
+  AI_Info.blockingCarsDist[1] = 0;
+  AI_Info.blockingCarsDist[0] = 0;
+  AI_Info.laneSpeeds[2] = 0;
+  AI_Info.laneSpeeds[1] = 0;
+  AI_Info.laneSpeeds[0] = 0;
+  AI_Info.laneSpeedsAhead[2] = 0;
+  AI_Info.laneSpeedsAhead[1] = 0;
+  AI_Info.laneSpeedsAhead[0] = 0;
+  AI_Info.laneWeights[2] = 0;
+  AI_Info.laneWeights[1] = 0;
+  AI_Info.laneWeights[0] = 0;
+  AI_Info.desiredLane = 0;
+  AI_Info.deltaYaw = 0;
   return;
 }
 
@@ -161,41 +176,39 @@ void AIInit_CleanUp2(void)
       AIPhysic_DeInitCar(carObj);
     } while (iVar2 < Cars_gNumCars);
   }
-  carLoop = 0;
+  iVar2 = 0;
   AITune_CleanUp2();
   AIPhysic_CleanUp();
   AIDataRecord_t::CleanUp2();
   AIPerson_Cleanup();
   if (0 < Cars_gNumCars) {
     do {
-      carLoop = carLoop + 1;
+      iVar2 = iVar2 + 1;
       AIScript_Cleanup();
-    } while (carLoop < Cars_gNumCars);
+    } while (iVar2 < Cars_gNumCars);
   }
   AISpeeds_CleanUp();
   return;
 }
 
 /* ---- AI_TrafficStartUp__Fv  [@0x80066f0c] ---- */
-extern char  D_8005521C[];   /* "%sTr%02d.trf" format @0x8005521C */
-extern char *D_801164B0[];   /* path-table @0x801164B0 (Paths_Paths+0x48) */
-
 void AI_TrafficStartUp(void)
 {
   char filename[100];
   char *rawTriggers;
-
-  if (AIInit_GameSetupWords[6] != 0) {
-    triggerManagerTraffic = __builtin_new(0x34c);
-    sprintf(filename,D_8005521C,D_801164B0[0],AIInit_GameSetupWords[15]);
-    rawTriggers = (char *)loadfileadrz(filename,(void *)0x0);
-    AITraffic_rawTriggers = (u_char *)rawTriggers;
-    if (rawTriggers != (char *)0x0) {
-      AITrigger_Init(triggerManagerTraffic,rawTriggers);
+  char acStack_70 [104];
+  
+  if (GameSetup_gData.trafficDensity != 0) {
+    triggerManagerTraffic = (AITrigger_TriggerManager *)__builtin_new(0x34c);
+    sprintf(acStack_70,"%sTr%02d.trf",Paths_Paths[18],GameSetup_gData.track);
+    AITraffic_rawTriggers = (u_char *)loadfileadrz(acStack_70,0)
+    ;
+    rawTriggers = (char *)AITraffic_rawTriggers;
+    if (AITraffic_rawTriggers == (char *)0x0) {
+      rawTriggers = (char *)0x0;
     }
-    else {
-      AITrigger_Init(triggerManagerTraffic,(char *)0x0);
-    }
+    triggerManagerTraffic->Init(rawTriggers)
+    ;
   }
   return;
 }
@@ -215,15 +228,13 @@ void AI_TrafficCleanUp(void)
 }
 
 /* ---- AIInit_LoadConfigs__Fv  [@0x80066ff8] ---- */
-extern char  D_8005522C[];   /* sprintf format string @0x8005522C (shared rodata) */
-extern char *D_80116470[];   /* path-table @0x80116470 (Paths_Paths+8) */
-
 void AIInit_LoadConfigs(void)
 {
   char pathname[100];
   Udff_tInfo *handle;
-
-  sprintf(pathname,D_8005522C,D_80116470[0]);
+  char acStack_70 [104];
+  
+  sprintf(acStack_70,"%strafcfg.dat",Paths_Paths[2]);
   handle = Udff_Opena((char *)0x0,trafcfg,1);
   AIInit_LoadPhysicsConfig(handle);
   Udff_Close(handle);
@@ -239,18 +250,18 @@ void AIInit_LoadPhysicsConfig(Udff_tInfo *handle)
   AIPhysic_ModelConfig_t *pAVar2;
   int iVar3;
   
-  AIInit_AIPhysicConfigWords[0] = Udff_GetInt(handle);
-  AIInit_AIPhysicConfigWords[1] = Udff_GetInt(handle);
-  AIInit_AIPhysicConfigWords[2] = Udff_GetInt(handle);
-  AIInit_AIPhysicConfigWords[3] = Udff_GetInt(handle);
-  AIInit_AIPhysicConfigWords[4] = Udff_GetInt(handle);
+  AIPhysicConfig.latvelcalc_lookahead = Udff_GetInt(handle);
+  AIPhysicConfig.min_lookahead = Udff_GetInt(handle);
+  AIPhysicConfig.max_lookahead = Udff_GetInt(handle);
+  AIPhysicConfig.look_ahead_factor = Udff_GetInt(handle);
+  AIPhysicConfig.skid_value = Udff_GetInt(handle);
   iVar3 = 0;
   do {
     if (iVar3 == 0) {
-      pAVar2 = (AIPhysic_ModelConfig_t *)(AIInit_AIPhysicConfigWords + 5);
+      pAVar2 = &AIPhysicConfig.ICModel;
     }
     else {
-      pAVar2 = (AIPhysic_ModelConfig_t *)(AIInit_AIPhysicConfigWords + 16);
+      pAVar2 = &AIPhysicConfig.OOCModel;
     }
     iVar1 = Udff_GetInt(handle);
     pAVar2->dlpos_to_dlvel = iVar1;
@@ -283,8 +294,8 @@ void AIInit_LoadPhysicsConfig(Udff_tInfo *handle)
 void AIInit_ClearAICar(Car_tObj *carObj)
 {
   coorddef zero;
-
-  memset((u_char *)&zero,'\0',0xc);
+  
+  memset((u_char *)&zero,'\0',sizeof(zero));
   (carObj->N).angularVel = zero;
   (carObj->N).flightTime = 0;
   carObj->frontSkid = 0;
@@ -301,20 +312,12 @@ void AIInit_ClearAICar(Car_tObj *carObj)
 }
 
 /* ---- AIInit_RestartAICar__FP8Car_tObj  [@0x800671ec] ---- */
-/* Body sourced from the NFS4-F reconstruction tree (game/common/aiinit.cpp).
- * D_8011321C == GameSetup_gData.reverseTrack (GameSetup_gData+0x30) — standalone-
- * symbol form matches the reloc. MATCHING AIDS (permuter, not original source):
- * the `new_var = carObj` alias on one store + copTopSpeed-before-copAccMult ordering
- * coax gcc's allocator (early 0x10000 -> v1, no anti-dep; li a1,1 stays first). */
-extern int D_8011321C;   /* standalone global @0x8011321C (== GameSetup_gData+0x30) */
-
 void AIInit_RestartAICar(Car_tObj *carObj)
 {
   int iVar1;
-  Car_tObj *new_var;   /* matching aid (permuter) */
-
+  
   iVar1 = -1;
-  if (D_8011321C == 0) {
+  if (GameSetup_gData.reverseTrack == 0) {
     iVar1 = 1;
   }
   carObj->direction = iVar1;
@@ -329,11 +332,10 @@ void AIInit_RestartAICar(Car_tObj *carObj)
   carObj->driveDirection = 1;
   carObj->driveDirectionTimer = 0;
   carObj->driveDirectionReverseTime = 0;
-  new_var = carObj;
   carObj->barrierThinkHarder = 0;
   carObj->desiredLatPos = 0;
   carObj->desiredSpeed = 0;
-  new_var->originalDesiredSpeed = 0;
+  carObj->originalDesiredSpeed = 0;
   carObj->currentSpeed = 0;
   carObj->speed = 0;
   carObj->laneSlack = 0;
@@ -353,17 +355,17 @@ void AIInit_RestartAICar(Car_tObj *carObj)
   (carObj->speechInfo).speechMode = 0;
   carObj->wipeOutEndTick = 0;
   carObj->btcGlueModifier = 0x10000;
-  carObj->copTopSpeed = 0x640000;
   carObj->copAccMult = 0x10000;
+  carObj->copTopSpeed = 0x640000;
   carObj->donutMode = 0;
   carObj->laneIndex = 7;
   carObj->AIFishtailEndTick = 0;
   carObj->lookAheadSlice = 0;
-  if ((carObj->carFlags & 2U) != 0) {
-    carObj->forceNoSimOptz = 0;
+  if ((carObj->carFlags & 2U) == 0) {
+    carObj->forceNoSimOptz = 1;
   }
   else {
-    carObj->forceNoSimOptz = 1;
+    carObj->forceNoSimOptz = 0;
   }
   carObj->wipeOutStartTick = 0;
   if ((carObj->carFlags & 10U) == 2) {
@@ -398,20 +400,25 @@ void AIInit_InitAICar(Car_tObj *carObj,Udff_tInfo *handle)
   iVar1 = Udff_GetInt(handle);
   carObj->redLine = iVar1;
   Udff_GetBuffer(handle,(char *)carObj->topSpeeds,0x1c);
-  for (gearLoop = 0, iVar6 = -4; gearLoop < 7; gearLoop = gearLoop + 1) {
-    if (gearLoop == 0) {
-      iVar2 = rdiv(0x10000,carObj->topSpeeds[0]);
+  iVar1 = 0;
+  iVar6 = -4;
+  pCVar5 = carObj;
+  do {
+    if (iVar1 == 0) {
+      iVar2 = fixeddiv(0x10000,carObj->topSpeeds[0]);
       carObj->invTopSpeeds[0] = iVar2;
     }
-    else if (carObj->topSpeeds[gearLoop] == 0) {
-      carObj->invTopSpeeds[gearLoop] = 0;
+    else if (pCVar5->topSpeeds[0] == 0) {
+      pCVar5->invTopSpeeds[0] = 0;
     }
     else {
-      iVar2 = rdiv(0x10000,carObj->topSpeeds[gearLoop] - ((Car_tObj *)((int)carObj + iVar6))->topSpeeds[0]);
-      carObj->invTopSpeeds[gearLoop] = iVar2;
+      iVar2 = fixeddiv(0x10000,pCVar5->topSpeeds[0] - carObj->topSpeeds[iVar1 - 1]);
+      pCVar5->invTopSpeeds[0] = iVar2;
     }
     iVar6 = iVar6 + 4;
-  }
+    iVar1 = iVar1 + 1;
+    pCVar5 = (Car_tObj *)&(pCVar5->N).oldSlice;
+  } while (iVar1 < 7);
   Udff_GetBuffer(handle,(char *)carObj->accTable,0xe0);
   iVar1 = Udff_GetInt(handle);
   carObj->aiShiftDuration = iVar1;
@@ -420,17 +427,17 @@ void AIInit_InitAICar(Car_tObj *carObj,Udff_tInfo *handle)
   iVar1 = Udff_GetInt(handle);
   carObj->max_aa = iVar1;
   if ((carObj->carFlags & 8U) != 0) {
-    scale = AIInit_accelerationScaleWords[carObj->carInfo->carType];
+    scale = AITune_accelerationScale[carObj->carInfo->carType].scale;
   }
-  pAVar3 = new AIDataRecord_AccTable_t((char *)carObj->accTable,scale,3);  /* enum body is not emitted in aiinit.obj; ABI name retained by the owner declaration */
+  pAVar3 = new AIDataRecord_AccTable_t((char *)carObj->accTable,scale,(AIDataRecord_WhichRecord_t)3);  /* @was __builtin_new(0x5c)+flat ctor __23AIDataRecord_AccTable_t... */
   carObj->accelerationRecord = pAVar3;
   iVar1 = AIInit_IsNonStandardCarFile(carObj->carInfo->carType);
-  if (iVar1 != 0) {
-    pAVar4 = new AIDataRecord_CurveSpeedTable_t(carObj->carName,7);  /* enum body is not emitted in aiinit.obj; ABI name retained by the owner declaration */
-    carObj->curveSpeedTable = pAVar4;
+  if (iVar1 == 0) {
+    carObj->curveSpeedTable = (AIDataRecord_CurveSpeedTable_t *)0x0;
   }
   else {
-    carObj->curveSpeedTable = (AIDataRecord_CurveSpeedTable_t *)0x0;
+    pAVar4 = new AIDataRecord_CurveSpeedTable_t(carObj->carName,(AIDataRecord_WhichRecord_t)7);  /* @was __builtin_new(0x58)+flat ctor __30AIDataRecord_CurveSpeedTable_t... */
+    carObj->curveSpeedTable = pAVar4;
   }
   iVar1 = fixedmult(carObj->max_clacc,0x13333);
   carObj->max_clacc = iVar1;
@@ -448,27 +455,20 @@ void AIInit_InitAICar(Car_tObj *carObj,Udff_tInfo *handle)
 /* ---- AIInit_DeInitAICar__FP8Car_tObj  [@0x800674e8] ---- */
 void AIInit_DeInitAICar(Car_tObj *carObj)
 {
-  /* Ghidra typed `_vf` as a pointer to a 1-byte-stride array, so the raw
-     `pa_Var1 + 4` / `pa_Var1[2] + 2` byte arithmetic lands the dispatch pfn at
-     +12 and the this-adjust delta at +8 (vtable entry[1]). Using the real
-     8-byte __vtbl_ptr_type stride here would scale those to +96/+64. */
-  char (*pa_Var1) [3];
+  __vtbl_ptr_type (*pa_Var1) [3];
   AIDataRecord_CurveSpeedTable_t *pAVar2;
   AIDataRecord_AccTable_t *pAVar3;
-  char *nm;
-
+  
   pAVar2 = carObj->curveSpeedTable;
   if (pAVar2 != (AIDataRecord_CurveSpeedTable_t *)0x0) {
-    nm = pAVar2->name_;
-    pa_Var1 = (char (*)[3])pAVar2->_vf;
-    (**(int (**)(...))(pa_Var1 + 4))(nm + *(short *)(pa_Var1[2] + 2) + -8,3);
+    pa_Var1 = (pAVar2->_base_AIDataRecord_t)._vf;
+    (**(int (**)(...))(pa_Var1 + 4))((pAVar2->_base_AIDataRecord_t).name_ + *(short *)(pa_Var1[2] + 2) + -8,3);
     carObj->curveSpeedTable = (AIDataRecord_CurveSpeedTable_t *)0x0;
   }
   pAVar3 = carObj->accelerationRecord;
   if (pAVar3 != (AIDataRecord_AccTable_t *)0x0) {
-    nm = pAVar3->name_;
-    pa_Var1 = (char (*)[3])pAVar3->_vf;
-    (**(int (**)(...))(pa_Var1 + 4))(nm + *(short *)(pa_Var1[2] + 2) + -8,3);
+    pa_Var1 = pAVar3->_vf;
+    (**(int (**)(...))(pa_Var1 + 4))(pAVar3->name_ + *(short *)(pa_Var1[2] + 2) + -8,3);
     carObj->accelerationRecord = (AIDataRecord_AccTable_t *)0x0;
   }
   return;
@@ -499,10 +499,39 @@ void AIInit_DeInitAICar2(Car_tObj *carObj)
 /* ---- AIInit_IsNonStandardCarFile__Fi  [@0x800675d8] ---- */
 int AIInit_IsNonStandardCarFile(int index)
 {
+  u_int *puVar1;
+  int *piVar2;
+  int carType;
+  u_int *puVar3;
   int iVar4;
+  u_int *puVar5;
+  u_int uVar6;
+  u_int uVar7;
+  u_int uVar8;
+  AIPhysic_ModelConfig_t *model;
+  int gearLoop;
+  int loop;
+  int accelerationScale;
   int nonStandardList [50];
-
-  __builtin_memcpy(nonStandardList,D_8005523C,sizeof nonStandardList);
+  
+  puVar1 = (u_int *)kAIInitNonStandardTable;
+  piVar2 = nonStandardList;
+  do {
+    puVar5 = (u_int *)piVar2;
+    puVar3 = puVar1;
+    uVar6 = puVar3[1];
+    uVar7 = puVar3[2];
+    uVar8 = puVar3[3];
+    *puVar5 = *puVar3;
+    puVar5[1] = uVar6;
+    puVar5[2] = uVar7;
+    puVar5[3] = uVar8;
+    puVar1 = puVar3 + 4;
+    piVar2 = (int *)puVar5 + 4;
+  } while (puVar3 + 4 != (u_int *)(u_int *)(kAIInitNonStandardTable + 48));
+  uVar6 = puVar3[5];
+  puVar5[4] = puVar3[4];   /* byte-match backport: was 0 (dropped element [48]) */
+  puVar5[5] = uVar6;
   if (index < 0x32) {
     iVar4 = nonStandardList[index];
   }

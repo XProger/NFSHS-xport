@@ -1,56 +1,48 @@
 /* frontend/common/femenuextended_externs.h - reconstructed externs. NOT original. */
 #ifndef _FE_SCREENS_FEDIALOG_EXTERNS_H_
 #define _FE_SCREENS_FEDIALOG_EXTERNS_H_
-#include "fedialog_types.h"
+#include "../../nfs4_types.h"
+#include "../../lib/libfns.h"
+extern "C" u_char *&Render_gPacketPtr, *&Render_gPalettePtr;
 extern tFEApplication *FEApp;
-extern tfrontEnd frontEnd;
-extern tPadModuleState gPadinfo;
-/* Address-visible view: several retail routines schedule %hi(ticks)
-   independently of the load; a scalar extern collapses it into a macro. */
-extern int ticks[];
+extern "C" extern tfrontEnd frontEnd;
+extern "C" tPadModuleState gPadinfo;
+extern "C" int ticks;
 extern tGlobalMenuDefs *menuDefs;
 /* class vtables (FEDialog.obj-defined subclasses) */
-extern __vtbl_ptr_type tDialogBase_vtable[], tDialogHelp_vtable[], tDialogMessageString_vtable[], tDialogBackUpOnly_vtable[],
-  tDialogInteractive_vtable[], tDialogYesNo_vtable[], tDialogYesNoMem_vtable[],
-  tDialogYesNoTri_vtable[], tDialogNoInputMessage_vtable[];//X
+extern __vtbl_ptr_type tDialogBase_vtable[], tDialogHelp_vtable[], tDialogMessageString_vtable[],
+  tDialogInteractive_vtable[], tDialogYesNoMem_vtable[], tDialogYesNoTri_vtable[],
+  tDialogNoInputMessage_vtable[];
+extern "C" __vtbl_ptr_type tDialogBackUpOnly_vtable[], tDialogYesNo_vtable[];
 /* engine helpers (shared with FeMenuOptions) */
 int   CalcFadeVal(int, int);  int CalcFadeVal(int,int,int);  int CalcFadeVal(int,int,int,int);
-void  DrawShapeExtended(int,int,int,int,int,int,tDrawShapeExtended*);
+extern "C" { void  DrawShapeExtended(int,int,int,int,int,int,tDrawShapeExtended*); }
 void  ScaleShapeExtended(int,int,int,int,int,int,tDrawShapeExtended*);
 void  PSXDrawSquare(int,int,int,int,int);  void PSXDrawTransSquare(int,int,int,int,int,short);
 void  FeDraw_SetABRMode(int);  void Flare_2DHalo(int,int,int,int,int);
-int   TextSys_WordX(int);  int TextSys_WordY(int);  char *TextSys_Word(int);  int TextSys_WordFlags(int);
+extern "C" { int   TextSys_WordX(int);  int TextSys_WordY(int);  char *TextSys_Word(int);  int TextSys_WordFlags(int); }
 void  AudioCmn_PlayFESFX(int);  void AudioCmn_PlayFESFXVol(int,int);
-extern tTexture_ShapeInfo *gHelpShapes;  extern tPlayer gMenu_SubMenuPlayer;
-void  FETextRender_FullTextRGB(char*,short,short,int,char,short);
+extern "C" tTexture_ShapeInfo *gHelpShapes;  extern tPlayer gMenu_SubMenuPlayer;
+extern "C" { void  FETextRender_FullTextRGB(char*,short,short,int,char,short); }
 void  FETextRender_Title(short);
-void  FETextRender_WordWrapTextRGBJustify(char*,RECT&,int,int,int,bool);
-int   CalcTextFadeSelToHi(int, short, short);  int CalcTextFadeUnselToSel(int, short, short);
-extern char textDefinitions[14][6];  extern int kRGBVals[];  extern int screenheight;
-extern int gFlip;  extern int Draw_gPlayer1View;
-void *Draw_GetDRAWENV(int,int);
+extern "C" { void  FETextRender_WordWrapTextRGBJustify(char*,RECT&,int,int,int,bool); }
+extern "C" { int   CalcTextFadeSelToHi(...);  int CalcTextFadeUnselToSel(...); }
+extern "C" char textDefinitions[6][14]; extern int kRGBVals[]; extern "C" int screenheight;
+extern "C" int gFlip; extern "C" int Draw_gPlayer1View;
+extern "C" { void *Draw_GetDRAWENV(int,int); }
 /* FEDialog-specific helpers */
-void  DrawShape_SubtractNFS4RectEdges(RECT &);  void DrawShape_NFS4RoundRectangle(...);
-void  FETextRender_SetFont(int);  extern "C" int textpixels(char*);  void s_upper(char*);
-/* TRUE prototypes (2026-08-02, user-approved): the old variadic `(...)` decls mangled as
- * phantom symbols wherever FontUpsideDownBlit's address is taken -- byte-neutral fix,
- * reloc symbols now match font.cpp/psxfront.cpp definitions. */
-void  Font_SetBlitter(void (*)(int,int,void *,int,int,struct charactertbl *,int));
-void  Font_ReSetBlitter();
-void  FontUpsideDownBlit(int,int,void *,int,int,struct charactertbl *,int);
-int CalcOnOffFade(...);  extern int screenwidth;
-void  FETextRender_MenuTextPositionedJustify(short,short,short,short,int,int);
+extern "C" { void  DrawShape_SubtractNFS4RectEdges(...);  void DrawShape_NFS4RoundRectangle(...); }
+extern "C" { void  FETextRender_SetFont(int);  int textpixels(char*);  void s_upper(char*); }
+extern "C" { void  Font_SetBlitter(...);  void Font_ReSetBlitter();  void FontUpsideDownBlit(...); }
+extern "C" void MenuNFS4_SetHelpPos(RECT *); extern "C" void CalcOnOffFade(tMenuTextType, short, short, short, int &, int &);  extern "C" int screenwidth;
+void  FETextRender_MenuTextPositionedJustify(short,short,short,short,tMenuTextState,tMenuTextType);
+extern tDialogBase *DialogVisibilityList[8];
 void FeTools_DrawPSXButton(u_char,u_short,int,int);
-void FETextRender_SetABR(int,bool);
-/* FEDialog.obj filters the completed text-enum records, but the callee keeps
- * those enum names in its GCC-v2 linkage spelling. */
-void FETextRender_FullText(char*,short,short,int,int,short)
-    __asm__("FETextRender_FullText__FPcss13tMenuTextType14tMenuTextStates");
-int  FETextRender_WordWrapHeight(short, char *);
-void FETextRender_WordWrapTextRGB(char*, RECT&, int);
-int  FEInput_GetKeyFromPlayer(tPlayer, long);
+extern "C" { void FETextRender_SetABR(int,bool); }
+void FETextRender_FullText(char*,short,short,tMenuTextType,tMenuTextState,short);
+extern "C" { int  FETextRender_WordWrapHeight(...); }
+extern "C" { void FETextRender_WordWrapTextRGB(...); }
+tInputKeyType FEInput_GetKeyFromPlayer(tPlayer,long);
 extern int CURRENTPLAYER;
-extern "C" int MCRD_handlecardevents(int);  extern "C" CARDINFO_def *MCRD_getcard(int);
-extern "C" void blockmove(void *, void *, int);
-extern "C" void PAD_update(void);
+extern "C" { int MCRD_handlecardevents(...);  CARDINFO_def *MCRD_getcard(int); }
 #endif

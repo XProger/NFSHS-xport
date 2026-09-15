@@ -1,19 +1,14 @@
+#include "../../../lib/snd.h"
+
 /* eaclib/psx/sndpsxz/sstgetv.c -- RECONSTRUCTED. NOT original.  *** 1/1 ***  obj sstgetv.obj @0x800E83EC */
-extern int sndgs[];
-extern int iSNDstreamgetstreamptr(int tag);   /* sst     */
-extern int SNDgetvol(unsigned int tag);       /* sgetvol */
-extern int SNDSTRM_getvol(int tag);           /* @0x800E83EC */
+extern "C" int sndgs[];
+extern "C" SndStreamState *iSNDstreamgetstreamptr(int tag);   /* sst */
+extern "C" int SNDgetvol(unsigned int tag);       /* sgetvol */
+extern "C" void SNDSTRM_getvol(int tag);          /* @0x800E83EC */
 /* SNDSTRM_getvol : query a stream's current volume. */
-extern int SNDSTRM_getvol(int tag)
+extern "C" void SNDSTRM_getvol(int tag)
 {
-    int sp, vol;
-    if ((signed char)sndgs[0xf] == 0)
-        return -10;
-    sp = iSNDstreamgetstreamptr(tag);
-    if (sp == 0)
-        return -8;
-    vol = SNDgetvol(*(unsigned int *)(sp + 8));
-    if (vol < 0)
-        vol = *(signed char *)(sp + 0x54);
-    return vol;
+    SndStreamState *sp;
+    if ((char)sndgs[0xf] != 0 && (sp = iSNDstreamgetstreamptr(tag)) != 0)
+        SNDgetvol((unsigned int)sp->playResult);
 }

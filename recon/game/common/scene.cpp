@@ -2,13 +2,8 @@
  *   6 fns: Scene_Init/DeInit/PurgeScene/BuildCustomSceneList/LoadSceneFile + GetPlaneY.
  *   GTE-free. Full SYM-locals applied.
  */
-#include "scene_types.h"
+#include "../../nfs4_types.h"
 #include "scene_externs.h"
-
-/* gp-rel owning-TU defs: these small (<=G4) globals are extern-declared
- * but OWNED here; tentative defs -> cc1 `.comm` -> stock maspsx gp-rels them
- * (matches the oracle's %gp_rel). section 3.12 #6. (auto: gen_gprel_defs.py) */
-CSceneList *gGameSceneList;
 
 /* ---- intra-TU forward declarations (auto-emitted, signature-exact) ---- */
 void Scene_Init(int numObjDefs);
@@ -53,31 +48,38 @@ void Scene_PurgeScene(void)
 int Scene_BuildCustomSceneList(void)
 
 {
-  SceneElem *se;
   int i;
+  int i_2;
+  SceneElem *se;
+  SceneElem *objectData;
   int slice;
+  int ret_slice;
   
   Object_ClearCustomObjects();
-  slice = -1;
+  ret_slice = -1;
   if (gGameSceneList != (CSceneList *)0x0) {
-    se = (SceneElem *)(gGameSceneList + 1);
-    slice = gGameSceneList->slice_;
-    Object_customSliceNum = slice;
-    for (i = 0; i < gGameSceneList->numElements_; se++, i++) {
-      if (se->type < 3) {
-        if (-1 < se->type) {
-          Object_AddCustomObject(se,1);
+    objectData = (SceneElem *)(gGameSceneList + 1);
+    ret_slice = gGameSceneList->slice_;
+    i_2 = 0;
+    Object_customSliceNum = ret_slice;
+    if (0 < gGameSceneList->numElements_) {
+      do {
+        if ((objectData->type < 3) && (-1 < objectData->type)) {
+          Object_AddCustomObject(objectData,1);
         }
-      }
+        i_2 = i_2 + 1;
+        objectData = objectData + 1;
+      } while (i_2 < gGameSceneList->numElements_);
     }
   }
-  return slice;
+  return ret_slice;
 }
 
 /* ---- Scene_LoadSceneFile__Fi  [SCENE.CPP:1111-1137] SLD-VERIFIED ---- */
 void Scene_LoadSceneFile(int sceneFileIndex)
 
 {
+  int priority;
   char fname [128];
   int bigFile;
   
@@ -85,10 +87,11 @@ void Scene_LoadSceneFile(int sceneFileIndex)
   bigFile = 0;
   sprintf(fname,"%sscene.viv",Paths_Paths[6]);
   FILE_addbigsync(fname,(void *)0x10,100,&bigFile);
-  sprintf(fname,"tr%02d%02d.scn",SCENE_TRACK,sceneFileIndex);
+  priority = GameSetup_gData.track;
+  sprintf(fname,"tr%02d%02d.scn",priority,sceneFileIndex);
   gGameSceneList = (CSceneList *)0x0;
   gGameSceneList = (CSceneList *)loadfileadr(fname,0);
-  FILE_delbigsync((char *)bigFile,(void *)0x64);
+  FILE_delbigsync((char *)bigFile,(void *)0x64,priority,(int *)sceneFileIndex);
   return;
 }
 
@@ -96,13 +99,20 @@ void Scene_LoadSceneFile(int sceneFileIndex)
 int GetPlaneY(const coorddef *norm,const coorddef *pointOnPlane,const coorddef *testPoint)
 
 {
+  int iVar1;
+  int iVar2;
+  int iVar3;
+  int iVar4;
+  int iVar5;
   int D;
-
-  D = -(fixedmult(norm->x,pointOnPlane->x) +
-        fixedmult(norm->y,pointOnPlane->y) +
-        fixedmult(norm->z,pointOnPlane->z));
-  return fixeddiv(-(fixedmult(norm->x,testPoint->x) +
-                    fixedmult(norm->z,testPoint->z) + D),norm->y);
+  
+  iVar1 = fixedmult(norm->x,pointOnPlane->x);
+  iVar2 = fixedmult(norm->y,pointOnPlane->y);
+  iVar3 = fixedmult(norm->z,pointOnPlane->z);
+  iVar4 = fixedmult(norm->x,testPoint->x);
+  iVar5 = fixedmult(norm->z,testPoint->z);
+  iVar1 = fixeddiv(-((iVar4 + iVar5) - (iVar1 + iVar2 + iVar3)),norm->y);
+  return iVar1;
 }
 
 /* end of scene.cpp */

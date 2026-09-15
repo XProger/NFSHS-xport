@@ -9,8 +9,9 @@
 tScreenTrophyRoom::tScreenTrophyRoom()
 
 {
-
-  this->_vf = (__vtbl_ptr_type (*)[10])tScreenTrophyRoom_vtable;
+  
+  tScreen_ctor(&this->_base_tScreen);
+  (this->_base_tScreen)._vf = (__vtbl_ptr_type (*)[10])tScreenTrophyRoom_vtable;
   this->fPreviousTrophy = '\0';
   this->fRealCurrentTourn[0] = 0;
   this->fRealCurrentTourn[1] = 0;
@@ -23,10 +24,8 @@ tScreenTrophyRoom::tScreenTrophyRoom()
 tScreenTrophyRoom::~tScreenTrophyRoom()
 
 {
-  /* MATCH: NO manual tScreen_dtor call — the declared base dtor auto-fires
-     (gcc-2.8 derived-dtor shape: vptr store in the base-dtor jal delay slot,
-      original __in_chrg forwarded in $a1 untouched).  cf. catalog D/wave-3. */
-  this->_vf = (__vtbl_ptr_type (*)[10])tScreenTrophyRoom_vtable;
+  (this->_base_tScreen)._vf = (__vtbl_ptr_type (*)[10])tScreenTrophyRoom_vtable;
+  (((tScreen*)(&this->_base_tScreen))->~tScreen(), (tScreen*)(&this->_base_tScreen));
   return;
 }
 
@@ -37,23 +36,13 @@ void tScreenTrophyRoom::GetShapeInfo(short &numPermShapes,short &numSwapShapes,
                char **permFileName,char **swapFileName)
 
 {
+  
   numPermShapes = 0x26;
   numSwapShapes = 0x20;
-  /* MATCH: the SLD splits the THIS-dependent current-tournament read from the
-     call.  Folding that read into the call scales the index terms separately
-     and hands &tournamentManager a non-$a0 scratch; the remaining offset plus
-     `cur` expression can stay in the call without changing code or SLD. */
-  {
-    /* SYM-CODEGEN-CARRIER: cur -- folding this member read into the index is
-       FAIL27 (49/48); its own statement frees $a0 before the manager address
-       is formed and reproduces retail's allocation order. */
-    uint cur = (uint)(byte)this->fRealCurrentTourn[(byte)frontEnd.tier];
-
-    GetTrophyName(&tournamentManager,
-               (tournamentManager.fDefinition)->fTournaments +
-                 ((uint)(tournamentManager.fDefinition)->fTiers[(byte)frontEnd.tier].fTournOffset + cur),
-               ts_Small,gSwapFileName,-1);
-  }
+  GetTrophyName(&tournamentManager,
+             (tournamentManager.fDefinition)->fTournaments +
+             (uint)(tournamentManager.fDefinition)->fTiers[(byte)frontEnd.tier].fTournOffset +
+             (uint)(byte)this->fRealCurrentTourn[(byte)frontEnd.tier],ts_Small,gSwapFileName,-1);
   *permFileName = "zTrophy";
   *swapFileName = gSwapFileName;
   return;
@@ -66,34 +55,52 @@ void tScreenTrophyRoom::ProcessInput(tPlayer fromPlayer,tInputKeyType &keyval,
                tMenuCommand &command)
 
 {
-  /* MATCH: the SLD records no locals for this function.  In particular, the
-     clamp is the expanded EA-style MIN(MAX(current, 0), fNumTrophies): the
-     repeated inner expression is significant because retail recomputes and
-     reloads the selected value instead of retaining a temporary. */
-  if (keyval == kInput_KeyType_Cross) {
+  tGlobalMenuDefs *mdefs;
+  short step;
+  int half;
+  tInputKeyType key;
+  int tierIdx;
+  
+  mdefs = menuDefs;
+  key = keyval;
+  if (key == kInput_KeyType_Cross) {
     command.type = kMenu_Command_GoToMenu;
-    command.nextMenu = (tMenu *)&menuDefs->menuTrophyInfo;
+    command.nextMenu = (tMenu *)&mdefs->menuTrophyInfo;
+    key = keyval;
   }
-  if ((keyval != kInput_KeyType_Up) && (keyval != kInput_KeyType_Down))
+  if ((key != kInput_KeyType_Up) && (key != kInput_KeyType_Down))
   goto TrophyRoomProc_keyLeftCheck;
-  if (this->fRealCurrentTourn[this->tier] < this->fNumTrophies / 2) {
-    this->fRealCurrentTourn[this->tier] =
-         this->fRealCurrentTourn[this->tier] + this->fNumTrophies / 2;
-    AudioCmn_PlayFESFX(3);
+  tierIdx = this->tier;
+  half = (uint)(ushort)this->fNumTrophies << 0x10;
+  half = (half >> 0x10) - (half >> 0x1f) >> 1;
+  step = (short)half;
+  if (this->fRealCurrentTourn[tierIdx] < half) {
+    this->fRealCurrentTourn[tierIdx] = this->fRealCurrentTourn[tierIdx] + step;
+    half = 3;
   }
   else {
-    this->fRealCurrentTourn[this->tier] =
-         this->fRealCurrentTourn[this->tier] - this->fNumTrophies / 2;
-    AudioCmn_PlayFESFX(4);
+    this->fRealCurrentTourn[tierIdx] = this->fRealCurrentTourn[tierIdx] - step;
+    half = 4;
   }
-  this->fRealCurrentTourn[this->tier] =
-       ((0 < this->fRealCurrentTourn[this->tier]
-         ? this->fRealCurrentTourn[this->tier] : 0) < this->fNumTrophies)
-       ? (0 < this->fRealCurrentTourn[this->tier]
-          ? this->fRealCurrentTourn[this->tier] : 0)
-       : this->fNumTrophies;
+  AudioCmn_PlayFESFX(half);
+  if (this->fRealCurrentTourn[this->tier] < 1) {
+    if (0 < this->fNumTrophies) goto TrophyRoomProc_clampLowTourn;
+TrophyRoomProc_useNumTrophies:
+    step = this->fNumTrophies;
+  }
+  else {
+    if (this->fNumTrophies <= this->fRealCurrentTourn[this->tier])
+    goto TrophyRoomProc_useNumTrophies;
+TrophyRoomProc_clampLowTourn:
+    step = this->fRealCurrentTourn[this->tier];
+    if (this->fRealCurrentTourn[this->tier] < 0) {
+      step = 0;
+    }
+  }
+  this->fRealCurrentTourn[this->tier] = step;
+  key = keyval;
 TrophyRoomProc_keyLeftCheck:
-  if (keyval == kInput_KeyType_Left) {
+  if (key == kInput_KeyType_Left) {
     this->fRealCurrentTourn[this->tier] = this->fRealCurrentTourn[this->tier] + -1;
     if (this->fRealCurrentTourn[this->tier] < 0) {
       this->fRealCurrentTourn[this->tier] = this->fNumTrophies + -1;
@@ -105,7 +112,7 @@ TrophyRoomProc_keyLeftCheck:
       this->fRealCurrentTourn[this->tier] = 0;
     }
   }
-  ::ProcessInput((tScreen *)this,fromPlayer,keyval,command);
+  ::ProcessInput(&this->_base_tScreen,fromPlayer,keyval,command);
   return;
 }
 
@@ -115,11 +122,18 @@ TrophyRoomProc_keyLeftCheck:
 void tScreenTrophyRoom::PreLoad()
 
 {
-  ::PreLoad((tScreen *)this);
+  char *name;
+  
+  ::PreLoad(&this->_base_tScreen);
   (this->fTrophyShapes).fShapes = (tTexture_ShapeInfo *)0x0;
-  ::InitializeShapes((tScreen *)this,&this->fTrophyShapes,8);
-  ::AsyncLoadShapeFile((tScreen *)this,
-      frontEnd.tier != '\0' ? "zCase2" : "zCase",&this->fTrophyShapes);
+  InitializeShapes(&this->_base_tScreen,&this->fTrophyShapes,8);
+  if (frontEnd.tier == '\0') {
+    name = "zCase";
+  }
+  else {
+    name = "zCase2";
+  }
+  AsyncLoadShapeFile(&this->_base_tScreen,name,&this->fTrophyShapes);
   return;
 }
 
@@ -129,74 +143,52 @@ void tScreenTrophyRoom::PreLoad()
 void tScreenTrophyRoom::Initialize()
 
 {
-  /* MATCH (W54-A7, from the SYM SLD map 0x80040910..0x80040AE4): retail's
-     statements are 119 base-Initialize / 124 systemtask / 125 the load poll /
-     126 tier / 127 fNumTrophies (a ONE-line select) / 128 fClearScreen /
-     130 the `short i` for-loop / 132..138 ONE placement read + select /
-     140 the texture load / 144..152 the tail.  No <<16 fixed-point counter,
-     no `numT` temp, and the placement is read ONCE (the if-body reuses it).
-     MATCH (2026-08-10, 18 -> PASS 118/118): the instrumented GCC dump plus allocsim
-     reproduced all 13 global handouts and isolated the frontEnd/constant priority
-     crossing and the loop's caller-saved-to-$s3 handoff.  The later source-only SYM
-     cleanup (2026-08-26) found the simpler original-looking form: direct
-     `frontEnd.tier` reads plus `loopFe = &frontEnd` preserve that handoff at exact
-     PASS, so the old `fe` alias and four-input opacity fence were unnecessary.
-     The load-poll result also feeds its condition directly.  The six remaining
-     SYM-omitted value webs have measured counterfactual receipts beside their
-     declarations; explicit `tournIdx`/`tourney`, in particular, retain retail's
-     address-add result and operand order. */
-  /* SYM-CODEGEN-CARRIER: curIdx -- the direct EA `MIN(current,count - 1)`
-     expansion is FAIL 16 at 120/118 because it reloads both operands; retail
-     keeps one candidate and one current-tournament load. */
+  short numT;
+  void *loaded;
+  int i_int;
+  short n_trophies;
   int curIdx;
-  /* SYM-CODEGEN-CARRIER: loopFe -- reusing `fe` directly is FAIL 21 at
-     117/118; it loses retail's caller-saved-to-`$s3` handoff and rotates the
-     tier/constant allocation web. */
-  tfrontEnd *loopFe;
+  int place;
   short i;
-
-  this->tScreen::Initialize();
+  uint tour_idx;
+  
+  this->_base_tScreen.Initialize();
   do {
     systemtask(0);
-  } while (((int)::IsShapeFileLoaded((tScreen *)this,&this->fTrophyShapes) ^ 1) != 0);
+    loaded = IsShapeFileLoaded(&this->_base_tScreen,&this->fTrophyShapes);
+  } while (loaded != (void *)0x1);
   this->tier = (uint)(byte)frontEnd.tier;
-  this->fNumTrophies = frontEnd.tier != '\0' ? 8 : 6;
+  n_trophies = 6;
+  if (frontEnd.tier != '\0') {
+    n_trophies = 8;
+  }
+  tour_idx = 0;
+  this->fNumTrophies = n_trophies;
   this->fClearScreen = 1;
-  i = 0;
-  loopFe = &frontEnd;
-
-  for (; i < this->fNumTrophies; i = i + 1) {
-    /* SYM-CODEGEN-CARRIER: placement -- loading directly into `short place`
-       and clamping the invalid case is FAIL 12 at 120/118; it changes signed
-       load width and reverses the retail branch/value initialization. */
-    int placement;
-    /* SYM-CODEGEN-CARRIER: tournIdx -- folding the tier offset into the
-       tournament pointer is FAIL 15 at 125/118 and decomposes the scaled
-       address into a longer shift/add web. */
-    int tournIdx;
-    /* SYM-CODEGEN-CARRIER: place -- folding the clamp into the texture-call
-       argument is FAIL 8 at 114/118; it removes retail's independent short
-       result and its sign-extension/value-selection web. */
-    short place;
-    /* SYM-CODEGEN-CARRIER: tourney -- direct indexed access is count-exact
-       FAIL 4 and reverses retail's pointer-add destination/operand order. */
-    tTourneyInfo *tourney;
-
+  i_int = 0;
+  while( true ) {
+    i = i_int >> 0x10;
+    if (this->fNumTrophies <= i) break;
     this->fTrophyList[i] = 1;
-    tournIdx = (uint)(tournamentManager.fDefinition)->fTiers[(byte)loopFe->tier].fTournOffset +
-               (uint)(byte)i;
-    tourney = (tournamentManager.fDefinition)->fTournaments + tournIdx;
-    placement = (signed char)tournamentManager.fBestPlacement[(signed char)tourney->fTournamentID];
     place = 0;
-    if ((u_int)(placement - 1) < 3) {
-      place = placement;
+    if ((int)tournamentManager.fBestPlacement
+             [(tournamentManager.fDefinition)->fTournaments
+              [(uint)(tournamentManager.fDefinition)->fTiers[(byte)frontEnd.tier].fTournOffset +
+               (tour_idx & 0xff)].fTournamentID] - 1U < 3) {
+      place = (int)tournamentManager.fBestPlacement
+                   [(tournamentManager.fDefinition)->fTournaments
+                    [(uint)(tournamentManager.fDefinition)->fTiers[(byte)frontEnd.tier].fTournOffset
+                     + (tour_idx & 0xff)].fTournamentID];
     }
-    FETexture_LoadPmxAtOffset((this->fTrophyShapes).fFile,i * 4 + place,
+    tour_idx = tour_idx + 1;
+    FETexture_LoadPmxAtOffset((this->fTrophyShapes).fFile,i * 4 + (int)(short)place,
                (this->fTrophyShapes).fShapes + i,0,0);
+    i_int = tour_idx * 0x10000;
   }
   purgememadr((this->fTrophyShapes).fFile);
+  numT = this->fNumTrophies;
   (this->fTrophyShapes).fFile = (char *)0x0;
-  this->fTrophyList[this->fNumTrophies] = 0;
+  this->fTrophyList[numT] = 0;
   curIdx = this->fNumTrophies + -1;
   if (this->fRealCurrentTourn[this->tier] < curIdx) {
     curIdx = (int)this->fRealCurrentTourn[this->tier];
@@ -214,74 +206,49 @@ void tScreenTrophyRoom::Cleanup()
 
 {
   
-  ::FreeShapes((tScreen *)this,&this->fTrophyShapes);
-  this->tScreen::Cleanup();
+  FreeShapes(&this->_base_tScreen,&this->fTrophyShapes);
+  this->_base_tScreen.Cleanup();
   return;
 }
 
 
 
 /* ---- tScreenTrophyRoom::DrawBackground  [SCREENTROPHYROOM.CPP:161-234] ---- */
-/* MATCH (W66): 108 -> PASS (261/261).  The trophy-info comma-staging receipt gives
-   the this-dependent current tournament its retail evaluation order, while the
-   selectedTourn pointer prevents destructive reuse of the definition base.  The
-   text call is kept as one nested expression and drawFlagsPtr is published after it,
-   letting sched1 place the pointer between TextSys_Word and CalcFadeVal.  Retail's
-   loop came from duplicated branch-local ScaleShapeExtended calls which GCC then
-   cross-jumps; spelling one shared call loses three argument-setup instructions.
-   Finally, the source-order comparison `i >= fNumTrophies` produces the oracle's
-   sign-extend-before-load sequence.  The two-reference fModNumber fence crosses
-   its allocator step and restores the SLD s3 / drawFlagsPtr s4 handout. */
 void tScreenTrophyRoom::DrawBackground()
 
 {
-  /* Reliable SYM names every retained retail local and omits these five
-     optimized-away source identities justified by the W66 receipt above:
-     SYM-CODEGEN-CARRIER: feTier
-     SYM-CODEGEN-CARRIER: currentTourn
-     SYM-CODEGEN-CARRIER: tourn
-     SYM-CODEGEN-CARRIER: selectedTourn
-     SYM-CODEGEN-CARRIER: drawFlagsPtr */
-  tDrawShapeExtended drawFlags3;
-  int fModNumber;
-  int TROPHY_LEFTOFFSET;
-  tDrawShapeExtended drawFlags;
-  tDrawShapeExtended *drawFlagsPtr;
-  short i;
-  short x;
-  short y;
+  char *sMenuText;
   int texttoshow;
+  short x;
+  int amount;
+  short y;
+  short i;
+  int fModNumber;
+  int TROPHY_LEFTOFFSET = 0x114;
+  int shapeArgB = 0, shapeArgC = 0;   /* ScaleShape y/scale args (stack-passed, lost by decompiler) */
+  tDrawShapeExtended drawFlags3;
+  tDrawShapeExtended drawFlags;
   
   drawFlags3.tint[0] = 0xcec844;
-  DrawShapeExtended((ticks >> 4) % 10 + 0x1c,
-                    0x410,0x10,0x10,0,0,&drawFlags3);
+  DrawShapeExtended(ticks >> 0x1f,0x410,0x10,0x10,0,0,&drawFlags3);
   fModNumber = 3;
   if (frontEnd.tier != '\0') {
     fModNumber = 4;
   }
-  TROPHY_LEFTOFFSET = 0x114 - (fModNumber * 0x5f >> 1);
-  ::DrawBackgroundImage((tScreen *)this,0,0x18,gCurrentShapes,0);
-  PSXDrawBrightEndLine(0x232323,0x6a,0x39,300,1,3,(int)this->fScreenFadeVal,0x1e);
+  DrawBackgroundImage(&this->_base_tScreen,0,0x18,gCurrentShapes,0);
+  PSXDrawBrightEndLine(0x232323,0x6a,0x39,300,1,3,(int)(this->_base_tScreen).fScreenFadeVal,0x1e);
   this->LoadTrophy();
-  ::IsShapeFileLoaded((tScreen *)this,&this->fSwapShapes);
-  if (this->fSwapShapes.fFile != (char *)0x0) {
-    ::UploadSwapShapes((tScreen *)this,0x20);
+  IsShapeFileLoaded(&this->_base_tScreen,&(this->_base_tScreen).fSwapShapes);
+  if ((this->_base_tScreen).fSwapShapes.fFile != (char *)0x0) {
+    UploadSwapShapes(&this->_base_tScreen,0x20);
     this->startTicks = ticks;
   }
-  {
-    uint feTier = (uint)(byte)frontEnd.tier;
-    byte currentTourn;
-    uint tourn;
-    tTourneyInfo *selectedTourn;
-
-    tourn = (currentTourn = (byte)this->fRealCurrentTourn[this->tier],
-             (uint)(tournamentManager.fDefinition)->fTiers[feTier].fTournOffset +
-                 currentTourn);
-    selectedTourn = (tournamentManager.fDefinition)->fTournaments + tourn;
-    FETextRender_MenuTextPositionedJustifyFade((int)this->fScreenFadeVal,
-               (signed char)selectedTourn->fTournamentID + 0x354,0x100,0x2f,2,
-               textState_Hilighted,textType_ScreenInfo);
-  }
+  FETextRender_MenuTextPositionedJustifyFade((int)(this->_base_tScreen).fScreenFadeVal,
+             (tournamentManager.fDefinition)->fTournaments
+             [(uint)(tournamentManager.fDefinition)->fTiers[(byte)frontEnd.tier].fTournOffset +
+              (uint)(byte)this->fRealCurrentTourn[this->tier]].fTournamentID + 0x354,0x100,0x2f,2,
+             textState_Hilighted,textType_ScreenInfo);
+  amount = 0x23;
   texttoshow = 0x3de;
   if (((gPadinfo.buf[0].ID == '#') &&
       ((gPadinfo.buf[4].ID == '#' || (gPadinfo.buf[4].nopad != '\0')))) ||
@@ -292,31 +259,20 @@ void tScreenTrophyRoom::DrawBackground()
   else if ((gPadinfo.buf[0].ID == '#') || (gPadinfo.buf[4].ID == '#')) {
     texttoshow = 0x3e0;
   }
-  __asm__("" : "=r"(texttoshow) : "0"(texttoshow));
-  i = 0;
-  FETextRender_FullTextRGB(TextSys_Word(texttoshow),0x100,200,
-                           CalcFadeVal(0x505050,this->fScreenFadeVal),'\0',2);
-  drawFlagsPtr = &drawFlags;
-  __asm__("" : "=r"(drawFlagsPtr) : "0"(drawFlagsPtr));
-  while (true) {
-    if ((int)i >= (int)this->fNumTrophies) break;
-    x = TROPHY_LEFTOFFSET + (i % fModNumber) * 0x5f;
-    y = (i / fModNumber) * 45 + 70;
-    if ((i == this->fRealCurrentTourn[this->tier]) &&
-       ((this->fSwapShapes.fFlags & 1) != 0)) {
-      drawFlags.custom_shapes = this->fSwapShapes.fShapes;
-      texttoshow = ((ticks - this->startTicks) / 12) % 32;
-      ScaleShapeExtended(texttoshow,0x600,x,y,(int)this->fScreenFadeVal,0,drawFlagsPtr);
+  sMenuText = TextSys_Word(texttoshow);
+  texttoshow = CalcFadeVal(0x505050,amount);
+  FETextRender_FullTextRGB(sMenuText,0x100,200,texttoshow,'\0',2);
+  for (i = 0; texttoshow = (int)i, texttoshow < this->fNumTrophies; i = i + 1) {
+    if ((texttoshow == this->fRealCurrentTourn[this->tier]) &&
+       (((this->_base_tScreen).fSwapShapes.fFlags & 1) != 0)) {
+      drawFlags.custom_shapes = (this->_base_tScreen).fSwapShapes.fShapes;
     }
     else {
       drawFlags.custom_shapes = (this->fTrophyShapes).fShapes;
-      texttoshow = i;
-      ScaleShapeExtended(texttoshow,0x600,x,y,(int)this->fScreenFadeVal,0,drawFlagsPtr);
     }
-    i = i + 1;
+    ScaleShapeExtended((TROPHY_LEFTOFFSET - (fModNumber * 0x5f >> 1)) + (texttoshow % fModNumber) * 0x5f,0x600,shapeArgB,shapeArgC,(int)(this->_base_tScreen).fScreenFadeVal,0,&drawFlags)
+    ;
   }
-  __asm__("" : : "r"(i));
-  __asm__("" : : "r"(fModNumber), "r"(fModNumber));
   return;
 }
 
@@ -326,26 +282,21 @@ void tScreenTrophyRoom::DrawBackground()
 void tScreenTrophyRoom::LoadTrophy()
 
 {
+  short x;
+  char *fileName;
+  short y;
+  int fModNumber;
+  int TROPHY_LEFTOFFSET;
+  tDrawShapeExtended drawFlags3;
+  tDrawShapeExtended drawFlags;
+  
   if (this->fRealCurrentTourn[this->tier] != (ushort)(byte)this->fPreviousTrophy) {
-    /* MATCH: the two index terms are grouped into one x84 chain.  Direct
-       gSwapFileName arguments still keep its address in $s0 across both calls;
-       no source alias is required. */
-    /* the frontEnd.tier read is its OWN local so its %hi lands in the beq
-       delay slot (retail's eager steal) instead of tournamentManager's. */
-    /* SYM-CODEGEN-CARRIER: tierIdx -- folding the frontend tier read into the
-       index is measured FAIL2 (54/54): the eager delay-slot %hi switches from
-       frontEnd to tournamentManager even though the instruction text matches. */
-    uint tierIdx = (uint)(byte)frontEnd.tier;
-    /* SYM-CODEGEN-CARRIER: tourn -- folding the grouped tournament index into
-       GetTrophyName is measured FAIL29 with five extra instructions (59/54),
-       changing the call argument and saved-register allocation. */
-    uint tourn = (uint)(tournamentManager.fDefinition)->fTiers[tierIdx].fTournOffset +
-                 (uint)(byte)this->fRealCurrentTourn[this->tier];
-
+    fileName = (char *)0x0;
     GetTrophyName(&tournamentManager,
-               (tournamentManager.fDefinition)->fTournaments + tourn,
-               ts_Small,gSwapFileName,-1);
-    ::AsyncLoadSwapShapeFile((tScreen *)this,gSwapFileName);
+               (tournamentManager.fDefinition)->fTournaments +
+               (uint)(tournamentManager.fDefinition)->fTiers[(byte)frontEnd.tier].fTournOffset +
+               (uint)(byte)this->fRealCurrentTourn[this->tier],ts_Small,gSwapFileName,-1);
+    AsyncLoadSwapShapeFile(&this->_base_tScreen,gSwapFileName);
     this->fPreviousTrophy = (char)this->fRealCurrentTourn[this->tier];
   }
   return;

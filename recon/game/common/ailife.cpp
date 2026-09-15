@@ -2,12 +2,9 @@
  *   Player-action submission + reaction-table processing. SYM-v3 locals; vs disasm-v2.txt.
  *   NOT original source; SYM-faithful, recompilable C++.
  */
-#include "ailife_types.h"
+#include "../../nfs4_types.h"
+#include "../../mips_semantics.h"
 #include "ailife_externs.h"
-
-#define WRAP_SLICE(a,b) (((a) >= 0) \
-    ? ((((b) + (a)) >= gNumSlices) ? ((b) + (a)) - gNumSlices : ((b) + (a))) \
-    : ((((b) + (a)) < 0) ? ((b) + (a)) + gNumSlices : ((b) + (a))))
 
 
 /* ---- intra-TU forward declarations ---- */
@@ -29,7 +26,7 @@ Car_tObj * AILife_IsCarInAnyVisibleArea(Car_tObj *carObj);
 Car_tObj * AILife_IsSliceInAnyVisibleArea(int slice);
 Car_tObj * AILife_IsSliceCloseToAnyCopCar(int slice);
 Car_tObj * AILife_IsPositionInAnyVisibleArea(coorddef *pos);
-void AILife_Debug(char *format, ...);
+void AILife_Debug(char *format);
 
 
 /* ---- AILife_EvaluateLife__FP8Car_tObj  [@0x80067650] ---- */
@@ -60,128 +57,153 @@ void AILife_RCSetSpeeds(Car_tObj *carObj)
 /* ---- AILife_RCPickSliceAndDirection__FP8Car_tObj  [@0x800676e4] ---- */
 void AILife_RCPickSliceAndDirection(Car_tObj *carObj)
 {
-  /* SYM @0x800676e4: approachSide($s5), offset(scratch $v0), search($s6), count($s4),
-   * checkCar($s0). Every fastRandom/randSeed roll writes its raw product to randtemp; these
-   * stores are observable even when the product is immediately consumed. approachOffset
-   * (unnamed $s2 in retail) is loop-invariant and materialized once. The post-loop slice
-   * adjustment is distinct from approachSide, which remains live and unmodified in $s5. */
   int approachSide;
   int offset;
   int search;
   int count;
-  Car_tObj *checkCar;
-
-  {
-    int basisCarIndex;
-    randtemp = fastRandom * randSeed;
-    fastRandom = randtemp & 0xffff;
-    basisCarIndex =
-        Cars_gNumLifeBasisCars * ((randtemp & 0xffff00) >> 8) >> 0x10;
-    randtemp = fastRandom * randSeed;
-    fastRandom = randtemp & 0xffff;
-    approachSide = 1;
-    carObj->basisCar = Cars_gLifeBasisCarList[basisCarIndex];
-    if ((int)(((randtemp & 0xffff00) >> 8) * 1000 >> 0x10) < 500) {
-      approachSide = -1;
-    }
-  }
-  {
-    Car_tObj *basisCar =
-        *(Car_tObj *volatile *)&carObj->basisCar;
-    int speed = basisCar->currentSpeed;
-    speed = 0 <= speed ? speed : -speed;
-    if (0x1e0000 < speed) {
-      approachSide = basisCar->direction;
-    }
-    search = basisCar->sortIndex;
-  }
-  for (count = 0; count < Cars_gNumCars;
-       search = search + approachSide, count = count + 1) {
-    checkCar = Cars_gSortedList[(search + Cars_gNumCars) % Cars_gNumCars];
-    if (((checkCar != carObj) && (checkCar != carObj->basisCar)) &&
-        ((checkCar->carFlags & 0x100U) != 0))
-    {
-      coorddef basisOuterCoord;
-      int basisOuterSlice =
-          (int)(carObj->basisCar->N).simRoadInfo.slice;
-      basisOuterSlice = WRAP_SLICE(approachSide * 0x24, basisOuterSlice);
-      basisOuterCoord = *AILIFE_SLICE_CENTER(basisOuterSlice);
-      if ((AILife_IsCoordInThisVisibleArea(&basisOuterCoord,checkCar) != 0) &&
-          (0 < approachSide *
-               (AIWorld_ApxSplineDistance(checkCar,carObj->basisCar) / 0x10000))) {
-        carObj->basisCar = checkCar;
-      }
-      else {
-        break;
-      }
-    }
-  }
-
-  randtemp = fastRandom * randSeed;
+  Car_tObj*checkCar;
+  coorddef basisOuterCoord;
+  int basisOuterSlice;
+  short sVar1;
+  u_int uVar2;
+  int iVar3;
+  bool bVar4;
+  int *piVar5;
+  int iVar6;
+  int iVar7;
+  u_int uVar8;
+  Car_tObj *pCVar9;
+  short sVar10;
+  int iVar11;
+  int iVar12;
+  coorddef local_38;
+  
+  uVar2 = fastRandom * randSeed;
+  randtemp = (uVar2 & 0xffff) * randSeed;
+  iVar11 = 1;
   fastRandom = randtemp & 0xffff;
-  if ((int)((randtemp >> 8 & 0xffff) * 1000 >> 0x10) < 500) {
-    carObj->direction = -1;
+  uVar8 = randtemp & 0xffff00;
+  carObj->basisCar =
+       Cars_gLifeBasisCarList[Cars_gNumLifeBasisCars * ((uVar2 & 0xffff00) >> 8) >> 0x10];
+  if ((uVar8 >> 8) * 1000 >> 0x10 < 500) {
+    iVar11 = -1;
   }
-  else {
-    carObj->direction = 1;
+  pCVar9 = carObj->basisCar;
+  iVar6 = pCVar9->currentSpeed;
+  if (iVar6 < 0) {
+    iVar6 = -iVar6;
   }
+  if (0x1e0000 < iVar6) {
+    iVar11 = pCVar9->direction;
+  }
+  iVar12 = pCVar9->sortIndex;
+  for (iVar6 = 0; iVar6 < Cars_gNumCars; iVar6 = iVar6 + 1) {
+    if (Cars_gNumCars == 0) {
+      trap(0x1c00);
+    }
+    if ((Cars_gNumCars == -1) && (iVar12 + Cars_gNumCars == -0x80000000)) {
+      trap(0x1800);
+    }
+    pCVar9 = Cars_gSortedList[(iVar12 + Cars_gNumCars) % Cars_gNumCars];
+    if (((pCVar9 != carObj) && (pCVar9 != carObj->basisCar)) && ((pCVar9->carFlags & 0x100U) != 0))
+    {
+      iVar7 = (int)(carObj->basisCar->N).simRoadInfo.slice + iVar11 * 0x24;
+      if (iVar11 * 0x24 < 0) {
+        iVar3 = gNumSlices;
+        if (iVar7 < 0) goto LAB_800678dc;
+      }
+      else if (gNumSlices <= iVar7) {
+        iVar3 = -gNumSlices;
+LAB_800678dc:
+        iVar7 = iVar7 + iVar3;
+      }
+      bVar4 = false;
+      piVar5 = (int *)(iVar7 * 0x20 + (int)BWorldSm_slices);
+      local_38.x = *piVar5;
+      local_38.y = piVar5[1];
+      local_38.z = piVar5[2];
+      iVar7 = AILife_IsCoordInThisVisibleArea(&local_38,pCVar9);
+      if (iVar7 != 0) {
+        iVar7 = AIWorld_ApxSplineDistance(pCVar9,carObj->basisCar);
+        if (iVar7 < 0) {
+          iVar7 = iVar7 + 0xffff;
+        }
+        if (0 < iVar11 * (iVar7 >> 0x10)) {
+          bVar4 = true;
+        }
+      }
+      if (!bVar4) break;
+      carObj->basisCar = pCVar9;
+    }
+    iVar12 = iVar12 + iVar11;
+  }
+  uVar2 = fastRandom * randSeed;
+  fastRandom = uVar2 & 0xffff;
+  iVar6 = -1;
+  if (499 < (uVar2 >> 8 & 0xffff) * 1000 >> 0x10) {
+    iVar6 = 1;
+  }
+  carObj->direction = iVar6;
   if (AITune_oneWay != 0) {
-    carObj->direction = AILIFE_REVERSE_TRACK == 0 ? 1 : -1;
+    iVar6 = -1;
+    if (GameSetup_gData.reverseTrack == 0) {
+      iVar6 = 1;
+    }
+    carObj->direction = iVar6;
   }
   randtemp = fastRandom * randSeed;
+  iVar11 = ((randtemp >> 0x15 & 7) + 0x1c) * iVar11;
   fastRandom = randtemp & 0xffff;
   carObj->desiredDirection = carObj->direction;
-  offset = ((randtemp >> 0x15 & 7) + 0x1c) * approachSide;
-  (carObj->N).simRoadInfo.slice =
-      WRAP_SLICE(offset, (carObj->basisCar->N).simRoadInfo.slice);
-  /* RAW @0x80067ad4-e8: a1=basisCar->carIndex(+0x254), a2=(basisCar->N).simRoadInfo.slice(+8),
-   * a3=(carObj->N).simRoadInfo.slice(+8) -- the 3 dropped varargs, restored from the oracle. */
-  AILife_Debug(" psad checked group, basis now %d(s=%d) new slice=%d\n",
-               carObj->basisCar->carIndex,
-               (carObj->basisCar->N).simRoadInfo.slice,
-               (carObj->N).simRoadInfo.slice);
+  if (iVar11 < 0) {
+    sVar1 = (carObj->basisCar->N).simRoadInfo.slice;
+    sVar10 = sVar1 + (short)iVar11;
+    if (sVar1 + iVar11 < 0) {
+      sVar10 = (short)gNumSlices + sVar10;
+    }
+    (carObj->N).simRoadInfo.slice = sVar10;
+  }
+  else {
+    sVar1 = (carObj->basisCar->N).simRoadInfo.slice;
+    sVar10 = sVar1 + (short)iVar11;
+    if (gNumSlices <= sVar1 + iVar11) {
+      sVar10 = sVar10 - (short)gNumSlices;
+    }
+    (carObj->N).simRoadInfo.slice = sVar10;
+  }
+  AILife_Debug(" psad checked group, basis now %d(s=%d) new slice=%d\n");
   return;
 }
 
 /* ---- AILife_RCPickDesiredLatPosition__FP8Car_tObj  [@0x80067b1c] ---- */
 void AILife_RCPickDesiredLatPosition(Car_tObj *carObj)
 {
-  /* SYM @0x80067b1c (single fn-scope block, no per-branch nesting): REG randNumLanes($v1),
-   * newSlice($a0, doubles as the byte-table base pointer AND the final result), width($a1)
-   * -- and the RNG step (fastRandom*randSeed) is computed ONCE (oracle materializes it fresh
-   * per branch, but from the SAME unconsumed fastRandom/randSeed -- the earlier recon called
-   * it TWICE, a real duplicate-computation bug) (w18-a7). */
   int randNumLanes;
   int newSlice;
   int width;
-  int finalLatPos;
-
-  newSlice = (int)(carObj->N).simRoadInfo.slice;
+  int iVar1;
+  u_int uVar2;
+  
+  iVar1 = (int)(carObj->N).simRoadInfo.slice;
   if (carObj->direction == AITune_driveSide) {
-    width = AILIFE_SLICE_WIDTH_RT(newSlice);
-    randtemp = fastRandom * randSeed;
-    fastRandom = randtemp & 0xffff;
-    width = width << 0xf;
-    randNumLanes = AILIFE_SLICE_LANE_COUNT(newSlice) & 0xf;
-    randNumLanes =
-        (randNumLanes * (randtemp >> 8 & 0xffff) >> 0x10) + 1;
-    carObj->desiredLatPos =
-        width * randNumLanes - ((u_int)width >> 1);
+    iVar1 = iVar1 * 0x20 + (int)BWorldSm_slices;
+    uVar2 = (u_int)*(u_char *)(iVar1 + 0x1f) * 0x8000;
+    iVar1 = uVar2 * (((*(u_char *)(iVar1 + 0x1d) & 0xf) * (fastRandom * randSeed >> 8 & 0xffff) >>
+                     0x10) + 1) - (uVar2 >> 1);
   }
   else {
-    width = AILIFE_SLICE_WIDTH_LF(newSlice);
-    randtemp = fastRandom * randSeed;
-    fastRandom = randtemp & 0xffff;
-    width = width << 0xf;
-    randNumLanes = AILIFE_SLICE_LANE_COUNT(newSlice) >> 4;
-    randNumLanes =
-        (randNumLanes * (randtemp >> 8 & 0xffff) >> 0x10) + 1;
-    carObj->desiredLatPos =
-        -width * randNumLanes + ((u_int)width >> 1);
+    iVar1 = iVar1 * 0x20 + (int)BWorldSm_slices;
+    uVar2 = (u_int)*(u_char *)(iVar1 + 0x1e);
+    iVar1 = uVar2 * -0x8000 *
+            (((u_int)(*(u_char *)(iVar1 + 0x1d) >> 4) * (fastRandom * randSeed >> 8 & 0xffff) >> 0x10)
+            + 1) + (uVar2 * 0x8000 >> 1);
   }
-  finalLatPos = *(volatile int *)&carObj->desiredLatPos + carObj->laneSlack;
-  carObj->desiredLatPos = finalLatPos;
-  carObj->rampDesiredLatPos = finalLatPos;
+  randtemp = fastRandom * randSeed;
+  fastRandom = randtemp & 0xffff;
+  carObj->desiredLatPos = iVar1;
+  iVar1 = carObj->desiredLatPos + carObj->laneSlack;
+  carObj->desiredLatPos = iVar1;
+  carObj->rampDesiredLatPos = iVar1;
   return;
 }
 
@@ -201,74 +223,90 @@ void AILife_PlaceCarAtLocation(Car_tObj *carObj,int slice,int desiredLatPos,int 
 /* ---- AILife_SetInitialSlicePositionOrientationEtc__FP8Car_tObj  [@0x80067c8c] ---- */
 void AILife_SetInitialSlicePositionOrientationEtc(Car_tObj *carObj)
 {
-  /* SYM @0x80067c8c block: ONE local `offset` (AUTO coorddef, fp-24) -- not two
-   * (dropped a duplicate dead `coorddef local_18` the earlier pass left; w18-a7). */
   coorddef offset;
-
-  memset((u_char *)&offset,'\0',0xc);
-  offset.x = carObj->desiredLatPos;
-  offset.y = 0x10000;
-  Newton_SetInitialSlicePositionOrientationEtc(&carObj->N,(int)(carObj->N).simRoadInfo.slice,&offset,carObj->direction);
+  coorddef local_18;
+  
+  memset((u_char *)&local_18,'\0',0xc);
+  local_18.x = carObj->desiredLatPos;
+  local_18.y = 0x10000;
+  Newton_SetInitialSlicePositionOrientationEtc(&carObj->N,(int)(carObj->N).simRoadInfo.slice,&local_18,carObj->direction);
   return;
 }
 
 /* ---- AILife_PlaceCarAtLocation__FP8Car_tObji  [@0x80067ce0] ---- */
 void AILife_PlaceCarAtLocation(Car_tObj *carObj,int rotation1024)
 {
-  /* SYM @0x80067ce0 block: "targetDirection"(coorddef, currentSpeed!=0 branch) and
-   * "zero"(coorddef, currentSpeed==0 branch) are TWO block-scoped locals sharing ONE
-   * stack slot (fp-0x50) -- each branch writes its own coorddef and copies it into
-   * linearVel INSIDE the branch; gcc TAIL-MERGES the byte-identical copy sequence into
-   * one shared block (raw shows a single merge point + `j`) (w18-a7, §D tail-merge). */
+  coorddef targetDirection;
+  int speed;
+  coorddef zero;
+  matrixtdef rotMatrix;
+  u_long uVar1;
+  matrixtdef *pmVar2;
+  int iVar3;
+  int iVar4;
+  int iVar5;
+  matrixtdef *m1;
+  coorddef velocity;
+  matrixtdef mStack_40;
+  
+  iVar3 = carObj->desiredLatPos;
+  iVar4 = carObj->currentSpeed;
   (carObj->N).active = '\x01';
-  carObj->rampDesiredLatPos = carObj->desiredLatPos;
-  carObj->desiredSpeed = carObj->currentSpeed;
+  carObj->rampDesiredLatPos = iVar3;
+  carObj->desiredSpeed = iVar4;
   AIPhysic_ResetCar(carObj);
-  if (stackSpeedUpEnbabledFlag != 0) {
-    gWSavePtr = (u_long)SetSp((void *)gWSavePtr);  /* @0x57D38 disasm-v2: scratchpad sp swap */
+  if (stackSpeedUpEnbabledFlag == 0) {
+    AILife_SetInitialSlicePositionOrientationEtc(carObj);
+  }
+  else {
+    gWSavePtr = (intptr_t)SetSp((void *)gWSavePtr);  /* @0x57D38 disasm-v2: scratchpad sp swap */
     stackSpeedUpEnbabledFlag = 0;
     AILife_SetInitialSlicePositionOrientationEtc(carObj);
-    gWSavePtr = (u_long)SetSp((void *)gWSavePtr);  /* @0x57D60 disasm-v2: restore sp */
+    gWSavePtr = (intptr_t)SetSp((void *)gWSavePtr);  /* @0x57D60 disasm-v2: restore sp */
     stackSpeedUpEnbabledFlag = 1;
   }
-  else {
-    AILife_SetInitialSlicePositionOrientationEtc(carObj);
+  if (carObj->currentSpeed == 0) {
+    memset((u_char *)&velocity,'\0',sizeof(velocity));
   }
-  if (carObj->currentSpeed != 0) {
-    coorddef targetDirection;
-    int speed;
-    int direction;
-    targetDirection = *(coorddef *)&(carObj->N).orientMat.m[6];
-    speed = carObj->currentSpeed;
-    direction = targetDirection.x;
-    if (speed < 0) {
-      speed = -speed;
+  else {
+    velocity.x = (carObj->N).orientMat.m[6];
+    velocity.y = (carObj->N).orientMat.m[7];
+    velocity.z = (carObj->N).orientMat.m[8];
+    iVar3 = carObj->currentSpeed;
+    if (iVar3 < 0) {
+      iVar3 = nfs4_mips_negu_s32(iVar3);
     }
-    targetDirection.x = fixedmult(speed,direction);
-    targetDirection.y = fixedmult(speed,targetDirection.y);
-    targetDirection.z = fixedmult(speed,targetDirection.z);
-    (carObj->N).linearVel = targetDirection;
+    velocity.x = fixedmult(iVar3,velocity.x);
+    velocity.y = fixedmult(iVar3,velocity.y);
+    velocity.z = fixedmult(iVar3,velocity.z);
   }
-  else {
-    coorddef zero;
-    memset((u_char *)&zero,'\0',0xc);
-    (carObj->N).linearVel = zero;
-  }
+  (carObj->N).linearVel = velocity;
   if ((carObj->carFlags & 4U) != 0) {
     Physics_ResetCar(carObj);
   }
-  {
-    matrixtdef rotMatrix;
-    xformy(&rotMatrix,(void *)rotation1024);
-    Math_fasttransmult(
-        &(carObj->N).orientMat,&rotMatrix,&(carObj->N).orientMat);
-    (carObj->N).shadowMat = (carObj->N).orientMat;
-  }
+  xformy(&mStack_40,rotation1024);
+  m1 = &(carObj->N).orientMat;
+  Math_fasttransmult(m1,&mStack_40,m1);
+  pmVar2 = &(carObj->N).shadowMat;
+  do {
+    iVar3 = m1->m[1];
+    iVar4 = m1->m[2];
+    iVar5 = m1->m[3];
+    pmVar2->m[0] = m1->m[0];
+    pmVar2->m[1] = iVar3;
+    pmVar2->m[2] = iVar4;
+    pmVar2->m[3] = iVar5;
+    m1 = (matrixtdef *)(m1->m + 4);
+    pmVar2 = (matrixtdef *)(pmVar2->m + 4);
+  } while (m1 != (matrixtdef *)((carObj->N).orientMat.m + 8));
+  pmVar2->m[0] = m1->m[0];
   AIInit_ClearAICar(carObj);
-  carObj->roadPosition =
-      carObj->desiredLatPos =
-      carObj->rampDesiredLatPos = Cars_CalculateRoadPosition(carObj);
-  carObj->roadSpan = Cars_CalculateRoadSpan(carObj);
+  iVar3 = Cars_CalculateRoadPosition(carObj);
+  carObj->rampDesiredLatPos = iVar3;
+  carObj->desiredLatPos = iVar3;
+  carObj->roadPosition = iVar3;
+  iVar3 = Cars_CalculateRoadSpan(carObj);
+  carObj->roadSpan = iVar3;
   AIWorld_CalculateLaneInfo(carObj);
   return;
 }
@@ -276,16 +314,10 @@ void AILife_PlaceCarAtLocation(Car_tObj *carObj,int rotation1024)
 /* ---- AILife_ReencarnateTraffic__FP8Car_tObj  [@0x80067ee4] ---- */
 void AILife_ReencarnateTraffic(Car_tObj *carObj)
 {
-  /* PERMUTER (score 0 @iter224): compute the color-index UNCONDITIONALLY into a named
-   * local before the flag test -- matches the oracle materializing it regardless of
-   * the branch (w18-a7). */
-  u_int colorIdx;
-
   randtemp = fastRandom * randSeed;
   fastRandom = randtemp & 0xffff;
-  colorIdx = (randtemp >> 8 & 0xffff) * 3 >> 0x10;
   if ((carObj->carFlags & 0x10U) != 0) {
-    R3DCar_ChangeTrafficColor(carObj,colorIdx);
+    R3DCar_ChangeTrafficColor(carObj,(randtemp >> 8 & 0xffff) * 3 >> 0x10);
   }
   AI_ChooseNewLaneSlack(carObj);
   AISpeeds_SetTrafficSpeedRandomFactor(carObj);
@@ -302,20 +334,23 @@ void AILife_ReencarnateTraffic(Car_tObj *carObj)
  * decl. Added `void` + the intra-TU forward declaration (sibling of AILife_ReencarnateCopByPosition) (M19). */
 void AILife_ReencarnateTrafficByPosition(Car_tObj *carObj,int slice,int travelDirection,coorddef *pos,matrixtdef *ori)
 {
-  /* SYM @0x80067f94 (fn-scope): AUTO coorddef "zero"(fp-0x40, memset'd linearVel temp),
-   * AUTO coorddef "offset"(fp-0x30, Newton_Set.. coorddef) -- dropped the dead duplicate
-   * decls the earlier pass left unused (w18-a7). */
   coorddef zero;
   coorddef offset;
-  u_int colorIdx;
-
-  memset((u_char *)&zero,'\0',0xc);
-  memset((u_char *)&offset,'\0',0xc);
+  short sVar1;
+  int *piVar2;
+  matrixtdef *pmVar3;
+  int iVar4;
+  int iVar5;
+  int iVar6;
+  coorddef zeroVelocity;
+  coorddef cStack_30;
+  
+  memset((u_char *)&zeroVelocity,'\0',sizeof(zeroVelocity));
+  memset((u_char *)&cStack_30,'\0',0xc);
   randtemp = fastRandom * randSeed;
   fastRandom = randtemp & 0xffff;
-  colorIdx = (randtemp >> 8 & 0xffff) * 3 >> 0x10;
   if ((carObj->carFlags & 0x10U) != 0) {
-    R3DCar_ChangeTrafficColor(carObj,colorIdx);
+    R3DCar_ChangeTrafficColor(carObj,(randtemp >> 8 & 0xffff) * 3 >> 0x10);
   }
   AI_ChooseNewLaneSlack(carObj);
   AISpeeds_SetTrafficSpeedRandomFactor(carObj);
@@ -324,19 +359,26 @@ void AILife_ReencarnateTrafficByPosition(Car_tObj *carObj,int slice,int travelDi
   carObj->desiredDirection = travelDirection;
   (carObj->N).simRoadInfo.slice = (short)slice;
   AILife_RCSetSpeeds(carObj);
+  sVar1 = (carObj->N).simRoadInfo.slice;
   carObj->currentSpeed = 0;
-  Newton_SetInitialSlicePositionOrientationEtc(
-      &carObj->N,(int)(carObj->N).simRoadInfo.slice,&offset,carObj->direction);
-  (carObj->N).position = *pos;
+  Newton_SetInitialSlicePositionOrientationEtc(&carObj->N,(int)sVar1,&cStack_30,carObj->direction);
+  pmVar3 = &(carObj->N).orientMat;
+  iVar4 = pos->y;
+  iVar5 = pos->z;
+  (carObj->N).position.x = pos->x;
+  (carObj->N).position.y = iVar4;
+  (carObj->N).position.z = iVar5;
   (carObj->N).orientMat = *ori;
   (carObj->N).shadowMat = *ori;
-  (carObj->N).linearVel = zero;
+  (carObj->N).linearVel = zeroVelocity;
   (carObj->N).speedXZ = 0;
   AIInit_ClearAICar(carObj);
-  carObj->roadPosition =
-      carObj->desiredLatPos =
-      carObj->rampDesiredLatPos = Cars_CalculateRoadPosition(carObj);
-  carObj->roadSpan = Cars_CalculateRoadSpan(carObj);
+  iVar4 = Cars_CalculateRoadPosition(carObj);
+  carObj->rampDesiredLatPos = iVar4;
+  carObj->desiredLatPos = iVar4;
+  carObj->roadPosition = iVar4;
+  iVar4 = Cars_CalculateRoadSpan(carObj);
+  carObj->roadSpan = iVar4;
   AIWorld_CalculateLaneInfo(carObj);
   AILife_RCPickDesiredLatPosition(carObj);
   return;
@@ -345,56 +387,58 @@ void AILife_ReencarnateTrafficByPosition(Car_tObj *carObj,int slice,int travelDi
 /* ---- AILife_ReencarnateCopBySlice__FP8Car_tObjiiii  [@0x800681a0] ---- */
 void AILife_ReencarnateCopBySlice(Car_tObj *carObj,int slice,int travelDirection,int roadSide,int moving)
 {
-  /* SYM @0x800681a0: "width"($v0)/"numLanes"($v1) are BLOCK-SCOPED locals inside each
-   * of the 3 lane-metric sub-branches (line23 block, line29 block) -- not function-scope
-   * generic uVar2/uVar3 (w18-a7). */
+  int width;
+  int numLanes;
+  int iVar1;
+  u_int uVar2;
+  u_int uVar3;
+  
+  iVar1 = AITune_oneWay;
   (carObj->N).simRoadInfo.slice = (short)slice;
-  if (AITune_oneWay != 0) {
-    travelDirection = -1;
-    if (AILIFE_REVERSE_TRACK == 0) {
-      travelDirection = 1;
-    }
+  if ((iVar1 != 0) && (travelDirection = -1, GameSetup_gData.reverseTrack == 0)) {
+    travelDirection = 1;
   }
   carObj->direction = travelDirection;
   carObj->desiredDirection = travelDirection;
   if (moving == 0) {
     if (roadSide == -1) {
-      carObj->desiredLatPos =
-          -0x20000 -
-          (AILIFE_SLICE_WIDTH_LF(slice) << 15) *
-          (AILIFE_SLICE_LANE_COUNT(slice) >> 4);
+      iVar1 = slice * 0x20 + (int)BWorldSm_slices;
+      iVar1 = -0x20000 -
+              (u_int)*(u_char *)(iVar1 + 0x1e) * 0x8000 * (u_int)(*(u_char *)(iVar1 + 0x1d) >> 4);
+      goto LAB_800682dc;
     }
-    else {
-      carObj->desiredLatPos =
-          (AILIFE_SLICE_WIDTH_RT(slice) << 15) *
-          (AILIFE_SLICE_LANE_COUNT(slice) & 0xf) + 0x20000;
-    }
+    iVar1 = slice * 0x20 + (int)BWorldSm_slices;
+    iVar1 = (u_int)*(u_char *)(iVar1 + 0x1f) * 0x8000 * (*(u_char *)(iVar1 + 0x1d) & 0xf);
+    uVar2 = 0x20000;
+LAB_800682d4:
+    iVar1 = iVar1 + uVar2;
   }
   else {
-    if ((carObj->direction == 1) ||
-        ((AILIFE_SLICE_LANE_COUNT(slice) >> 4) == 0)) {
-      int width;
-      int numLanes;
-      width = AILIFE_SLICE_WIDTH_RT(slice) << 15;
-      numLanes = AILIFE_SLICE_LANE_COUNT(slice) & 0xf;
-      carObj->desiredLatPos = width * numLanes - ((u_int)width >> 1);
+    if (carObj->direction != 1) {
+      iVar1 = slice * 0x20 + (int)BWorldSm_slices;
+      uVar2 = (u_int)(*(u_char *)(iVar1 + 0x1d) >> 4);
+      if (uVar2 != 0) {
+        uVar3 = (u_int)*(u_char *)(iVar1 + 0x1e);
+        iVar1 = uVar3 * -0x8000 * uVar2;
+        uVar2 = uVar3 * 0x8000 >> 1;
+        goto LAB_800682d4;
+      }
     }
-    else {
-      int width;
-      width = AILIFE_SLICE_WIDTH_LF(slice) << 15;
-      carObj->desiredLatPos =
-          -width * (AILIFE_SLICE_LANE_COUNT(slice) >> 4) +
-          ((u_int)width >> 1);
-    }
+    iVar1 = slice * 0x20 + (int)BWorldSm_slices;
+    uVar2 = (u_int)*(u_char *)(iVar1 + 0x1f) * 0x8000;
+    iVar1 = uVar2 * (*(u_char *)(iVar1 + 0x1d) & 0xf) - (uVar2 >> 1);
   }
-  if (moving != 0) {
-    AILife_RCSetSpeeds(carObj);
-  }
-  else {
+LAB_800682dc:
+  carObj->desiredLatPos = iVar1;
+  if (moving == 0) {
     carObj->desiredSpeed = 0;
     carObj->currentSpeed = 0;
   }
-  carObj->roadPosition = carObj->rampDesiredLatPos = carObj->desiredLatPos;
+  else {
+    AILife_RCSetSpeeds(carObj);
+  }
+  carObj->rampDesiredLatPos = carObj->desiredLatPos;
+  carObj->roadPosition = carObj->desiredLatPos;
   AILife_PlaceCarAtLocation(carObj,0);
   return;
 }
@@ -402,36 +446,46 @@ void AILife_ReencarnateCopBySlice(Car_tObj *carObj,int slice,int travelDirection
 /* ---- AILife_ReencarnateCopByPosition__FP8Car_tObjiiP8coorddefP10matrixtdef  [@0x80068324] ---- */
 void AILife_ReencarnateCopByPosition(Car_tObj *carObj,int slice,int travelDirection,coorddef *pos,matrixtdef *ori)
 {
-  /* SYM @0x80068324 (fn-scope): AUTO coorddef "zero"(fp-0x38, memset'd linearVel temp),
-   * AUTO coorddef "offset"(fp-0x28, Newton_Set.. coorddef) -- dropped the dead duplicate
-   * decls the earlier pass left unused (w18-a7). */
   coorddef zero;
   coorddef offset;
-
-  memset((u_char *)&zero,'\0',0xc);
-  memset((u_char *)&offset,'\0',0xc);
+  bool bVar1;
+  int *piVar2;
+  matrixtdef *pmVar3;
+  int iVar4;
+  int iVar5;
+  int iVar6;
+  coorddef zeroVelocity;
+  coorddef cStack_28;
+  
+  memset((u_char *)&zeroVelocity,'\0',sizeof(zeroVelocity));
+  memset((u_char *)&cStack_28,'\0',0xc);
+  bVar1 = AITune_oneWay != 0;
   (carObj->N).simRoadInfo.slice = (short)slice;
-  if (AITune_oneWay != 0) {
-    travelDirection = -1;
-    if (AILIFE_REVERSE_TRACK == 0) {
-      travelDirection = 1;
-    }
+  if ((bVar1) && (travelDirection = -1, GameSetup_gData.reverseTrack == 0)) {
+    travelDirection = 1;
   }
   carObj->direction = travelDirection;
   carObj->desiredDirection = travelDirection;
   carObj->desiredSpeed = 0;
   carObj->currentSpeed = 0;
   AIPhysic_ResetCar(carObj);
-  Newton_SetInitialSlicePositionOrientationEtc(&carObj->N,(int)(carObj->N).simRoadInfo.slice,&offset,carObj->direction);
-  (carObj->N).position = *pos;
+  Newton_SetInitialSlicePositionOrientationEtc(&carObj->N,(int)(carObj->N).simRoadInfo.slice,&cStack_28,carObj->direction);
+  pmVar3 = &(carObj->N).orientMat;
+  iVar4 = pos->y;
+  iVar5 = pos->z;
+  (carObj->N).position.x = pos->x;
+  (carObj->N).position.y = iVar4;
+  (carObj->N).position.z = iVar5;
   (carObj->N).orientMat = *ori;
   (carObj->N).shadowMat = *ori;
-  (carObj->N).linearVel = zero;
+  (carObj->N).linearVel = zeroVelocity;
   AIInit_ClearAICar(carObj);
-  carObj->roadPosition =
-      carObj->desiredLatPos =
-      carObj->rampDesiredLatPos = Cars_CalculateRoadPosition(carObj);
-  carObj->roadSpan = Cars_CalculateRoadSpan(carObj);
+  iVar4 = Cars_CalculateRoadPosition(carObj);
+  carObj->rampDesiredLatPos = iVar4;
+  carObj->desiredLatPos = iVar4;
+  carObj->roadPosition = iVar4;
+  iVar4 = Cars_CalculateRoadSpan(carObj);
+  carObj->roadSpan = iVar4;
   AIWorld_CalculateLaneInfo(carObj);
   return;
 }
@@ -439,36 +493,51 @@ void AILife_ReencarnateCopByPosition(Car_tObj *carObj,int slice,int travelDirect
 /* ---- AILife_ReencarnateCopByLatPosAndRotation__FP8Car_tObjiiii  [@0x800684d4] ---- */
 void AILife_ReencarnateCopByLatPosAndRotation(Car_tObj *carObj,int slice,int travelDirection,int latPos,int rotation1024)
 {
-  /* SYM @0x800684d4 (single fn-scope block): AUTO coorddef "zero"(fp-0x60, memset'd
-   * linearVel temp), AUTO coorddef "offset"(fp-0x50, Newton_Set.. coorddef), AUTO
-   * matrixtdef "rotMatrix"(fp-0x40, xformy target) -- dropped the dead duplicate
-   * zero/offset/rotMatrix decls the earlier pass left unused (w18-a7). */
   coorddef zero;
   coorddef offset;
   matrixtdef rotMatrix;
+  bool bVar1;
+  matrixtdef *pmVar2;
   int iVar3;
-
-  memset((u_char *)&zero,'\0',0xc);
-  memset((u_char *)&offset,'\0',0xc);
+  int iVar4;
+  int iVar5;
+  matrixtdef *m1;
+  coorddef zeroVelocity;
+  coorddef local_50;
+  matrixtdef mStack_40;
+  
+  memset((u_char *)&zeroVelocity,'\0',sizeof(zeroVelocity));
+  memset((u_char *)&local_50,'\0',0xc);
   (carObj->N).active = '\x01';
+  bVar1 = AITune_oneWay != 0;
   (carObj->N).simRoadInfo.slice = (short)slice;
-  if (AITune_oneWay != 0) {
-    travelDirection = -1;
-    if (AILIFE_REVERSE_TRACK == 0) {
-      travelDirection = 1;
-    }
+  if ((bVar1) && (travelDirection = -1, GameSetup_gData.reverseTrack == 0)) {
+    travelDirection = 1;
   }
   carObj->direction = travelDirection;
   carObj->desiredDirection = travelDirection;
   carObj->desiredSpeed = 0;
   carObj->currentSpeed = 0;
   AIPhysic_ResetCar(carObj);
-  offset.x = latPos * carObj->direction;
-  Newton_SetInitialSlicePositionOrientationEtc(&carObj->N,(int)(carObj->N).simRoadInfo.slice,&offset,carObj->direction);
-  xformy(&rotMatrix,(void *)rotation1024);
-  Math_fasttransmult(&(carObj->N).orientMat,&rotMatrix,&(carObj->N).orientMat);
-  (carObj->N).shadowMat = (carObj->N).orientMat;
-  (carObj->N).linearVel = zero;
+  local_50.x = latPos * carObj->direction;
+  Newton_SetInitialSlicePositionOrientationEtc(&carObj->N,(int)(carObj->N).simRoadInfo.slice,&local_50,carObj->direction);
+  xformy(&mStack_40,rotation1024);
+  m1 = &(carObj->N).orientMat;
+  Math_fasttransmult(m1,&mStack_40,m1);
+  pmVar2 = &(carObj->N).shadowMat;
+  do {
+    iVar4 = m1->m[1];
+    iVar5 = m1->m[2];
+    iVar3 = m1->m[3];
+    pmVar2->m[0] = m1->m[0];
+    pmVar2->m[1] = iVar4;
+    pmVar2->m[2] = iVar5;
+    pmVar2->m[3] = iVar3;
+    m1 = (matrixtdef *)(m1->m + 4);
+    pmVar2 = (matrixtdef *)(pmVar2->m + 4);
+  } while (m1 != (matrixtdef *)((carObj->N).orientMat.m + 8));
+  pmVar2->m[0] = m1->m[0];
+  (carObj->N).linearVel = zeroVelocity;
   AIInit_ClearAICar(carObj);
   iVar3 = Cars_CalculateRoadPosition(carObj);
   carObj->rampDesiredLatPos = iVar3;
@@ -483,53 +552,52 @@ void AILife_ReencarnateCopByLatPosAndRotation(Car_tObj *carObj,int slice,int tra
 /* ---- AILife_IsCoordInThisLiveArea__FP8coorddefP8Car_tObj  [@0x80068658] ---- */
 int AILife_IsCoordInThisLiveArea(coorddef *tPos,Car_tObj *racer)
 {
-  /* SYM @0x80068658 block: REG xD($v1)/zD($a2)/dist($v1, reuses xD's reg) -- 3 named
-   * locals, not 2 generic iVar temps (w18-a7). */
   int xD;
   int zD;
   int dist;
-
-  zD = tPos->z - (racer->N).position.z;
-  zD = __builtin_abs(zD);
-  xD = tPos->x - (racer->N).position.x;
-  xD = __builtin_abs(xD);
-  if (zD < xD) {
-    dist = xD + (zD >> 2);
+  int iVar1;
+  int iVar2;
+  
+  iVar2 = tPos->z - (racer->N).position.z;
+  if (iVar2 < 0) {
+    iVar2 = -iVar2;
+  }
+  iVar1 = tPos->x - (racer->N).position.x;
+  if (iVar1 < 0) {
+    iVar1 = -iVar1;
+  }
+  if (iVar2 < iVar1) {
+    iVar1 = iVar1 + (iVar2 >> 2);
   }
   else {
-    dist = zD + (xD >> 2);
+    iVar1 = iVar2 + (iVar1 >> 2);
   }
-  if (0xd80000 < dist) {
-    /* RAW @0x800686b8-800686f0: nullsub arg materialize -- $a0=&"dist=%d",
-     * $a1 = dist/0xffff (magic-mult div, M=0x80008001 shift=15, restored per §3.14).
-     * literal 0/1 returns (not `!cond`) -- oracle recomputes the return value AFTER
-     * the call rather than keeping the compare flag live across it in a saved reg. */
-    AILife_Debug("dist=%d", dist / 0xffff);
-    return 0;
+  if (0xd80000 < iVar1) {
+    AILife_Debug((char *)(AIInit_forceHumanHandBrake + 1));
   }
-  return 1;
+  return (u_int)(0xd80000 >= iVar1);
 }
 
 /* ---- AILife_IsTrafficCarInAnyLiveArea__FP8Car_tObj  [@0x80068704] ---- */
 Car_tObj * AILife_IsTrafficCarInAnyLiveArea(Car_tObj *traffic)
 {
+  int racerLoop;
+  coorddef*tPos;
   int iVar1;
   Car_tObj **ppCVar2;
-  int racerLoop;
-  coorddef *tPos;
+  int iVar3;
   
-  racerLoop = 0;
-  tPos = &(traffic->N).position;
+  iVar3 = 0;
   if (0 < Cars_gNumLifeBasisCars) {
     ppCVar2 = Cars_gLifeBasisCarList;
     do {
-      iVar1 = AILife_IsCoordInThisLiveArea(tPos,*ppCVar2);
+      iVar1 = AILife_IsCoordInThisLiveArea(&(traffic->N).position,*ppCVar2);
+      iVar3 = iVar3 + 1;
       if (iVar1 != 0) {
         return *ppCVar2;
       }
-      racerLoop = racerLoop + 1;
       ppCVar2 = ppCVar2 + 1;
-    } while (racerLoop < Cars_gNumLifeBasisCars);
+    } while (iVar3 < Cars_gNumLifeBasisCars);
   }
   return (Car_tObj *)0x0;
 }
@@ -537,23 +605,27 @@ Car_tObj * AILife_IsTrafficCarInAnyLiveArea(Car_tObj *traffic)
 /* ---- AILife_IsCoordInThisVisibleArea__FP8coorddefP8Car_tObj  [@0x80068788] ---- */
 int AILife_IsCoordInThisVisibleArea(coorddef *tPos,Car_tObj *racer)
 {
-  /* SYM @0x80068788 block: same REG layout as IsCoordInThisLiveArea -- xD($v1)/
-   * zD($a2)/dist($v1, reuses xD's reg) (w18-a7). */
   int xD;
   int zD;
   int dist;
-
-  zD = tPos->z - (racer->N).position.z;
-  zD = __builtin_abs(zD);
-  xD = tPos->x - (racer->N).position.x;
-  xD = __builtin_abs(xD);
-  if (zD < xD) {
-    dist = xD + (zD >> 2);
+  int iVar1;
+  int iVar2;
+  
+  iVar2 = tPos->z - (racer->N).position.z;
+  if (iVar2 < 0) {
+    iVar2 = -iVar2;
+  }
+  iVar1 = tPos->x - (racer->N).position.x;
+  if (iVar1 < 0) {
+    iVar1 = -iVar1;
+  }
+  if (iVar2 < iVar1) {
+    iVar1 = iVar1 + (iVar2 >> 2);
   }
   else {
-    dist = zD + (xD >> 2);
+    iVar1 = iVar2 + (iVar1 >> 2);
   }
-  return 0xac0000 < dist ^ 1;
+  return 0xac0000 < iVar1 ^ 1;
 }
 
 /* ---- AILife_IsCarInAnyVisibleArea__FP8Car_tObj  [@0x800687ec] ---- */
@@ -568,89 +640,93 @@ Car_tObj * AILife_IsCarInAnyVisibleArea(Car_tObj *carObj)
 /* ---- AILife_IsSliceInAnyVisibleArea__Fi  [@0x8006880c] ---- */
 Car_tObj * AILife_IsSliceInAnyVisibleArea(int slice)
 {
-  /* SYM @0x8006880c: racerLoop($s1)/sliceDist($v0, scratch) -- 2 named locals; the earlier
-   * recon left them declared-but-unwired and reintroduced generic iVar1/iVar3 instead, which
-   * pulled in an unneeded extra saved register (w22-a14). */
   int racerLoop;
   int sliceDist;
+  int iVar1;
   Car_tObj **ppCVar2;
-
-  racerLoop = 0;
+  int iVar3;
+  
+  iVar3 = 0;
   ppCVar2 = Cars_gHumanRaceCarList;
-RACER_TEST:
-  if (Cars_gNumHumanRaceCars <= racerLoop) {
-    goto RACER_NOT_FOUND;
+  while( true ) {
+    if (Cars_gNumHumanRaceCars <= iVar3) {
+      return (Car_tObj *)0x0;
+    }
+    iVar1 = AIWorld_ApxSplineDistance((int)((*ppCVar2)->N).simRoadInfo.slice,slice);
+    if (iVar1 < 0) {
+      iVar1 = -iVar1;
+    }
+    if (iVar1 < 0xac0000) break;
+    ppCVar2 = ppCVar2 + 1;
+    iVar3 = iVar3 + 1;
   }
-  sliceDist = AIWorld_ApxSplineDistance((int)((*ppCVar2)->N).simRoadInfo.slice,slice);
-  sliceDist = __builtin_abs(sliceDist);
-  if (0xabffff < sliceDist) goto RACER_CONTINUE;
   return *ppCVar2;
-RACER_CONTINUE:
-  ppCVar2 = ppCVar2 + 1;
-  racerLoop = racerLoop + 1;
-  goto RACER_TEST;
-RACER_NOT_FOUND:
-  return (Car_tObj *)0x0;
 }
 
 /* ---- AILife_IsSliceCloseToAnyCopCar__Fi  [@0x800688ac] ---- */
 Car_tObj * AILife_IsSliceCloseToAnyCopCar(int slice)
 {
-  /* SYM @0x800688ac: copLoop($s1)/sliceDist($v0, scratch) -- same declared-but-unwired-locals
-   * fix as IsSliceInAnyVisibleArea (w22-a14). */
   int copLoop;
   int sliceDist;
+  int iVar1;
   Car_tObj **ppCVar2;
-
-  copLoop = 0;
+  int iVar3;
+  
+  iVar3 = 0;
   ppCVar2 = Cars_gCopCarList;
-COP_TEST:
-  if (Cars_gNumCopCars <= copLoop) {
-    goto COP_NOT_FOUND;
+  while( true ) {
+    if (Cars_gNumCopCars <= iVar3) {
+      return (Car_tObj *)0x0;
+    }
+    iVar1 = AIWorld_ApxSplineDistance((int)((*ppCVar2)->N).simRoadInfo.slice,slice);
+    if (iVar1 < 0) {
+      iVar1 = -iVar1;
+    }
+    if (iVar1 < 0x320000) break;
+    ppCVar2 = ppCVar2 + 1;
+    iVar3 = iVar3 + 1;
   }
-  sliceDist = AIWorld_ApxSplineDistance((int)((*ppCVar2)->N).simRoadInfo.slice,slice);
-  sliceDist = __builtin_abs(sliceDist);
-  if (0x31ffff < sliceDist) goto COP_CONTINUE;
   return *ppCVar2;
-COP_CONTINUE:
-  ppCVar2 = ppCVar2 + 1;
-  copLoop = copLoop + 1;
-  goto COP_TEST;
-COP_NOT_FOUND:
-  return (Car_tObj *)0x0;
 }
 
 /* ---- AILife_IsPositionInAnyVisibleArea__FP8coorddef  [@0x8006894c] ---- */
 Car_tObj * AILife_IsPositionInAnyVisibleArea(coorddef *pos)
 {
+  int racerLoop;
   int iVar1;
   Car_tObj **ppCVar2;
-  int racerLoop;
-
-  racerLoop = 0;
+  int iVar3;
+  
+  iVar3 = 0;
   if (0 < Cars_gNumHumanRaceCars) {
     ppCVar2 = Cars_gHumanRaceCarList;
     do {
       iVar1 = AILife_IsCoordInThisVisibleArea(pos,*ppCVar2);
+      iVar3 = iVar3 + 1;
       if (iVar1 != 0) {
         return *ppCVar2;
       }
-      racerLoop = racerLoop + 1;
       ppCVar2 = ppCVar2 + 1;
-    } while (racerLoop < Cars_gNumHumanRaceCars);
+    } while (iVar3 < Cars_gNumHumanRaceCars);
   }
   return (Car_tObj *)0x0;
 }
 
 /* ---- AILife_Debug__FPce  [@0x800689d0] ---- */
-/* HIDDEN-PHANTOM FIX (w14-a2): oracle mangles __FPce (char*,...) -- was __FPc (char*) with no
- * varargs, a NAME MISMATCH invisible to the gate ("NOT IN OBJECT" forever). Raw demangle
- * @0x800689d0 confirms "AILife_Debug(char *, ...)". Nullsub body (§3.2 compiled-out debug fn)
- * but callers still set up the real varargs (§3.2 nullsub-still-takes-its-real-args). */
-void AILife_Debug(char *format, ...)
+void AILife_Debug(char *format)
 {
-  /* SYM fsize=0, no locals besides REGPARM format -- the Ghidra-decompiled dead locals this
-   * used to carry (sliceDist/dist/newSlice/... /rotMatrix) were leftover decompiler noise from
-   * a larger un-optimized debug body; dropped per SYM (w14-a2, matches oracle's zero-size frame). */
+  int sliceDist;
+  int dist;
+  int newSlice;
+  int width;
+  int zD;
+  int speed;
+  int copLoop;
+  int count;
+  int approachSide;
+  int search;
+  coorddef zero;
+  matrixtdef rotMatrix;
+  
   return;
 }

@@ -5,91 +5,95 @@
 #define SPEECH_EXTERNS_H
 
 /* ---- speech-event trigger fns (spchevnt.cpp, unmangled C-linkage; variadic call sites) ---- */
+#ifdef _MSC_VER
+#include "spchevnt.h"
 extern "C" {
-long SPCHNFS_C_A_CONFIRM(int = 0, ...);
-long SPCHNFS_C_A_INTRO(int = 0, ...);
-long SPCHNFS_C_C_IDLE_WINGMAN_DISAPPEARS(int = 0, ...);
-long SPCHNFS_C_C_IN_PURS_NEAR_PERP(int = 0, ...);
-long SPCHNFS_C_C_NEW_OFFICER_ENGAGING(int = 0, ...);
-long SPCHNFS_C_C_PERP_REAQUIRED(int = 0, ...);
-long SPCHNFS_C_D_DURING_FALSE_ARREST(int = 0, ...);
-long SPCHNFS_C_D_ENDGAME(int = 0, ...);
-long SPCHNFS_C_D_ENGAGE_PURS_REP_SPDR(int = 0, ...);
-long SPCHNFS_C_D_ENGAGE_PURS_REP_SPDR_REPLY(int = 0, ...);
-long SPCHNFS_C_D_IN_PURS_AWAY_PERP_REPLY_LOC(int = 0, ...);
-long SPCHNFS_C_D_IN_PURS_AWAY_PERP_REPLY_STS(int = 0, ...);
-long SPCHNFS_C_D_IN_PURS_LOOK_PERP_REPLY_LOC(int = 0, ...);
-long SPCHNFS_C_D_IN_PURS_LOOK_PERP_REPLY_STS(int = 0, ...);
-long SPCHNFS_C_D_IN_PURS_NEAR_PERP_REP_LOC(int = 0, ...);
-long SPCHNFS_C_D_IN_PURS_NEAR_PERP_REP_SPD(int = 0, ...);
-long SPCHNFS_C_D_IN_PURS_NEAR_PERP_REP_STS(int = 0, ...);
-long SPCHNFS_C_D_IN_PURS_PERP_AIRBORN(int = 0, ...);
-long SPCHNFS_C_D_PERP_APPREHENSION(int = 0, ...);
-long SPCHNFS_C_D_PERP_CRASH_GEN(int = 0, ...);
-long SPCHNFS_C_D_PERP_CRASH_ROLL(int = 0, ...);
-long SPCHNFS_C_D_PERP_LOST(int = 0, ...);
-long SPCHNFS_C_D_PERP_SIGHTED(int = 0, ...);
-long SPCHNFS_C_D_RDBLK_FAILED(int = 0, ...);
-long SPCHNFS_C_D_REQUEST_BKUP(int = 0, ...);
-long SPCHNFS_C_D_REQUEST_EMS(int = 0, ...);
-long SPCHNFS_C_D_REQ_RDBLK(int = 0, ...);
-long SPCHNFS_C_D_REQ_SPBLT(int = 0, ...);
-long SPCHNFS_C_D_SPBLT_FAILED(int = 0, ...);
-long SPCHNFS_C_P_ARRESTED(int = 0, ...);
-long SPCHNFS_C_P_BULLHORN_SPEECH(int = 0, ...);
-long SPCHNFS_C_P_FALSE_ARREST_BULLHORN(int = 0, ...);
-long SPCHNFS_C_P_TICKET(int = 0, ...);
-long SPCHNFS_C_P_WARNING(int = 0, ...);
-long SPCHNFS_D_A_CONFIRM(int = 0, ...);
-long SPCHNFS_D_C_BEGIN_PURS_REP_SPDR(int = 0, ...);
-long SPCHNFS_D_C_BKUP_REQUEST_DENIED_REPLY(void);   /* MATCH: true (void) sig per spchevnt.c:675 -- the `int = 0` default arg emitted a spurious `addu a0,zero,zero` in the jal delay slot (oracle: nop) */
-long SPCHNFS_D_C_BKUP_REQUEST_GRANT_REPLY(int = 0, ...);
-long SPCHNFS_D_C_INTRO_CALL(int = 0, ...);
-long SPCHNFS_D_C_IN_PURS_AWAY_PERP_CONFIRM(int = 0, ...);
-long SPCHNFS_D_C_IN_PURS_NEAR_PERP(int = 0, ...);
-long SPCHNFS_D_C_IN_PURS_NEAR_PERP_CONFIRM(int = 0, ...);
-long SPCHNFS_D_C_PERP_APPREHENSION_REPLY(int = 0, ...);
-long SPCHNFS_D_C_PERP_LOST_CONFIRM(int = 0, ...);
-long SPCHNFS_D_C_PERP_SIGHTED_CONFIRM(int = 0, ...);
-long SPCHNFS_D_C_RDBLK_CONFIRMED(int = 0, ...);
-long SPCHNFS_D_C_RDBLK_SPBLT_DENIED_REPLY(int = 0, ...);
-long SPCHNFS_D_C_RDBLK_SPBLT_GRANT_REPLY(int = 0, ...);
-long SPCHNFS_D_C_SPBLT_CONFIRMED(SPCHNFSType_POSITION *, int,
-                                 SPCHNFSType_DISTANCE *, int,
-                                 SPCHNFSType_SPIKE_BELT_SIDE *);
-long SPCHNFS_S_C_SUPER_COP_ARRIVAL(int = 0, ...);
-long SPCHNFS_S_C_SUPER_COP_CRITICISM(int = 0, ...);
-long SPCHNFS_W_D_RDBLK_PLC(int = 0, ...);
-long SPCHNFS_W_D_SPBLT_PLC(int = 0, ...);
-long SPCH_AddBank(int = 0, ...);
-void SPCH_ClearEventQueue(void);
-void SPCH_Deinit(void);
+int SPCH_AddBank(intptr_t bank);
+long SPCH_ClearEventQueue(int = 0, ...);
+long SPCH_Deinit(int = 0, ...);
 long SPCH_GetSampleDataRate(int = 0, ...);
-long SPCH_Init(int = 0, ...);
-long SPCH_InitBankMem(int = 0, ...);
-long SPCH_PlaySpeech(...);
+int SPCH_Init(intptr_t sampleRequestCb, unsigned int gameNum, int dataRate);
+intptr_t SPCH_InitBankMem(intptr_t memAllocFn, intptr_t memFreeFn, int numBanks);
+long SPCH_PlaySpeech(int = 0, ...);
 long SPCH_ResolveData(int = 0, ...);
 }
+#else
+extern "C" {
+extern "C" { long SPCHNFS_C_A_CONFIRM(int = 0, ...); }
+extern "C" { long SPCHNFS_C_A_INTRO(int = 0, ...); }
+extern "C" { long SPCHNFS_C_C_IDLE_WINGMAN_DISAPPEARS(int = 0, ...); }
+extern "C" { long SPCHNFS_C_C_IN_PURS_NEAR_PERP(int = 0, ...); }
+extern "C" { long SPCHNFS_C_C_NEW_OFFICER_ENGAGING(int = 0, ...); }
+extern "C" { long SPCHNFS_C_C_PERP_REAQUIRED(int = 0, ...); }
+extern "C" { long SPCHNFS_C_D_DURING_FALSE_ARREST(int = 0, ...); }
+extern "C" { long SPCHNFS_C_D_ENDGAME(int = 0, ...); }
+extern "C" { long SPCHNFS_C_D_ENGAGE_PURS_REP_SPDR(int = 0, ...); }
+extern "C" { long SPCHNFS_C_D_ENGAGE_PURS_REP_SPDR_REPLY(int = 0, ...); }
+extern "C" { long SPCHNFS_C_D_IN_PURS_AWAY_PERP_REPLY_LOC(int = 0, ...); }
+extern "C" { long SPCHNFS_C_D_IN_PURS_AWAY_PERP_REPLY_STS(int = 0, ...); }
+extern "C" { long SPCHNFS_C_D_IN_PURS_LOOK_PERP_REPLY_LOC(int = 0, ...); }
+extern "C" { long SPCHNFS_C_D_IN_PURS_LOOK_PERP_REPLY_STS(int = 0, ...); }
+extern "C" { long SPCHNFS_C_D_IN_PURS_NEAR_PERP_REP_LOC(int = 0, ...); }
+extern "C" { long SPCHNFS_C_D_IN_PURS_NEAR_PERP_REP_SPD(int = 0, ...); }
+extern "C" { long SPCHNFS_C_D_IN_PURS_NEAR_PERP_REP_STS(int = 0, ...); }
+extern "C" { long SPCHNFS_C_D_IN_PURS_PERP_AIRBORN(int = 0, ...); }
+extern "C" { long SPCHNFS_C_D_PERP_APPREHENSION(int = 0, ...); }
+extern "C" { long SPCHNFS_C_D_PERP_CRASH_GEN(int = 0, ...); }
+extern "C" { long SPCHNFS_C_D_PERP_CRASH_ROLL(int = 0, ...); }
+extern "C" { long SPCHNFS_C_D_PERP_LOST(int = 0, ...); }
+extern "C" { long SPCHNFS_C_D_PERP_SIGHTED(int = 0, ...); }
+extern "C" { long SPCHNFS_C_D_RDBLK_FAILED(int = 0, ...); }
+extern "C" { long SPCHNFS_C_D_REQUEST_BKUP(int = 0, ...); }
+extern "C" { long SPCHNFS_C_D_REQUEST_EMS(int = 0, ...); }
+extern "C" { long SPCHNFS_C_D_REQ_RDBLK(int = 0, ...); }
+extern "C" { long SPCHNFS_C_D_REQ_SPBLT(int = 0, ...); }
+extern "C" { long SPCHNFS_C_D_SPBLT_FAILED(int = 0, ...); }
+extern "C" { long SPCHNFS_C_P_ARRESTED(int = 0, ...); }
+extern "C" { long SPCHNFS_C_P_BULLHORN_SPEECH(int = 0, ...); }
+extern "C" { long SPCHNFS_C_P_FALSE_ARREST_BULLHORN(int = 0, ...); }
+extern "C" { long SPCHNFS_C_P_TICKET(int = 0, ...); }
+extern "C" { long SPCHNFS_C_P_WARNING(int = 0, ...); }
+extern "C" { long SPCHNFS_D_A_CONFIRM(int = 0, ...); }
+extern "C" { long SPCHNFS_D_C_BEGIN_PURS_REP_SPDR(int = 0, ...); }
+extern "C" { long SPCHNFS_D_C_BKUP_REQUEST_DENIED_REPLY(int = 0, ...); }
+extern "C" { long SPCHNFS_D_C_BKUP_REQUEST_GRANT_REPLY(int = 0, ...); }
+extern "C" { long SPCHNFS_D_C_INTRO_CALL(int = 0, ...); }
+extern "C" { long SPCHNFS_D_C_IN_PURS_AWAY_PERP_CONFIRM(int = 0, ...); }
+extern "C" { long SPCHNFS_D_C_IN_PURS_NEAR_PERP(int = 0, ...); }
+extern "C" { long SPCHNFS_D_C_IN_PURS_NEAR_PERP_CONFIRM(int = 0, ...); }
+extern "C" { long SPCHNFS_D_C_PERP_APPREHENSION_REPLY(int = 0, ...); }
+extern "C" { long SPCHNFS_D_C_PERP_LOST_CONFIRM(int = 0, ...); }
+extern "C" { long SPCHNFS_D_C_PERP_SIGHTED_CONFIRM(int = 0, ...); }
+extern "C" { long SPCHNFS_D_C_RDBLK_CONFIRMED(int = 0, ...); }
+extern "C" { long SPCHNFS_D_C_RDBLK_SPBLT_DENIED_REPLY(int = 0, ...); }
+extern "C" { long SPCHNFS_D_C_RDBLK_SPBLT_GRANT_REPLY(int = 0, ...); }
+extern "C" { long SPCHNFS_D_C_SPBLT_CONFIRMED(int = 0, ...); }
+extern "C" { long SPCHNFS_S_C_SUPER_COP_ARRIVAL(int = 0, ...); }
+extern "C" { long SPCHNFS_S_C_SUPER_COP_CRITICISM(int = 0, ...); }
+extern "C" { long SPCHNFS_W_D_RDBLK_PLC(int = 0, ...); }
+extern "C" { long SPCHNFS_W_D_SPBLT_PLC(int = 0, ...); }
+int SPCH_AddBank(intptr_t bank);
+long SPCH_ClearEventQueue(int = 0, ...);
+long SPCH_Deinit(int = 0, ...);
+long SPCH_GetSampleDataRate(int = 0, ...);
+int SPCH_Init(intptr_t sampleRequestCb, unsigned int gameNum, int dataRate);
+intptr_t SPCH_InitBankMem(intptr_t memAllocFn, intptr_t memFreeFn, int numBanks);
+long SPCH_PlaySpeech(int = 0, ...);
+long SPCH_ResolveData(int = 0, ...);
+}
+#endif
 
 /* ---- SPCH_ speech-runtime API ---- */  /* (declared above; variadic) */
 
 /* ---- audio ---- */
-/* W55-A2 BUGFIX (class-3, synthetic default-args): these four were placeholder
-   `int f(int = 0, ...)` decls.  Under C++ linkage a variadic decl mangles to `__Fie`, so
-   speech.o emitted `U AudioMus_PlaySong__Fie` / `AudioMus_StopSong__Fie` /
-   `CopSpeak_DirectRequest__Fie` / `CopSpeak_GenericBankRequest__Fie` -- four PHANTOM
-   symbols that can never link (verify_asm's reloc-name leniency hid them).  The true
-   signatures come from the definitions (audiomus.cpp / copspeak.cpp) and are confirmed by
-   configs/symbol_addrs.txt: AudioMus_StopSong__Fi, AudioMus_PlaySong__FPc,
-   CopSpeak_DirectRequest__FillP8Car_tObjPc, CopSpeak_GenericBankRequest__FiP8Car_tObj. */
-extern int AudioMus_PlaySong(char *pattern);
-extern void AudioMus_StopSong(int fadeticks);
-extern int AudioMus_Threshold(void);
+extern "C" { extern int AudioMus_PlaySong(char *); }
+extern "C" { extern int AudioMus_StopSong(int = 0, ...); }
+extern "C" { extern int AudioMus_Threshold(int = 0, ...); }
 
 /* ---- CopSpeak (sibling TU) ---- */
-extern void CopSpeak_DirectRequest(int filehandle, long offset, long size, Car_tObj *car, char *name);
-extern void CopSpeak_Flush(void);
-extern void CopSpeak_GenericBankRequest(int patch, Car_tObj *car);
+extern "C" { extern int CopSpeak_DirectRequest(int = 0, ...); }
+extern "C" { extern int CopSpeak_Flush(int = 0, ...); }
+extern "C" { extern int CopSpeak_GenericBankRequest(int = 0, ...); }
 extern int CopSpeak_gSpchHandle;
 
 /* ---- eaclib / PsyQ / file I/O ---- */
@@ -101,19 +105,19 @@ extern void *__builtin_new(unsigned);
 extern void __builtin_delete(void *);
 
 /* ---- cross-TU globals (typed from SYM Globals.jsonl) ---- */
-extern GameSetup_tData GameSetup_gData;
-extern char GameSetup_gCarNames[51][5];
-extern char *Paths_Paths[50];
+extern "C" extern "C" GameSetup_tData GameSetup_gData;
+extern "C" char GameSetup_gCarNames[51][5];
+extern "C" extern "C" char *Paths_Paths[50];
 extern int gNumSlices;
-extern u_long gWSavePtr;
+extern intptr_t gWSavePtr;
 extern u_int fastRandom;
 extern u_int randSeed;
 extern u_int randtemp;
-extern int stackSpeedUpEnbabledFlag;
+extern "C" extern int stackSpeedUpEnbabledFlag;
 
 /* ---- per-class vtables (data syms; assigned to _vf[31]) ---- */
-extern const __vtbl_ptr_type Speaker_vtable[] __asm__("_vt_Q26Speech7Speaker");
-extern const __vtbl_ptr_type MobileSpeaker_vtable[] __asm__("_vt_Q26Speech13MobileSpeaker");
-extern const __vtbl_ptr_type DispatchSpeaker_vtable[] __asm__("_vt_Q26Speech15DispatchSpeaker");
+extern __vtbl_ptr_type Speaker_vtable[];   /* @0x80055dc4 #75 data-mat (defined in speech.cpp) */
+extern __vtbl_ptr_type MobileSpeaker_vtable[];   /* @0x80055bd4 #75 data-mat (defined in speech.cpp) */
+extern __vtbl_ptr_type DispatchSpeaker_vtable[];   /* @0x80055ccc #75 data-mat (defined in speech.cpp) */
 
 #endif /* SPEECH_EXTERNS_H */

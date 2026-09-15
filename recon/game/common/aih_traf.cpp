@@ -6,9 +6,8 @@
  *   Faithful C++ (option A). NOT original source; SYM-faithful, recompilable. vs disasm-v2.
  */
 #include "../../lib/nfs4_new.h"
-#include "aih_traf_types.h"
+#include "../../nfs4_types.h"
 #include "aih_traf_externs.h"
-
 
 /* ---- CheckForCops__14AIHigh_TrafficPi  AIHigh_Traffic::CheckForCops  [AIH_TRAF.CPP:32-56] SLD-VERIFIED ---- */
 Car_tObj *
@@ -18,50 +17,58 @@ AIHigh_Traffic::CheckForCops(int *closestDistance)
 
 
 {
-  Car_tObj*closestCop;
   int copLoop;
+  Car_tObj*closestCop;
+  Car_tObj*cop;
+  int sliceDistance;
 
+  int iVar1;
 
+  Car_tObj *otherCarObj;
 
-  closestCop = (Car_tObj *)0x0;
+  Car_tObj **ppCVar2;
+
+  int iVar3;
+
+  Car_tObj *pCVar4;
+
+  
+
+  pCVar4 = (Car_tObj *)0x0;
 
   *closestDistance = 0x4e200000;
 
-  copLoop = 0;
+  ppCVar2 = Cars_gCopCarList;
 
-  while (true) {
+  for (iVar3 = 0; iVar3 < Cars_gNumCopCars; iVar3 = iVar3 + 1) {
 
-    Car_tObj*cop;
-    int currentBest;
-    int sliceDistance;
+    otherCarObj = *ppCVar2;
 
-    if (Cars_gNumCopCars <= copLoop) break;
+    if ((otherCarObj->AIFlags & 4U) == 0) {
 
-    cop = Cars_gCopCarList[copLoop];
+      iVar1 = AIWorld_ApxSplineDistance((this->_base_AIHigh_Base).carObj_,otherCarObj);
 
-    if ((cop->AIFlags & 4U) == 0) {
+      if (iVar1 < 0) {
 
-      sliceDistance = AIWorld_ApxSplineDistance(this->carObj_,cop);
+        iVar1 = -iVar1;
 
-      currentBest = *closestDistance;
+      }
 
-      sliceDistance = __builtin_abs(sliceDistance);
+      if (iVar1 < *closestDistance) {
 
-      if (sliceDistance < currentBest) {
+        *closestDistance = iVar1;
 
-        closestCop = cop;
-
-        *closestDistance = sliceDistance;
+        pCVar4 = otherCarObj;
 
       }
 
     }
 
-    copLoop = copLoop + 1;
+    ppCVar2 = ppCVar2 + 1;
 
   }
 
-  return closestCop;
+  return pCVar4;
 
 }
 
@@ -72,20 +79,7 @@ AIHigh_Traffic::CheckForCops(int *closestDistance)
 
 
 
-/* ---- CopCheck__14AIHigh_TrafficPi  AIHigh_Traffic::CopCheck  [AIH_TRAF.CPP:61-121] SLD-VERIFIED ----
- * 04R RECEIPT (1 diff, ours 66 / oracle 67; objdiff 98.43): the oracle's closest==0 path exits
- * PAST the v0=s0 tail (.L80065E58) with `addu v0,zero,zero` eager-stolen into the beqz slot --
- * retail REMATERIALIZES the zero from $zero while a live $s0 also holds 0.  Six spellings
- * falsified (numbers = gate diffs @insns): inline wrapper 1@66 (baseline, kept) - early
- * `return 0` 1@66 (value-merged into the s0 tail) - `return closest` 1@66 (const-propped, same
- * merge) - identity fence inside the if 6@69 (out-of-line block, polarity flip) - fence above
- * the test 3@68 (zero materializes but as `addu v0,S0,zero` + empty slot: cse substitutes the
- * live s0 zero AND the fence barrier blocks the slot sink) - end-goto return-null block 5@66
- * (merged anyway).  CLASS = methodology 3.25-3b STILL-LIVE-CONSTANT no-copy-prop identity (the
- * w47-a1 nfile fingerprint: retail rematerializes a constant that is live in a register; our
- * cc1 copy-propagates) -- not source-reachable by any spelling tried; ANGLE = instrumented-cc1
- * trace of the cse/jump decision on this site (Mode-A check first), same lane as nfile's three
- * sites.  NOT a floor: the fence-above probe proves the SHAPE is one cse substitution away. */
+/* ---- CopCheck__14AIHigh_TrafficPi  AIHigh_Traffic::CopCheck  [AIH_TRAF.CPP:61-121] SLD-VERIFIED ---- */
 AIHigh_Cop *
 
 AIHigh_Traffic::CopCheck(int *blockade)
@@ -98,58 +92,69 @@ AIHigh_Traffic::CopCheck(int *blockade)
   int speed;
   AIHigh_Cop*cop;
 
+  Car_tObj *pCVar1;
 
+  int iVar2;
+
+  AIHigh_Cop *pAVar3;
+
+  int local_18 [2];
+
+  
 
   *blockade = 0;
 
-  cop = (AIHigh_Cop *)0x0;
+  pAVar3 = (AIHigh_Cop *)0x0;
 
-  /* 04T: SOLVED by community scratch https://decomp.me/scratch/DDEJs (score 0):
-   * BOTH failure paths are early `return cop;` -- returning the VARIABLE (not a
-   * 0 literal) keeps distinct return sites, and the closest==0 site's v0 zero
-   * lands eager-stolen in the beqz slot exactly like retail.  The 6 falsified
-   * spellings from the 04R receipt all returned constants/merged shapes. */
-  if (Cars_gNumCopCars == 0) {
+  if (Cars_gNumCopCars != 0) {
 
-    return cop;
+    pCVar1 = this->CheckForCops(local_18);
 
-  }
+    pAVar3 = (AIHigh_Cop *)0x0;
 
-  closest = this->CheckForCops(&closestDistance);
+    if (pCVar1 != (Car_tObj *)0x0) {
 
-  if (closest == (Car_tObj *)0x0) {
+      iVar2 = pCVar1->currentSpeed;
 
-    return cop;
+      if (iVar2 < 0) {
 
-  }
+        iVar2 = -iVar2;
 
-  /* The retail inline abs form is required to retain the SLD allocation:
-   * closest in $a0 and speed in $a1. */
-  speed = __builtin_abs(closest->currentSpeed);
+      }
 
-  if ((speed < 0x20000) && (closestDistance < 0x4b0000)) {
+      if ((iVar2 < 0x20000) && (local_18[0] < 0x4b0000)) {
 
-    *blockade = 1;
+        *blockade = 1;
 
-    cop = (AIHigh_Cop *)highLevelAIObjs[closest->carIndex];
+        pAVar3 = (AIHigh_Cop *)highLevelAIObjs[pCVar1->carIndex];
 
-    if (((AIHigh_Cop *)highLevelAIObjs[closest->carIndex])->perpTarget_ == (AIHigh_Player *)0x0)
+        if (((AIHigh_Cop *)highLevelAIObjs[pCVar1->carIndex])->perpTarget_ == (AIHigh_Player *)0x0)
 
-    {
+        {
 
-      cop = (AIHigh_Cop *)0x0;
+          pAVar3 = (AIHigh_Cop *)0x0;
+
+        }
+
+      }
+
+      else {
+
+        pAVar3 = (AIHigh_Cop *)0x0;
+
+        if ((0x20000 < iVar2) && (pAVar3 = (AIHigh_Cop *)0x0, local_18[0] < 0x4b0000)) {
+
+          pAVar3 = (AIHigh_Cop *)highLevelAIObjs[pCVar1->carIndex];
+
+        }
+
+      }
 
     }
 
   }
 
-  else if ((0x20000 < speed) && (closestDistance < 0x4b0000)) {
-
-    cop = (AIHigh_Cop *)highLevelAIObjs[closest->carIndex];
-
-  }
-
-  return cop;
+  return pAVar3;
 
 }
 
@@ -160,227 +165,548 @@ AIHigh_Traffic::CopCheck(int *blockade)
 
 
 
-/* TU-local rodata: the case-0 initial offset {0, 0x640000, 0}. Oracle @0x800551A4 loads this
- * via 3 `lw`s and stores to the stack, NOT via 3 immediate `li`/`sw`s -- confirming the source
- * assigns from a named const struct, not per-field literals. Sits immediately before this TU's
- * own _vt_14AIHigh_Traffic in rodata -> TU-owned, not a cross-module extern. */
-static const coorddef D_800551A4 = { 0, 0x640000, 0 };
-
 /* ---- HighExecute__14AIHigh_Traffic  AIHigh_Traffic::HighExecute  [AIH_TRAF.CPP:129-340] SLD-VERIFIED ---- */
 
 void AIHigh_Traffic::HighExecute()
+
+
+
 {
-  carObj_->unlap = 0;
-  carObj_->lap = 0;
+  trigger_t *pNewTrigger;
+  coorddef trafficOffset;
+  AIState_Base*newState;
+  BWorldSm_Pos spos;
+  int blockade;
+  int cRand;
+  AIState_Idle*idleState;
+  int slice;
 
-  switch ((stateType_t)stateType_) {
-  case STATE_NONE:
-    {
-      coorddef trafficOffset = D_800551A4;
+  bool bVar1;
 
-      if ((carObj_->carFlags & 0x400U) != 0) {
-        AIState_Idle *idleState = operator new(0x10);
-        new((AIState_Base *)idleState) AIState_Base(carObj_);
-        idleState->_vf = (__vtbl_ptr_type (*)[4])AIState_Idle_vtable;
-        idleState->idleInPlaceFlag_ = 1;
-        SetState((AIState_Base *)idleState,STATE_IDLE);
+  trigger_t *trigger;
+
+  AIState_RovingTraffic *pAVar2;
+
+  AIState_Idle *this_00;
+
+  AIHigh_Cop *pAVar3;
+
+  int iVar4;
+
+  AIState_Purgatory *pAVar5;
+
+  AIState_Base *pAVar6;
+
+  stateType_t sVar7;
+
+  __vtbl_ptr_type (*pa_Var8) [4];
+
+  AIState_Normal *pAVar9;
+
+  Car_tObj *pCVar10;
+
+  u_int uVar11;
+
+  AIState_Base *pAVar12;
+
+  coorddef local_c0;
+
+  BWorldSm_Pos local_b0;
+
+  int local_28;
+
+  int iStack_24;
+
+  int local_20;
+
+  
+
+  ((this->_base_AIHigh_Base).carObj_)->unlap = 0;
+
+  ((this->_base_AIHigh_Base).carObj_)->lap = 0;
+
+  switch((this->_base_AIHigh_Base).stateType_) {
+
+  case 0:
+
+    local_c0.x = 0;
+
+    local_c0.y = 0x640000;
+
+    local_c0.z = 0;
+
+    if ((((this->_base_AIHigh_Base).carObj_)->carFlags & 0x400U) == 0) {
+
+      pAVar5 = (AIState_Purgatory *)operator new(8);
+
+      pAVar6 = (AIState_Base *) (new(pAVar5) AIState_Purgatory((this->_base_AIHigh_Base).carObj_));
+
+      pAVar12 = (this->_base_AIHigh_Base).state_;
+
+      if (pAVar12 != (AIState_Base *)0x0) {
+
+        NFS4_AISTATE_DTOR(pAVar12);
+
       }
-      else {
-        AIState_Purgatory *purgatoryState = operator new(8);
-        AIState_Base *newState =
-          (AIState_Base *)new(purgatoryState) AIState_Purgatory(carObj_);
-        SetState(newState,STATE_PURGATORY);
-      }
 
-      Newton_SetInitialSlicePositionOrientationEtc(&carObj_->N,0,&trafficOffset,1);
-      return;
+      sVar7 = (stateType_t)1;
+
     }
 
-  case STATE_PURGATORY:
-    {
-      if (accidentData_ != (SceneElem *)0x0) {
-        BWorldSm_Pos spos;
-        AIState_Idle *idleState = operator new(0x10);
-        new((AIState_Base *)idleState) AIState_Base(carObj_);
-        idleState->_vf = (__vtbl_ptr_type (*)[4])AIState_Idle_vtable;
-        idleState->idleInPlaceFlag_ = 1;
-        SetState((AIState_Base *)idleState,STATE_IDLE);
+    else {
 
-        spos.slice = 0;
-        BWorldSm_FindClosestSlice(&accidentData_->cp,&spos);
-        AILife_ReencarnateTrafficByPosition
-          (carObj_,(int)spos.slice,1,&accidentData_->cp,&accidentData_->orient);
-        carObj_->carFlags = carObj_->carFlags | 0x400U;
-        accidentData_ = (SceneElem *)0x0;
+      pAVar6 = (AIState_Base *)operator new(0x10);
+
+      (new(pAVar6) AIState_Base((this->_base_AIHigh_Base).carObj_));
+
+      pAVar6->_vf = (__vtbl_ptr_type (*) [4])AIState_Idle_vtable;
+
+      pAVar6[1]._vf = (__vtbl_ptr_type (*) [4])0x1;
+
+      pAVar12 = (this->_base_AIHigh_Base).state_;
+
+      if (pAVar12 != (AIState_Base *)0x0) {
+
+        NFS4_AISTATE_DTOR(pAVar12);
+
       }
-      else {
-        int release = 0;
-        if ((*(*state_->_vf)[3].pfn)
-              ((int)&state_->carObj_ + (*state_->_vf)[3].delta) != 0) {
-          release = forcePurgatory_ == 0;
-        }
-        if (release != 0) {
-          trigger_t *pNewTrigger = CheckForNewTriggers();
 
-          if (pNewTrigger != (trigger_t *)0x0) {
-            /* SYM-OPTIMIZED: trigger -- DescribeTrigger's inlined parameter
-               aliases pNewTrigger in $s0; it has no independent source value. */
-            triggerManagerTraffic->DescribeTrigger(pNewTrigger);
-            if (*(int *)pNewTrigger == 5) {
-              SetState(
-                (AIState_Base *)new((AIState_RovingTraffic *)operator new(0x18))
-                  AIState_RovingTraffic(carObj_,pNewTrigger),
-                STATE_ROVING_TRAFFIC);
-              AILife_ReencarnateTrafficByPosition
-                (carObj_,*(int *)((char *)pNewTrigger + 4),1,
-                 *(coorddef **)((char *)pNewTrigger + 0x3c),
-                 (matrixtdef *)((char *)pNewTrigger + 0xc));
+      sVar7 = (stateType_t)3;
+
+    }
+
+    (this->_base_AIHigh_Base).state_ = pAVar6;
+
+    (this->_base_AIHigh_Base).stateType_ = sVar7;
+
+    Newton_SetInitialSlicePositionOrientationEtc(&((this->_base_AIHigh_Base).carObj_)->N,0,&local_c0,1);
+
+    return;
+
+  case 1:
+
+    bVar1 = false;
+
+    if (this->accidentData_ == (SceneElem *)0x0) {
+
+      pAVar6 = (this->_base_AIHigh_Base).state_;
+
+      pa_Var8 = pAVar6->_vf;
+
+      iVar4 = NFS4_AISTATE_TEST(pAVar6);
+
+      if (iVar4 != 0) {
+
+        bVar1 = this->forcePurgatory_ == 0;
+
+      }
+
+      if (bVar1) {
+
+        trigger = this->CheckForNewTriggers();
+
+        if (trigger == (trigger_t *)0x0) {
+
+          pAVar9 = (AIState_Normal *)operator new(8);
+
+          pAVar6 = &(new(pAVar9) AIState_Normal((this->_base_AIHigh_Base).carObj_))->_base_AIState_Base;
+
+          pAVar12 = (this->_base_AIHigh_Base).state_;
+
+          if (pAVar12 != (AIState_Base *)0x0) {
+
+            NFS4_AISTATE_DTOR(pAVar12);
+
+          }
+
+          (this->_base_AIHigh_Base).state_ = pAVar6;
+
+          (this->_base_AIHigh_Base).stateType_ = 2;
+
+          AILife_ReencarnateTraffic((this->_base_AIHigh_Base).carObj_);
+
+        }
+
+        else {
+
+          triggerManagerTraffic->DescribeTrigger(trigger);
+
+          if (*(int *)trigger == 5) {
+
+            pAVar2 = (AIState_RovingTraffic *)operator new(0x18);
+
+            pAVar2 = (new(pAVar2) AIState_RovingTraffic((this->_base_AIHigh_Base).carObj_,trigger));
+
+            pAVar6 = (this->_base_AIHigh_Base).state_;
+
+            if (pAVar6 != (AIState_Base *)0x0) {
+
+              NFS4_AISTATE_DTOR(pAVar6);
+
             }
+
+            (this->_base_AIHigh_Base).stateType_ = 6;
+
+            (this->_base_AIHigh_Base).state_ = &pAVar2->_base_AIState_Base;
+
+            AILife_ReencarnateTrafficByPosition((this->_base_AIHigh_Base).carObj_,*(int *)(trigger + 4),1,
+
+                       *(coorddef **)(trigger + 0x3c),(matrixtdef *)(trigger + 0xc));
+
           }
-          else {
-            AIState_Normal *normalState = operator new(8);
-            AIState_Base *newState =
-              (AIState_Base *)new(normalState) AIState_Normal(carObj_);
-            SetState(newState,STATE_NORMAL);
-            AILife_ReencarnateTraffic(carObj_);
-          }
+
         }
+
       }
-      break;
+
     }
 
-  case STATE_NORMAL:
-    {
-      int blockade;
+    else {
 
-      if (AILife_EvaluateLife(carObj_) != 0) {
-        AIState_Purgatory *purgatoryState = operator new(8);
-        AIState_Base *newState =
-          (AIState_Base *)new(purgatoryState) AIState_Purgatory(carObj_);
-        SetState(newState,STATE_PURGATORY);
-        break;
+      pAVar6 = (AIState_Base *)operator new(0x10);
+
+      (new(pAVar6) AIState_Base((this->_base_AIHigh_Base).carObj_));
+
+      pAVar6->_vf = (__vtbl_ptr_type (*) [4])AIState_Idle_vtable;
+
+      pAVar6[1]._vf = (__vtbl_ptr_type (*) [4])0x1;
+
+      pAVar12 = (this->_base_AIHigh_Base).state_;
+
+      if (pAVar12 != (AIState_Base *)0x0) {
+
+        NFS4_AISTATE_DTOR(pAVar12);
+
       }
 
-      if (forcePurgatory_ != 0) {
-        AIState_Purgatory *purgatoryState = operator new(8);
-        AIState_Base *newState =
-          (AIState_Base *)new(purgatoryState) AIState_Purgatory(carObj_);
-        SetState(newState,STATE_PURGATORY);
-        break;
-      }
+      (this->_base_AIHigh_Base).state_ = pAVar6;
 
-      if (CopCheck(&blockade) != (AIHigh_Cop *)0x0) {
-        if (ignoreCops_ != 0) {
-          break;
+      (this->_base_AIHigh_Base).stateType_ = 3;
+
+      local_b0.slice = 0;
+
+      BWorldSm_FindClosestSlice(&this->accidentData_->cp,&local_b0);
+
+      AILife_ReencarnateTrafficByPosition((this->_base_AIHigh_Base).carObj_,(int)local_b0.slice,1,&this->accidentData_->cp,
+
+                 &this->accidentData_->orient);
+
+      pCVar10 = (this->_base_AIHigh_Base).carObj_;
+
+      pCVar10->carFlags = pCVar10->carFlags | 0x400;
+
+      this->accidentData_ = (SceneElem *)0x0;
+
+    }
+
+    goto switchD_80065ec8_caseD_4;
+
+  case 2:
+
+    iVar4 = AILife_EvaluateLife((this->_base_AIHigh_Base).carObj_);
+
+    if (iVar4 == 0) {
+
+      if (this->forcePurgatory_ == 0) {
+
+        pAVar3 = this->CopCheck(&local_28);
+
+        if (pAVar3 == (AIHigh_Cop *)0x0) {
+
+          this->ignoreCops_ = 0;
+
+          goto switchD_80065ec8_caseD_4;
+
         }
+
+        if (this->ignoreCops_ != 0) goto switchD_80065ec8_caseD_4;
 
         randtemp = fastRandom * randSeed;
+
         fastRandom = randtemp & 0xffff;
-        int cRand = ((randtemp >> 8) & 0xffff) * 5 >> 0xf;
 
-        if (blockade != 0) {
-          AIState_Idle *idleState;
-          int slice = (int)carObj_->N.simRoadInfo.slice;
-          idleState = operator new(0x10);
-          new((AIState_Base *)idleState) AIState_Base(carObj_);
-          idleState->_vf = (__vtbl_ptr_type (*)[4])AIState_Idle_vtable;
-          idleState->idleInPlaceFlag_ = 1;
-          SetState((AIState_Base *)idleState,STATE_IDLE);
+        uVar11 = (randtemp >> 8 & 0xffff) * 5 >> 0xf;
 
-          (idleState = idleState)->SetIdlePosition(
-            carObj_->direction == 1 ?
-              ((u_int)BWorldSm_slices[slice].avgPavedWidthRt << 0xf) *
-                (BWorldSm_slices[slice].laneCount & 0xf) :
-              ((u_int)BWorldSm_slices[slice].avgPavedWidthLf << 0xf) *
-                ((u_int)BWorldSm_slices[slice].laneCount >> 4));
-        }
-        else if (cRand <= 0) {
-          AIState_Idle *idleState = operator new(0x10);
-          new((AIState_Base *)idleState) AIState_Base(carObj_);
-          idleState->_vf = (__vtbl_ptr_type (*)[4])AIState_Idle_vtable;
-          idleState->idleInPlaceFlag_ = 1;
-          SetState((AIState_Base *)idleState,STATE_IDLE);
-        }
-        else if (cRand < 8) {
-          AIState_Idle *idleState;
-          int slice = (int)carObj_->N.simRoadInfo.slice;
-          idleState = operator new(0x10);
-          new((AIState_Base *)idleState) AIState_Base(carObj_);
-          idleState->_vf = (__vtbl_ptr_type (*)[4])AIState_Idle_vtable;
-          idleState->idleInPlaceFlag_ = 1;
-          SetState((AIState_Base *)idleState,STATE_IDLE);
+        if (local_28 == 0) {
 
-          (idleState = idleState)->SetIdlePosition(
-            carObj_->direction == 1 ?
-              ((u_int)BWorldSm_slices[slice].avgPavedWidthRt << 0xf) *
-                (BWorldSm_slices[slice].laneCount & 0xf) :
-              ((u_int)BWorldSm_slices[slice].avgPavedWidthLf << 0xf) *
-                ((u_int)BWorldSm_slices[slice].laneCount >> 4));
+          if (uVar11 == 0) {
+
+            pAVar6 = (AIState_Base *)operator new(0x10);
+
+            (new(pAVar6) AIState_Base((this->_base_AIHigh_Base).carObj_))
+
+            ;
+
+            pAVar6->_vf = (__vtbl_ptr_type (*) [4])AIState_Idle_vtable;
+
+            pAVar6[1]._vf = (__vtbl_ptr_type (*) [4])0x1;
+
+            pAVar12 = (this->_base_AIHigh_Base).state_;
+
+            if (pAVar12 != (AIState_Base *)0x0) {
+
+              NFS4_AISTATE_DTOR(pAVar12);
+
+            }
+
+            sVar7 = (stateType_t)3;
+
+            break;
+
+          }
+
+          if (7 < uVar11) {
+
+            this->ignoreCops_ = 1;
+
+            goto switchD_80065ec8_caseD_4;
+
+          }
+
+          iVar4 = (int)(((this->_base_AIHigh_Base).carObj_)->N).simRoadInfo.slice;
+
+          this_00 = (AIState_Idle *)operator new(0x10);
+
+          (new(&this_00->_base_AIState_Base) AIState_Base((this->_base_AIHigh_Base).carObj_));
+
+          (this_00->_base_AIState_Base)._vf = (__vtbl_ptr_type (*) [4])AIState_Idle_vtable;
+
+          this_00->idleInPlaceFlag_ = 1;
+
+          pAVar6 = (this->_base_AIHigh_Base).state_;
+
+          if (pAVar6 != (AIState_Base *)0x0) {
+
+            NFS4_AISTATE_DTOR(pAVar6);
+
+          }
+
+          (this->_base_AIHigh_Base).state_ = &this_00->_base_AIState_Base;
+
+          (this->_base_AIHigh_Base).stateType_ = 3;
+
+          if (((this->_base_AIHigh_Base).carObj_)->direction != 1) goto LAB_800664c4;
+
+          iVar4 = iVar4 * 0x20 + (int)BWorldSm_slices;
+
+          local_20 = (u_int)*(u_char *)(iVar4 + 0x1f) << 0xf;
+
+          uVar11 = *(u_char *)(iVar4 + 0x1d) & 0xf;
+
         }
+
         else {
-          ignoreCops_ = 1;
+
+          iVar4 = (int)(((this->_base_AIHigh_Base).carObj_)->N).simRoadInfo.slice;
+
+          this_00 = (AIState_Idle *)operator new(0x10);
+
+          (new(&this_00->_base_AIState_Base) AIState_Base((this->_base_AIHigh_Base).carObj_));
+
+          (this_00->_base_AIState_Base)._vf = (__vtbl_ptr_type (*) [4])AIState_Idle_vtable;
+
+          this_00->idleInPlaceFlag_ = 1;
+
+          pAVar6 = (this->_base_AIHigh_Base).state_;
+
+          if (pAVar6 != (AIState_Base *)0x0) {
+
+            NFS4_AISTATE_DTOR(pAVar6);
+
+          }
+
+          (this->_base_AIHigh_Base).state_ = &this_00->_base_AIState_Base;
+
+          (this->_base_AIHigh_Base).stateType_ = 3;
+
+          if (((this->_base_AIHigh_Base).carObj_)->direction == 1) {
+
+            iVar4 = iVar4 * 0x20 + (int)BWorldSm_slices;
+
+            local_20 = (u_int)*(u_char *)(iVar4 + 0x1f) << 0xf;
+
+            uVar11 = *(u_char *)(iVar4 + 0x1d) & 0xf;
+
+          }
+
+          else {
+
+LAB_800664c4:
+
+            iVar4 = iVar4 * 0x20 + (int)BWorldSm_slices;
+
+            local_20 = (u_int)*(u_char *)(iVar4 + 0x1e) << 0xf;
+
+            uVar11 = (u_int)(*(u_char *)(iVar4 + 0x1d) >> 4);
+
+          }
+
         }
+
+        local_20 = local_20 * uVar11;
+
+        (this_00)->SetIdlePosition(local_20);
+
+        goto switchD_80065ec8_caseD_4;
+
       }
-      else {
-        ignoreCops_ = 0;
+
+      pAVar5 = (AIState_Purgatory *)operator new(8);
+
+      pAVar6 = (AIState_Base *) (new(pAVar5) AIState_Purgatory((this->_base_AIHigh_Base).carObj_));
+
+      pAVar12 = (this->_base_AIHigh_Base).state_;
+
+      if (pAVar12 != (AIState_Base *)0x0) {
+
+        NFS4_AISTATE_DTOR(pAVar12);
+
       }
-      break;
+
+      sVar7 = (stateType_t)1;
+
     }
 
-  case STATE_IDLE:
-    {
-      int blockade;
-      if (AILife_EvaluateLife(carObj_) != 0) {
-        AIState_Purgatory *purgatoryState = operator new(8);
-        AIState_Base *newState =
-          (AIState_Base *)new(purgatoryState) AIState_Purgatory(carObj_);
-        SetState(newState,STATE_PURGATORY);
+    else {
+
+      pAVar5 = (AIState_Purgatory *)operator new(8);
+
+      pAVar6 = (AIState_Base *) (new(pAVar5) AIState_Purgatory((this->_base_AIHigh_Base).carObj_));
+
+      pAVar12 = (this->_base_AIHigh_Base).state_;
+
+      if (pAVar12 != (AIState_Base *)0x0) {
+
+        NFS4_AISTATE_DTOR(pAVar12);
+
       }
-      else if ((CopCheck(&blockade) == (AIHigh_Cop *)0x0) &&
-               ((carObj_->carFlags & 0x400U) == 0)) {
-        AIState_Normal *normalState = operator new(8);
-        AIState_Base *newState =
-          (AIState_Base *)new(normalState) AIState_Normal(carObj_);
-        SetState(newState,STATE_NORMAL);
-      }
-      break;
+
+      sVar7 = (stateType_t)1;
+
     }
 
-  case STATE_ROVING_TRAFFIC:
-    {
-      if (AILife_EvaluateLife(carObj_) != 0) {
-        AIState_Purgatory *purgatoryState = operator new(8);
-        AIState_Base *newState =
-          (AIState_Base *)new(purgatoryState) AIState_Purgatory(carObj_);
-        SetState(newState,STATE_PURGATORY);
-      }
-      else if (forcePurgatory_ != 0) {
-        AIState_Purgatory *purgatoryState = operator new(8);
-        AIState_Base *newState =
-          (AIState_Base *)new(purgatoryState) AIState_Purgatory(carObj_);
-        SetState(newState,STATE_PURGATORY);
-      }
-      else if ((*(*state_->_vf)[3].pfn)
-                 ((int)&state_->carObj_ + (*state_->_vf)[3].delta) != 0) {
-        AIState_Normal *normalState = operator new(8);
-        AIState_Base *newState =
-          (AIState_Base *)new(normalState) AIState_Normal(carObj_);
-        SetState(newState,STATE_NORMAL);
-      }
-      break;
-    }
-
-  case STATE_CHASE:
-  case STATE_OFFROAD:
-  case STATE_NONACTIVE:
-  case STATE_DONUTS:
-  case STATE_GOTOSLICE:
-  case STATE_CRUISE:
-  default:
     break;
+
+  case 3:
+
+    iVar4 = AILife_EvaluateLife((this->_base_AIHigh_Base).carObj_);
+
+    if (iVar4 == 0) {
+
+      pAVar3 = this->CopCheck(&iStack_24);
+
+      if ((pAVar3 != (AIHigh_Cop *)0x0) || ((((this->_base_AIHigh_Base).carObj_)->carFlags & 0x400U) != 0)
+
+         ) goto switchD_80065ec8_caseD_4;
+
+LAB_80066684:
+
+      pAVar9 = (AIState_Normal *)operator new(8);
+
+      pAVar6 = &(new(pAVar9) AIState_Normal((this->_base_AIHigh_Base).carObj_))->_base_AIState_Base;
+
+      pAVar12 = (this->_base_AIHigh_Base).state_;
+
+      if (pAVar12 != (AIState_Base *)0x0) {
+
+        NFS4_AISTATE_DTOR(pAVar12);
+
+      }
+
+      sVar7 = (stateType_t)2;
+
+    }
+
+    else {
+
+      pAVar5 = (AIState_Purgatory *)operator new(8);
+
+      pAVar6 = (AIState_Base *) (new(pAVar5) AIState_Purgatory((this->_base_AIHigh_Base).carObj_));
+
+      pAVar12 = (this->_base_AIHigh_Base).state_;
+
+      if (pAVar12 != (AIState_Base *)0x0) {
+
+        NFS4_AISTATE_DTOR(pAVar12);
+
+      }
+
+      sVar7 = (stateType_t)1;
+
+    }
+
+    break;
+
+  default:
+
+    goto switchD_80065ec8_caseD_4;
+
+  case 6:
+
+    iVar4 = AILife_EvaluateLife((this->_base_AIHigh_Base).carObj_);
+
+    if (iVar4 == 0) {
+
+      if (this->forcePurgatory_ == 0) {
+
+        pAVar6 = (this->_base_AIHigh_Base).state_;
+
+        pa_Var8 = pAVar6->_vf;
+
+        iVar4 = NFS4_AISTATE_TEST(pAVar6);
+
+        if (iVar4 == 0) goto switchD_80065ec8_caseD_4;
+
+        goto LAB_80066684;
+
+      }
+
+      pAVar5 = (AIState_Purgatory *)operator new(8);
+
+      pAVar6 = (AIState_Base *) (new(pAVar5) AIState_Purgatory((this->_base_AIHigh_Base).carObj_));
+
+      pAVar12 = (this->_base_AIHigh_Base).state_;
+
+      if (pAVar12 != (AIState_Base *)0x0) {
+
+        NFS4_AISTATE_DTOR(pAVar12);
+
+      }
+
+      sVar7 = (stateType_t)1;
+
+    }
+
+    else {
+
+      pAVar5 = (AIState_Purgatory *)operator new(8);
+
+      pAVar6 = (AIState_Base *) (new(pAVar5) AIState_Purgatory((this->_base_AIHigh_Base).carObj_));
+
+      pAVar12 = (this->_base_AIHigh_Base).state_;
+
+      if (pAVar12 != (AIState_Base *)0x0) {
+
+        NFS4_AISTATE_DTOR(pAVar12);
+
+      }
+
+      sVar7 = (stateType_t)1;
+
+    }
+
   }
 
-  state_->StateExecute();
+  (this->_base_AIHigh_Base).state_ = pAVar6;
+
+  (this->_base_AIHigh_Base).stateType_ = sVar7;
+
+switchD_80065ec8_caseD_4:
+
+  ((this->_base_AIHigh_Base).state_)->StateExecute();
+
+  return;
+
 }
 
 
@@ -397,9 +723,9 @@ AIHigh_Traffic::AIHigh_Traffic(Car_tObj *carObj)
 
 {
 
-  (new((AIHigh_Base *)this) AIHigh_Base(carObj));
+  (new(&this->_base_AIHigh_Base) AIHigh_Base(carObj));
 
-  this->_vf = (__vtbl_ptr_type (*) [3])AIHigh_Traffic_vtable;
+  (this->_base_AIHigh_Base)._vf = (__vtbl_ptr_type (*) [3])AIHigh_Traffic_vtable;
 
   this->ignoreCops_ = 0;
 
@@ -421,88 +747,151 @@ AIHigh_Traffic::AIHigh_Traffic(Car_tObj *carObj)
 /* ---- CheckForNewTriggers__14AIHigh_Traffic  AIHigh_Traffic::CheckForNewTriggers  [AIH_TRAF.CPP:353-433] SLD-VERIFIED ---- */
 
 trigger_t * AIHigh_Traffic::CheckForNewTriggers()
+
+
+
 {
   int sortedLoop;
-  Car_tObj **sortedCar;
+  Car_tObj*testCar;
+  int dir;
+  AIHigh_Base*thisPlayer;
+  int thisSlice;
+  int startSlice;
+  int endSlice;
+  int fRandomChance;
+  int newSlice;
+  int temp;
+  int sliceLoop;
+  int triggerHere;
+  int iRandomChance;
+  int randomValue;
+  int unused;
 
-  sortedLoop = Cars_gNumCars - 1;
-  sortedCar = Cars_gTotalSortedList + sortedLoop;
+  int trigger;
 
-  while (sortedLoop >= 0) {
-    Car_tObj *testCar = *sortedCar;
+  Car_tObj *pCVar1;
 
-    if ((testCar->carFlags & 0x204U) != 0) {
-      int dir = -1;
-      AIHigh_Base *thisPlayer =
-        (AIHigh_Base *)highLevelAIObjs[testCar->carIndex];
-      int thisSlice;
-      int startSlice;
-      int endSlice;
-      int fRandomChance = 0x320000;
+  trigger_t *ptVar2;
 
-      if (testCar->currentSpeed >= 0) {
-        dir = 1;
-      }
+  u_int uVar3;
 
-      thisSlice = dir * 0x2d;
-      if (thisSlice >= 0) {
-        thisSlice =
-          testCar->N.simRoadInfo.slice + (thisSlice = thisSlice);
-        if (thisSlice >= gNumSlices) {
-          thisSlice -= gNumSlices;
-        }
-      }
-      else {
-        thisSlice =
-          testCar->N.simRoadInfo.slice + (thisSlice = thisSlice);
-        if (thisSlice < 0) {
-          thisSlice += gNumSlices;
-        }
-      }
+  int iVar4;
 
-      {
-        int newSlice = thisSlice;
-        int temp = thisPlayer->lastTrafficTriggerCheckSlice_;
-        thisPlayer->lastTrafficTriggerCheckSlice_ = newSlice;
-        if (temp < newSlice) {
-          startSlice = temp;
-          endSlice = newSlice;
-        }
-        else {
-          startSlice = newSlice;
-          endSlice = temp;
-        }
-      }
+  int iVar5;
 
-      int sliceLoop = startSlice;
-      while ((sliceLoop < endSlice) &&
-             ((endSlice - startSlice) < 0x32)) {
-        int triggerHere =
-          triggerManagerTraffic->CheckForTriggerAtSlice
-            (testCar->carIndex,sliceLoop);
+  int slice;
 
-        if (triggerHere != -1) {
-          int iRandomChance = ((fRandomChance * 0x19) << 2) / 0x10000;
-          randtemp = fastRandom * randSeed;
-          fastRandom = randtemp & 0xffff;
-          int randomValue = (((randtemp >> 8) & 0xffff) * 0x19) >> 0xe;
+  Car_tObj *pCVar6;
 
-          if ((AILife_IsSliceInAnyVisibleArea(sliceLoop) ==
-               (Car_tObj *)0x0) &&
-              (randomValue < iRandomChance)) {
-            int unused;
-            return triggerManagerTraffic->GetTrigger(triggerHere,&unused);
-          }
-        }
-        sliceLoop = sliceLoop + 1;
-      }
+  int iVar7;
+
+  int iStack_30;
+
+  Car_tObj **local_2c;
+
+  
+
+  iVar7 = Cars_gNumCars + -1;
+
+  local_2c = Cars_gTotalSortedList + iVar7;
+
+  do {
+
+    if (iVar7 < 0) {
+
+      return (trigger_t *)0x0;
+
     }
 
-    sortedLoop = sortedLoop - 1;
-    sortedCar = sortedCar - 1;
-  }
+    pCVar6 = *local_2c;
 
-  return (trigger_t *)0x0;
+    iVar4 = -1;
+
+    if ((pCVar6->carFlags & 0x204U) != 0) {
+
+      if (-1 < pCVar6->currentSpeed) {
+
+        iVar4 = 1;
+
+      }
+
+      iVar4 = iVar4 * 0x2d;
+
+      if (iVar4 < 0) {
+
+        iVar4 = (pCVar6->N).simRoadInfo.slice + iVar4;
+
+        if (iVar4 < 0) {
+
+          iVar4 = iVar4 + gNumSlices;
+
+        }
+
+      }
+
+      else {
+
+        iVar4 = (pCVar6->N).simRoadInfo.slice + iVar4;
+
+        if (gNumSlices <= iVar4) {
+
+          iVar4 = iVar4 - gNumSlices;
+
+        }
+
+      }
+
+      iVar5 = highLevelAIObjs[pCVar6->carIndex]->_base_AIHigh_Base.lastTrafficTriggerCheckSlice_;
+
+      highLevelAIObjs[pCVar6->carIndex]->_base_AIHigh_Base.lastTrafficTriggerCheckSlice_ = iVar4;
+
+      slice = iVar4;
+
+      if (iVar5 < iVar4) {
+
+        slice = iVar5;
+
+        iVar5 = iVar4;
+
+      }
+
+      iVar4 = iVar5 - slice;
+
+      while ((slice < iVar5 && (iVar4 < 0x32))) {
+
+        trigger = triggerManagerTraffic->CheckForTriggerAtSlice(pCVar6->carIndex, slice);
+
+        if (trigger != -1) {
+
+          randtemp = fastRandom * randSeed;
+
+          fastRandom = randtemp & 0xffff;
+
+          uVar3 = randtemp >> 8;
+
+          pCVar1 = AILife_IsSliceInAnyVisibleArea(slice);
+
+          if ((pCVar1 == (Car_tObj *)0x0) && ((uVar3 & 0xffff) * 0x19 >> 0xe < 5000)) {
+
+            ptVar2 = triggerManagerTraffic->GetTrigger(trigger, &iStack_30);
+
+            return ptVar2;
+
+          }
+
+        }
+
+        slice = slice + 1;
+
+      }
+
+    }
+
+    iVar7 = iVar7 + -1;
+
+    local_2c = local_2c + -1;
+
+  } while( true );
 
 }
 
@@ -513,10 +902,3 @@ trigger_t * AIHigh_Traffic::CheckForNewTriggers()
 
 
 /* end of aistate.cpp */
-
-/* cont.35 B3b: base-forward dtor re-attributed from main.c (�3.23 simple variant);
-   oracle = jal ___11AIHigh_Base; extern-C free fn exports the exact symbol. */
-extern "C" {
-void ___11AIHigh_Base(void *);
-void ___14AIHigh_Traffic(void *thisp) { ___11AIHigh_Base(thisp); }
-}

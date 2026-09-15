@@ -33,7 +33,7 @@ void Hud_BuildETimeString__FP4SPRTi(SPRT *sprt, int time);   /* :1232 */
 BOOL Hud_BuildDistanceString__FP4SPRTi(SPRT *sprt, int player);   /* :1253 */
 void Hud_BuildTimeString__FP4SPRTi(SPRT *sprt, int time);   /* :1273 */
 void Hud_BuildTach__Fi(int player);   /* :1376 */
-int Hud_BuildString__FPciiiib(char *str, int x, int y, int color, int player, BOOL justwidth);   /* :1450 */
+int Hud_BuildString__FPciiiib(char *str, int x, int y, int color, int player, bool justwidth);   /* :1450 */
 void Hud_BuildNumbers0__Fi(int player);   /* :1551 */
 void Hud_BuildNumbers__Fi(int player);   /* :1721 */
 void Hud_InitMap__Fv(void);   /* :1917 */

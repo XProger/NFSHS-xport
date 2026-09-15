@@ -2,8 +2,8 @@
  *   obj nfs4\eaclib\psx\cluttype.obj ; EACPSXZ.LIB.  1 fn @0x800FC250.  cluttype -- map a shape-id to its
  *   CLUT type code.  Ghidra nfs4-f.exe.c (cluttype) + IDA sig.
  */
-extern int cluttype(int shapeId);   /* @0x800FC250 */
-extern int cluttype(int shapeId)
+extern "C" int cluttype(int shapeId);   /* @0x800FC250 */
+extern "C" int cluttype(int shapeId)
 {
     int t = 0;
     switch (shapeId) {

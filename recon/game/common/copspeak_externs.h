@@ -6,22 +6,17 @@
 #define COPSPEAK_EXTERNS_H
 
 /* ---- audio (audiocmn/audioclc/audiomus.obj) ---- */
-extern void  AudioClc_SndError(int code);   /* W55-A2 (class-3): dropped the synthetic
-                                            * `= 0` default -- the true definition
-                                            * (audioclc.cpp, AudioClc_SndError__Fi) takes
-                                            * a required arg and the only call site passes
-                                            * one; a default silently licenses a 0-arg call
-                                            * that would emit a bogus `li a0,0`. */
-extern int   AudioCmn_GetAsyncSfx(int a, int b, bool c);
-extern int   AudioCmn_LoadAsyncSfx(int a, int b, void *buf, int n);
+extern void  AudioClc_SndError(int code = 0);   /* Ghidra dropped the arg at one site */
+extern "C" { extern int   AudioCmn_GetAsyncSfx(int a, int b, bool c); }
+extern "C" { extern int   AudioCmn_LoadAsyncSfx(int a, int b, void *buf, int n); }
 extern int   AudioMus_Buffered(void);
-extern int   AudioMus_Threshold(void);
+extern "C" { extern int   AudioMus_Threshold(void); }
 
 /* ---- platform / hud / font / textpix ---- */
-extern char *Platform_GetDCTBuffer(int size, char *name);   /* platform.obj */
+extern "C" { extern char *Platform_GetDCTBuffer(int size, char *name);   /* platform.obj */ }
 extern void  Hud_FBuildF4(int t, int x, int y, int w, int h, u_long col, char c0, char c1);  /* hud.obj */
 extern void  Font_TextXY(char *s, int x, int y);            /* font.obj */
-extern "C" int textpixels(char *s);                           /* textpix.obj */
+extern "C" { extern int   textpixels(char *s);                           /* textpix.obj */ }
 
 /* ---- sndpsxz (SND*) ---- */
 
@@ -33,12 +28,12 @@ extern "C" int textpixels(char *s);                           /* textpix.obj */
 extern void  trap(int code);
 
 /* ---- more cross-TU globals ---- */
-extern int  gMasterFENarrationLevel, gMasterAmbientLevel, gStereoMode;   /* audiocmn.obj */
-extern int  Audio_direct3davail;                  /* audio.obj */
+extern "C" int  gMasterFENarrationLevel, gMasterAmbientLevel, gStereoMode;   /* audiocmn.obj */
+extern "C" int  Audio_direct3davail;                  /* audio.obj */
 extern SndBnk_t gSndBnk[7];                        /* audiocmn.obj */
-extern char *Paths_Paths[50];                      /* paths.obj */
-extern char GameSetup_gCarNames[51][5];            /* gmesetup.obj */
-extern char GameSetup_gTrackNames[12][4];          /* gmesetup.obj */
-extern GameSetup_tData GameSetup_gData;            /* gmesetup.obj */
+extern "C" extern "C" char *Paths_Paths[50];                      /* paths.obj */
+extern "C" char GameSetup_gCarNames[51][5];            /* gmesetup.obj */
+extern "C" char GameSetup_gTrackNames[12][4];          /* gmesetup.obj */
+extern "C" extern "C" GameSetup_tData GameSetup_gData;            /* gmesetup.obj */
 
 #endif /* COPSPEAK_EXTERNS_H */

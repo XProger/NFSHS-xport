@@ -3,7 +3,8 @@
  *   (chunk visibility, build lists, spike belt, glare effects, render contexts). Self-contained.
  *   Verified vs disasm-v2.txt. NOT original source; SYM-faithful, recompilable C++.
  */
-#include "audioeng_types.h"
+#include "../../nfs4_types.h"
+#include "../../mips_semantics.h"
 #include "audioeng_externs.h"
 
 
@@ -24,91 +25,85 @@ void AudioEng_CleanUp(void);
 
 
 /* ---- AudioEng_Set__Fiiiiiiii  [@0x8007b5a8] ---- */
-/* MATCH: PASS 159/159.  The carType arms require their explicit retail layout:
- * shifted pitch first, normal pitch out-of-line.  Zero-insn arm/use fences keep
- * reorg from speculating the normal add into the branch slot; the post-dop
- * statement fence keeps gas>>6 on its SLD statement. */
 void AudioEng_Set(int player,int vol,int esp,int gas,int cam,int dop,int azi,int dir)
 {
-  AudioEng_t *g;
-  AudioEng_tAdjustments *a;
-  AudioEng_tState *s;
-  /* MATCH: snapshot the consumed parameters in retail source order.  GCC then
-     emits the exact s7/s5/a1/s6/s3/s4 prologue handout and load sequence. */
-  const int volume = vol;
-  const int camera = cam;
-  const int doppler = dop;
-  const int azimuth = azi;
-  const int gasLevel = gas;
-  const int direction = dir;
-  int adjustedEsp;
-  int shiftedEsp;
+  AudioEng_t*g;
+  AudioEng_tAdjustments*a;
+  AudioEng_tState*s;
+  int value;
+  int exhaustDelta;
+  u_char boost;
 
-  if ((u_int)player < 2) {
-    g = AudioEng_g[player];
-    if (g != (AudioEng_t *)0x0) {
-      a = &g->adjust;
-      if (g->plypos != '\x0f' || ((g->setpos + 1U & 1) == 0)) {
-        s = g->queue + (u_char)g->setpos;
-        s->esp = ((int)((u_int)a->timbreScale * esp) >> 0xe) < 0x200
-                     ? (u_short)((int)((u_int)a->timbreScale * esp) >> 0xe)
-                     : 0x1ff;
-        if (Cars_gList[player]->carInfo->carType == 0x1c) {
-          shiftedEsp = esp >> 2;
-          /* MATCH: issue the shift before the independent 0xc000 materialization. */
-          __asm__("" : : "r"(shiftedEsp));
-          adjustedEsp = 0xc000;
-          adjustedEsp += shiftedEsp;
-        }
-        else {
-          /* MATCH: arm-head barrier keeps the normal add out of the branch slot. */
-          __asm__("" : : "i"(0));
-          adjustedEsp = esp + 0x3333;
-        }
-        s->dop = (u_short)((int)((u_int)g->adjust.pitchScale *
-            fixedmult(adjustedEsp,doppler)) >> 10);
-        /* MATCH: SLD boundary; prevents gas>>6 from crossing the dop store. */
-        __asm__("" : : "i"(0));
-        if (gasLevel + (gasLevel >> 5) + (gasLevel >> 6) < 0x81) {
-          s->gas = gasLevel + (gasLevel >> 5) + (gasLevel >> 6);
-        }
-        else {
-          s->gas = 0x80;
-        }
-        if (camera == 0) {
-          s->exh = a->inCarExhaust;
-          if (AudioEng_GameSetupWords[3] == 1) {
-            s->sep = 0;
-            s->azi = (u_short)azimuth;
-          }
-          else {
-            s->azi = 0;
-            s->sep = 0x3fff;
-          }
-          s->vol = ((int)(volume * (u_int)a->inCarBoost) >> 6) < 0x800
-                       ? (u_short)((int)(volume * (u_int)a->inCarBoost) >> 6)
-                       : 0x7ff;
-        }
-        else {
-          s->exh = a->outCarExhaust;
-          if (direction < 0) {
-            s->exh += ((int)(direction * (u_int)a->fwdEngBoost *
-                             (u_int)s->exh) >> 7) / 0x10000;
-          }
-          else {
-            s->exh += ((int)(direction * (u_int)a->rwdExhBoost *
-                             (0x80 - (u_int)s->exh)) >> 7) / 0x10000;
-          }
-          s->azi = (u_short)azimuth;
-          s->sep = 0;
-          s->vol = ((int)(volume * (u_int)a->outCarBoost) >> 6) < 0x800
-                       ? (u_short)((int)(volume * (u_int)a->outCarBoost) >> 6)
-                       : 0x7ff;
-        }
-        g->setpos = g->setpos + 1U & 0xf;
-      }
-    }
+  if ((u_int)player >= 2) {
+    return;
   }
+  g = AudioEng_g[player];
+  if (g == (AudioEng_t *)0x0) {
+    return;
+  }
+  if ((g->plypos == '\x0f') &&
+      (((nfs4_mips_addu_s32((int)(u_char)g->setpos,1)) & 1) != 0)) {
+    return;
+  }
+
+  a = &g->adjust;
+  s = g->queue + (u_char)g->setpos;
+  value = nfs4_mips_sra_s32(
+      nfs4_mips_mult_s32((int)a->timbreScale,esp),0xe);
+  s->esp = (u_short)(value < 0x200 ? value : 0x1ff);
+
+  if (Cars_gList[player]->carInfo->carType == 0x1c) {
+    value = nfs4_mips_addu_s32(nfs4_mips_sra_s32(esp,2),0xc000);
+  }
+  else {
+    value = nfs4_mips_addu_s32(esp,0x3333);
+  }
+  value = fixedmult(value,dop);
+  s->dop = (u_short)nfs4_mips_sra_s32(
+      nfs4_mips_mult_s32((int)a->pitchScale,value),10);
+
+  value = nfs4_mips_addu_s32(
+      nfs4_mips_addu_s32(gas,nfs4_mips_sra_s32(gas,5)),
+      nfs4_mips_sra_s32(gas,6));
+  s->gas = (u_char)(value < 0x81 ? value : 0x80);
+
+  if (cam == 0) {
+    s->exh = a->inCarExhaust;
+    if (GameSetup_gData.commMode == 1) {
+      s->sep = 0;
+      s->azi = (u_short)azi;
+    }
+    else {
+      s->azi = 0;
+      s->sep = 0x3fff;
+    }
+    boost = a->inCarBoost;
+  }
+  else {
+    s->exh = a->outCarExhaust;
+    if (dir < 0) {
+      value = nfs4_mips_mult_s32(
+          nfs4_mips_mult_s32(dir,(int)a->fwdEngBoost),(int)s->exh);
+    }
+    else {
+      value = nfs4_mips_mult_s32(
+          nfs4_mips_mult_s32(dir,(int)a->rwdExhBoost),
+          nfs4_mips_subu_s32(0x80,(int)s->exh));
+    }
+    exhaustDelta = nfs4_mips_sra_s32(value,7);
+    if (exhaustDelta < 0) {
+      exhaustDelta = nfs4_mips_addu_s32(exhaustDelta,0xffff);
+    }
+    exhaustDelta = nfs4_mips_sra_s32(exhaustDelta,0x10);
+    s->exh = (u_char)nfs4_mips_addu_s32((int)s->exh,exhaustDelta);
+    s->azi = (u_short)azi;
+    s->sep = 0;
+    boost = a->outCarBoost;
+  }
+
+  value = nfs4_mips_sra_s32(nfs4_mips_mult_s32(vol,(int)boost),6);
+  s->vol = (u_short)(value < 0x800 ? value : 0x7ff);
+  g->setpos = (char)(nfs4_mips_addu_s32((int)(u_char)g->setpos,1) & 0xf);
   return;
 }
 
@@ -116,6 +111,14 @@ void AudioEng_Set(int player,int vol,int esp,int gas,int cam,int dop,int azi,int
 void AudioEng_Update(void)
 {
   int player;
+  AudioEng_t*g;
+  int n;
+  AudioEng_tState*s;
+  int tick;
+  u_long vol;
+  SNDPLAYOPTS playopts;
+  u_short leftazim;
+  u_short rightazim;
   short sVar1;
   short sVar2;
   bool bVar3;
@@ -132,213 +135,211 @@ void AudioEng_Update(void)
   u_short uVar14;
   u_short uVar15;
   AudioEng_t *pAVar16;
+  int local_48;
+  char local_44;
+  u_char local_40;
+  u_char local_3d;
+  u_short local_3c;
+  u_short local_38;
+  u_short local_36;
+  int local_30;
   
-  player = 0;
+  local_30 = 0;
   do {
-    AudioEng_t *g;
-    int n;
-    AudioEng_tState *s;
-    int tick;
-
-    if (1 < player) {
+    if ((1 < local_30) || (pAVar13 = AudioEng_g[local_30], pAVar13 == (AudioEng_t *)0x0)) {
       return;
     }
-    g = AudioEng_g[player];
-    if (g == (AudioEng_t *)0x0) {
-      return;
-    }
-    s = g->queue + (u_char)g->plypos;
-    tick = gettick();
-    if (g->plypos != g->setpos) {
-      n = gettick();
-      if (g->tick < n) {
-        g->tick = tick + 2;
-        for (n = 0; n < 16; n++) {
-          if ((signed char)g->chan[n].patchnum >= 0) {
-            u_long vol;
-
-            if ((s->esp >= g->chan[n].min) && (s->esp < g->chan[n].max)) {
-              vol = (signed char)g->chan[n].xlate[s->esp - g->chan[n].min];
+    iVar4 = (u_int)(u_char)pAVar13->plypos * 0xc + 0x5a;
+    pAVar12 = pAVar13->queue + (u_char)pAVar13->plypos;
+    gettick();
+    if (pAVar13->plypos != pAVar13->setpos) {
+      iVar8 = iVar4;
+      gettick();
+      if (pAVar13->tick < iVar8) {
+        pAVar13->tick = iVar4 + 2;
+        pAVar10 = pAVar13;
+        pAVar11 = pAVar13;
+        for (iVar4 = 0; iVar4 < 0x10; iVar4 = iVar4 + 1) {
+          if (-1 < pAVar10->chan[0].patchnum) {
+            uVar7 = (u_int)pAVar12->esp;
+            iVar8 = (int)pAVar10->chan[0].min;
+            if (((int)uVar7 < iVar8) || ((int)pAVar10->chan[0].max <= (int)uVar7)) {
+              iVar8 = 0;
             }
             else {
-              vol = 0;
+              iVar8 = (int)pAVar10->chan[0].xlate[uVar7 - iVar8];
             }
-            if (vol != 0) {
-              if (n < 8) {
-                vol *= Xfade[128 - s->gas];
+            iVar9 = 0;
+            if (iVar8 != 0) {
+              if (iVar4 < 8) {
+                uVar7 = 0x80 - pAVar12->gas;
               }
               else {
-                vol *= Xfade[s->gas];
+                uVar7 = (u_int)pAVar12->gas;
               }
-              if ((signed char)g->chan[n].patchnum >= 64) {
-                if (s->sep != 0) {
-                  vol *= (Xfade[128 - s->exh] * 47) >> 6;
-                }
-                else {
-                  vol *= Xfade[128 - s->exh];
-                }
+              if (pAVar10->chan[0].patchnum < '@') {
+                uVar5 = (u_int)pAVar12->exh;
+code_r_8007b9f4:
+                uVar5 = (u_int)(u_char)""[uVar5];
               }
               else {
-                vol *= Xfade[s->exh];
+                if (pAVar12->sep == 0) {
+                  uVar5 = 0x80 - pAVar12->exh;
+                  goto code_r_8007b9f4;
+                }
+                uVar5 = (int)((u_int)(u_char)""[0x80 - (u_int)pAVar12->exh] * 0x2f) >> 6;
               }
+              iVar9 = iVar8 * (u_int)(u_char)""[uVar7] * uVar5;
             }
-            vol *= s->vol;
-            vol >>= 21;
-            if (vol >= 128) {
-              vol = 127;
+            uVar7 = iVar9 * (u_int)pAVar12->vol >> 0x15;
+            if (0x7f < uVar7) {
+              uVar7 = 0x7f;
             }
-            g->vol[n] = vol;
-            g->azi = s->azi;
-            g->sep = s->sep;
-            g->dop = s->dop;
+            pAVar11->vol[0] = uVar7;
+            pAVar13->azi = (u_int)pAVar12->azi;
+            pAVar13->sep = (u_int)pAVar12->sep;
+            pAVar13->dop = (u_int)pAVar12->dop;
           }
+          pAVar11 = (AudioEng_t *)&(pAVar11->adjust).rwdExhBoost;
+          pAVar10 = (AudioEng_t *)pAVar10->vol;
         }
-        g->plypos = g->plypos + 1U & 0xf;
+        pAVar13->plypos = pAVar13->plypos + 1U & 0xf;
       }
     }
-    {
-      SNDPLAYOPTS playopts;
-      u_short leftazim;
-      u_short rightazim;
-
-      n = 0;
-      /* MATCH (w55-a12 + 2026-08-11, 28 -> 26 -> PASS 366/366): retail's
-       * second channel loop is UN-rotated -- `slti;beqz;nop` at the loop head
-       * and an unconditional `j` back-edge with the increment in its slot.
-       * `for (;;) { if (n >= 16) break; ... }` lets gcc-2.8 prove n==0 on
-       * entry, peel the first test and rotate the loop (test at the bottom,
-       * 2 insns short).  The `while (1) { if (!(n < 16)) break; ... }`
-       * spelling reproduces retail's top-test + j back-edge.  The remaining
-       * 26 were only the three induction variables colored in the wrong
-       * order.  allocsim priced the generated walks at n=p98 refs29/live237,
-       * delay=p573 refs20/live159 and vol=p578 refs17/live158.  Empty memory
-       * operands at the LOOP HEAD buy the weighted refs without emitting
-       * loads: vol x2 + delay x3 gives retail delay=$s4, vol=$s5, n=$s6.
-       * Placement is essential: the identical operand set at the loop tail
-       * reached 8 diffs but retained the wrong base-copy chain and moved the
-       * s0+=12 increment; at the head both schedules match exactly. */
-      while (1) {
-        if (!(n < 16)) {
-          break;
+    pAVar10 = pAVar13;
+    pAVar11 = pAVar13;
+    pAVar16 = pAVar13;
+    for (iVar4 = 0; iVar4 < 0x10; iVar4 = iVar4 + 1) {
+      cVar6 = pAVar10->chan[0].patchnum;
+      if (-1 < cVar6) {
+        if (pAVar16->vol[0] == 0) {
+          uVar7 = pAVar10->left[0].handle;
+          if (uVar7 != 0xffffffff) {
+            SNDstop(uVar7);
+            uVar7 = pAVar10->right[0].handle;
+            if (uVar7 != 0xffffffff) {
+              SNDstop(uVar7);
+            }
+            pAVar10->left[0].handle = -1;
+            pAVar10->right[0].handle = -1;
+          }
         }
-        __asm__("" : : "m"(g->vol[n]), "m"(g->vol[n]),
-                         "m"(g->delay[n]), "m"(g->delay[n]),
-                         "m"(g->delay[n]));
-        if ((signed char)g->chan[n].patchnum >= 0) {
-          if (g->vol[n] != 0) {
-          if ((signed char)g->chan[n].patchnum >= 64) {
-            leftazim = g->azi - g->sep;
-            rightazim = g->azi + g->sep;
+        else {
+          if (cVar6 < '@') {
+            uVar15 = (u_short)pAVar13->azi;
+            uVar14 = uVar15;
           }
           else {
-            leftazim = g->azi;
-            rightazim = leftazim;
+            sVar1 = (short)pAVar13->azi;
+            sVar2 = (short)pAVar13->sep;
+            uVar15 = sVar1 + sVar2;
+            uVar14 = sVar1 - sVar2;
           }
-          SNDplaysetdef(&playopts);
-          playopts.bhandle = g->bhandle;
-          playopts.patnum = (signed char)g->chan[n].patchnum;
-          playopts.vol = 0;
-          playopts.pitchmult = g->dop;
-          playopts.use3dpos = 1;
-          playopts.elevation = 0;
-          if (g->left[n].handle == -1) {
-            playopts.azimuth = leftazim;
-            g->left[n].handle = SNDplay(&playopts);
-            g->delay[n] = 2;
-            g->left[n].vol = 0;
-            g->left[n].azim = leftazim;
-            g->left[n].pitch = g->dop;
+          SNDplaysetdef(&local_48);
+          local_44 = pAVar13->bhandle;
+          local_48 = (int)pAVar10->chan[0].patchnum;
+          local_40 = 0;
+          local_3c = (u_short)pAVar13->dop;
+          local_3d = 1;
+          local_36 = 0;
+          iVar8 = pAVar10->left[0].handle;
+          if (iVar8 == -1) {
+            local_38 = uVar14;
+            iVar8 = SNDplay(&local_48);
+            pAVar10->left[0].handle = iVar8;
+            pAVar11->delay[0] = '\x02';
+            pAVar10->left[0].vol = '\0';
+            pAVar10->left[0].azim = uVar14;
+            pAVar10->left[0].pitch = (u_short)pAVar13->dop;
           }
           else {
-            if ((g->sep == 0) || ((signed char)g->chan[n].patchnum < 64) ||
-                (g->right[n].handle != -1)) {
-              iVar8 = (signed char)g->left[n].vol;
-              iVar9 = g->vol[n];
+            if (((pAVar13->sep == 0) || (pAVar10->chan[0].patchnum < '@')) ||
+               (pAVar10->right[0].handle != -1)) {
+              iVar8 = (int)pAVar10->left[0].vol;
+              iVar9 = pAVar16->vol[0];
               if (iVar8 != iVar9) {
                 if (iVar9 < iVar8) {
-                  iVar8 -= 2;
+                  iVar8 = iVar8 + -2;
                   bVar3 = iVar8 < iVar9;
                 }
                 else {
-                  iVar8 += 2;
+                  iVar8 = iVar8 + 2;
                   bVar3 = iVar9 < iVar8;
                 }
+                cVar6 = (char)iVar8;
                 if (bVar3) {
-                  iVar8 = iVar9;
+                  cVar6 = (char)iVar9;
                 }
-                *(volatile char *)&g->left[n].vol = iVar8;
-                SNDvol(*(volatile int *)&g->left[n].handle,
-                       (signed char)g->left[n].vol);
+                pAVar10->left[0].vol = cVar6;
+                SNDvol(pAVar10->left[0].handle,(int)pAVar10->left[0].vol);
               }
             }
-            if (g->left[n].azim != leftazim) {
-              SND3dpos(g->left[n].handle, leftazim, 0);
-              g->left[n].azim = leftazim;
+            if ((u_int)pAVar10->left[0].azim != (u_int)uVar14) {
+              SND3dpos(pAVar10->left[0].handle,(u_int)uVar14,0);
+              pAVar10->left[0].azim = uVar14;
             }
-            if (g->left[n].pitch != g->dop) {
-              SNDpitchmult(g->left[n].handle, g->dop);
-              g->left[n].pitch = g->dop;
+            if ((u_int)pAVar10->left[0].pitch != pAVar13->dop) {
+              SNDpitchmult(pAVar10->left[0].handle,pAVar13->dop);
+              pAVar10->left[0].pitch = (u_short)pAVar13->dop;
             }
-            if (((signed char)g->chan[n].patchnum >= 64) && (g->sep != 0)) {
-              if (g->right[n].handle == -1) {
-                g->delay[n]--;
-                if ((signed char)g->delay[n] == -1) {
-                  playopts.azimuth = rightazim;
-                  g->right[n].handle = SNDplay(&playopts);
-                  g->right[n].vol = 0;
-                  g->right[n].azim = rightazim;
-                  g->right[n].pitch = g->dop;
-                }
-              }
-              else {
-                iVar8 = (signed char)g->right[n].vol;
-                iVar9 = g->vol[n];
-                if (iVar8 != iVar9) {
-                  if (iVar9 < iVar8) {
-                    iVar8 -= 2;
-                    bVar3 = iVar8 < iVar9;
-                  }
-                  else {
-                    iVar8 += 2;
-                    bVar3 = iVar9 < iVar8;
-                  }
-                  if (bVar3) {
-                    iVar8 = iVar9;
-                  }
-                  *(volatile char *)&g->right[n].vol = iVar8;
-                  SNDvol(*(volatile int *)&g->right[n].handle,
-                         (signed char)g->right[n].vol);
-                }
-                if (g->right[n].azim != rightazim) {
-                  SND3dpos(g->right[n].handle, rightazim, 0);
-                  g->right[n].azim = rightazim;
-                }
-                if (g->right[n].pitch != g->dop) {
-                  SNDpitchmult(g->right[n].handle, g->dop);
-                  g->right[n].pitch = g->dop;
-                }
+            if ((pAVar10->chan[0].patchnum < '@') || (pAVar13->sep == 0)) {
+              uVar7 = pAVar10->right[0].handle;
+              if (uVar7 != 0xffffffff) {
+                SNDstop(uVar7);
+                pAVar10->right[0].handle = -1;
+                pAVar11->delay[0] = '\x02';
               }
             }
-            else if (g->right[n].handle != -1) {
-              SNDstop(g->right[n].handle);
-              g->right[n].handle = -1;
-              g->delay[n] = 2;
+            else if (pAVar10->right[0].handle == -1) {
+              cVar6 = pAVar11->delay[0] + -1;
+              pAVar11->delay[0] = cVar6;
+              iVar8 = (int)cVar6;
+              if (iVar8 == -1) {
+                local_38 = uVar15;
+                iVar8 = SNDplay(&local_48);
+                pAVar10->right[0].handle = iVar8;
+                pAVar10->right[0].vol = '\0';
+                pAVar10->right[0].azim = uVar15;
+LAB_8007bd18:
+                pAVar10->right[0].pitch = (u_short)pAVar13->dop;
               }
+            }
+            else {
+              iVar8 = (int)pAVar10->right[0].vol;
+              iVar9 = pAVar16->vol[0];
+              if (iVar8 != iVar9) {
+                if (iVar9 < iVar8) {
+                  iVar8 = iVar8 + -2;
+                  bVar3 = iVar8 < iVar9;
+                }
+                else {
+                  iVar8 = iVar8 + 2;
+                  bVar3 = iVar9 < iVar8;
+                }
+                cVar6 = (char)iVar8;
+                if (bVar3) {
+                  cVar6 = (char)iVar9;
+                }
+                pAVar10->right[0].vol = cVar6;
+                SNDvol(pAVar10->right[0].handle,(int)pAVar10->right[0].vol);
+              }
+              if ((u_int)pAVar10->right[0].azim != (u_int)uVar15) {
+                SND3dpos(pAVar10->right[0].handle,(u_int)uVar15,0);
+                pAVar10->right[0].azim = uVar15;
+              }
+              if ((u_int)pAVar10->right[0].pitch != pAVar13->dop) {
+                SNDpitchmult(pAVar10->right[0].handle,pAVar13->dop);
+                goto LAB_8007bd18;
+              }
+            }
           }
         }
-          else if (g->left[n].handle != -1) {
-            SNDstop(g->left[n].handle);
-            if (g->right[n].handle != -1) {
-              SNDstop(g->right[n].handle);
-            }
-            g->left[n].handle = -1;
-            g->right[n].handle = -1;
-          }
-        }
-        n++;
       }
+      pAVar11 = (AudioEng_t *)&(pAVar11->adjust).inCarExhaust;
+      pAVar10 = (AudioEng_t *)pAVar10->vol;
+      pAVar16 = (AudioEng_t *)&(pAVar16->adjust).rwdExhBoost;
     }
-    player = player + 1;
+    local_30 = local_30 + 1;
   } while( true );
 }
 
@@ -347,10 +348,10 @@ void AudioEng_LoadDef(char *filename,char *name,int handle,long offset,long size
 {
   AudioEng_tDef *pAVar1;
   
-  pAVar1 = reservememadr(name,size,0x10);
+  pAVar1 = (AudioEng_tDef *)reservememadr(name,size,0x10);
   *ed = pAVar1;
   if (pAVar1 != (AudioEng_tDef *)0x0) {
-    FILE_readsync(handle,offset,*ed,size,0x64);   /* oracle 0x8007be1c: a0=h a1=off a2=*ed a3=size stk=0x64 */
+    FILE_readsync(handle,offset,(intptr_t)*ed,size,0x64);   /* oracle 0x8007be1c: a0=h a1=off a2=*ed a3=size stk=0x64 */
   }
   return;
 }
@@ -358,224 +359,255 @@ void AudioEng_LoadDef(char *filename,char *name,int handle,long offset,long size
 /* ---- AudioEng_StartUp__FiPc  [@0x8007be54] ---- */
 int AudioEng_StartUp(int player,char *carname)
 {
-  AudioEng_tDef *cruisedef;
-  AudioEng_tDef *loaddef;
+  AudioEng_tDef*cruisedef;
+  AudioEng_tDef*loaddef;
   int tablesize;
   int i;
   int bankloaded;
   int spu;
   char filename[64];
-  AudioEng_t *g;
-  AudioEng_t **gslot;
-  char *header;
+  AudioEng_t*g;
+  char*header;
+  int handle;
+  long size;
+  long offset;
+  char*current;
+  int c;
+  AudioEng_tChanAttr*chan;
+  int j;
+  bool bVar1;
+  int iVar2;
+  AudioEng_t *pAVar3;
+  int iVar4;
+  void *pThis;
+  char *pdata;
+  AudioEng_tDef **ed;
+  u_char *dest;
+  short *psVar5;
+  AudioEng_t *pAVar6;
+  int iVar7;
+  AudioEng_t *pAVar8;
+  char *pcVar9;
+  AudioEng_tDef *pAVar10;
+  AudioEng_tDef *pAVar11;
+  int iVar12;
+  int iVar13;
+  int iVar14;
+  int iVar15;
+  u_char *puVar16;
+  u_int name;
+  int iVar17;
+  char acStack_80 [64];
+  int local_40;
+  long local_3c;
+  u_int local_38;
+  AudioEng_tDef *local_34;
+  AudioEng_tDef *local_30 [2];
   
   if (1 < (u_int)player) {
     return 0;
   }
-  gslot = &AudioEng_g[player];
-  if (*gslot != (AudioEng_t *)0x0) {
+  name = 0;
+  if (AudioEng_g[player] != (AudioEng_t *)0x0) {
     return 0;
   }
-  tablesize = 0;
-  spu = tablesize;
-  g = (AudioEng_t *)reservememadr("Engine Audio",0x370,tablesize);
-  i = tablesize;
-  *gslot = g;
-  g->tables = (char *)0x0;
-  g->tick = 0;
-  g->azi = 0;
-  g->sep = 0;
-  g->dop = 0x1000;
-  for (; i < 16; i++) {
-    g->vol[i] = 0;
-    g->left[i].handle = -1;
-    g->right[i].handle = -1;
-    *(signed char *)&g->chan[i].patchnum = -1;
-    g->chan[i].min = 0x200;
-    g->chan[i].max = 0x200;
-    g->chan[i].xlate = (char *)0x0;
-  }
-  cruisedef = (AudioEng_tDef *)0x0;
-  loaddef = (AudioEng_tDef *)0x0;
-  (g->adjust).inCarBoost = '2';
-  (g->adjust).inCarExhaust = '\x1f';
-  (g->adjust).outCarBoost = 0xa6;
-  (g->adjust).outCarExhaust = '+';
-  (g->adjust).fwdEngBoost = '@';
-  (g->adjust).rwdExhBoost = 'y';
-  (g->adjust).pitchScale = 'P';
-  (g->adjust).timbreScale = 'h';
-  g->setpos = '\0';
-  g->plypos = '\0';
-  bankloaded = 0;
-  if (AudioEng_GameSetupWords[3] == 1) {
-    sprintf(filename,"%s%sens.viv",Paths_Paths[28],carname);
+  iVar17 = 0;
+  pAVar3 = (AudioEng_t *)reservememadr("Engine Audio",0x370,0);
+  iVar15 = 0;
+  AudioEng_g[player] = pAVar3;
+  pAVar3->tables = (char *)0x0;
+  pAVar3->tick = 0;
+  pAVar3->azi = 0;
+  pAVar3->sep = 0;
+  pAVar3->dop = 0x1000;
+  pAVar6 = pAVar3;
+  pAVar8 = pAVar3;
+  do {
+    pAVar8->vol[0] = 0;
+    pAVar6->left[0].handle = -1;
+    pAVar6->right[0].handle = -1;
+    pAVar6->chan[0].patchnum = -1;
+    pAVar6->chan[0].min = 0x200;
+    pAVar6->chan[0].max = 0x200;
+    pAVar6->chan[0].xlate = (char *)0x0;
+    pAVar6 = (AudioEng_t *)pAVar6->vol;
+    iVar15 = iVar15 + 1;
+    pAVar8 = (AudioEng_t *)&(pAVar8->adjust).rwdExhBoost;
+  } while (iVar15 < 0x10);
+  local_30[0] = (AudioEng_tDef *)0x0;
+  local_34 = (AudioEng_tDef *)0x0;
+  (pAVar3->adjust).inCarBoost = '2';
+  (pAVar3->adjust).inCarExhaust = '\x1f';
+  (pAVar3->adjust).outCarBoost = 0xa6;
+  (pAVar3->adjust).outCarExhaust = '+';
+  (pAVar3->adjust).fwdEngBoost = '@';
+  (pAVar3->adjust).rwdExhBoost = 'y';
+  (pAVar3->adjust).pitchScale = 'P';
+  (pAVar3->adjust).timbreScale = 'h';
+  pAVar3->setpos = '\0';
+  pAVar3->plypos = '\0';
+  bVar1 = false;
+  if (GameSetup_gData.commMode == 1) {
+    pcVar9 = "%s%sens.viv";
   }
   else {
-    sprintf(filename,"%s%seng.viv",Paths_Paths[28],carname);
+    pcVar9 = "%s%seng.viv";
   }
-  header = (char *)loadbigfileheader(filename,(void *)16);
-  if (header == (char *)0x0) {
-    if (AudioEng_GameSetupWords[3] == 1) {
-      sprintf(filename,"%sp993ens.viv",Paths_Paths[28]);
+  sprintf(acStack_80,pcVar9,Paths_Paths[28],carname);
+  pcVar9 = (char *)loadbigfileheader(acStack_80,0x10);
+  if (pcVar9 == (char *)0x0) {
+    if (GameSetup_gData.commMode == 1) {
+      pcVar9 = "%sp993ens.viv";
     }
     else {
-      sprintf(filename,"%sp993eng.viv",Paths_Paths[28]);
+      pcVar9 = "%sp993eng.viv";
     }
-    header = (char *)loadbigfileheader(filename,(void *)16);
+    sprintf(acStack_80,pcVar9,Paths_Paths[28]);
+    pcVar9 = (char *)loadbigfileheader(acStack_80,0x10);
+    if (pcVar9 == (char *)0x0) goto LAB_8007c1ac;
   }
-  {
-    int handle;
-
-    if (header != (char *)0x0) {
-      FILE_opensync(filename,1,100,&handle);
-      {
-        int i;
-
-        for (i = 0; i < bigcount(header); i++) {
-          long size;
-          long offset;
-          char *name;
-
-          name = (char *)locatebigentry(header,(char *)0x0,i,&offset,&size);
-          if ((wildcard((u_char *)name,"*.bnk") != 0) && !bankloaded) {
-            char *pdata;
-
-            pdata = (char *)reservememadr(name,size,16);
-            if (pdata != (char *)0x0) {
-              bankloaded = 1;
-              FILE_readsync(handle,offset,pdata,size,100);
-              spu = AudioCmn_AddBank(name,size,pdata,player);
-              g->bhandle = (char)AudioEng_gSndBnkWords[player][0];
-            }
-          }
-          else if ((wildcard((u_char *)name,"*.ltb") != 0) &&
-                   (loaddef == (AudioEng_tDef *)0x0)) {
-            AudioEng_LoadDef(filename,name,handle,offset,size,&loaddef);
-          }
-          else if ((wildcard((u_char *)name,"*.ctb") != 0) &&
-                   (cruisedef == (AudioEng_tDef *)0x0)) {
-            AudioEng_LoadDef(filename,name,handle,offset,size,&cruisedef);
-          }
-        }
+  FILE_opensync(acStack_80,1,0x64,&local_40);   /* oracle 0x8007c03c: a3=&handle out */
+  for (iVar15 = 0; iVar4 = bigcount(pcVar9), iVar15 < iVar4;
+      iVar15 = iVar15 + 1) {
+    pThis = locatebigentry(pcVar9,(char *)0x0,iVar15,&local_3c,&local_38);   /* oracle 0x8007c06c: a2=i a3=&offset stk=&size */
+    iVar4 = wildcard((u_char *)pThis,"*.bnk");
+    if ((iVar4 == 0) || (bVar1)) {
+      iVar4 = wildcard((u_char *)pThis,"*.ltb");
+      if ((iVar4 == 0) || (local_34 != (AudioEng_tDef *)0x0)) {
+        iVar4 = wildcard((u_char *)pThis,"*.ctb");
+        if ((iVar4 == 0) || (local_30[0] != (AudioEng_tDef *)0x0)) goto LAB_8007c190;
+        ed = local_30;
       }
-      FILE_closesync(handle,100);
-      purgememadr(header);
+      else {
+        ed = &local_34;
+      }
+      AudioEng_LoadDef(acStack_80,(char *)pThis,local_40,local_3c,local_38,ed);
     }
-  }
-  if (!bankloaded) {
-    return spu;
-  }
-  if (cruisedef == (AudioEng_tDef *)0x0) {
-    return spu;
-  }
-  if (loaddef == (AudioEng_tDef *)0x0) {
-    return spu;
-  }
-  {
-    char *current;
-    {
-      AudioEng_tChanAttr *chanbase;
-      int c;
-
-      c = 0;
-      chanbase = g->chan;
-      for (; c < 2; c++) {
-        AudioEng_tDef *ed;
-
-        if (c != 0) {
-          ed = loaddef;
-        }
-        else {
-          ed = cruisedef;
-        }
-        if (ed->resolved == 0) {
-          for (i = 0; i < 8; i++) {
-            if ((signed char)ed->patchnum[i] >= 0) {
-              AudioEng_tChanAttr *chan;
-              int j;
-
-              ed->pvoltable[i] =
-                  (AudioEng_tTable *)((char *)&ed->pvoltable[i] +
-                                      (int)ed->pvoltable[i]);
-              ed->pbendtable[i] =
-                  (AudioEng_tTable *)((char *)&ed->pbendtable[i] +
-                                      (int)ed->pbendtable[i]);
-              chan = chanbase + i;
-              if (c != 0) {
-                chan += 8;
-              }
-              chan->patchnum = ed->patchnum[i];
-              j = 0;
-              while ((j < 512) &&
-                     ((signed char)ed->pvoltable[i]->xlate[j] == 0)) {
-                j++;
-              }
-              chan->min = j;
-              while ((j < 512) &&
-                     ((signed char)ed->pvoltable[i]->xlate[j] != 0)) {
-                j++;
-              }
-              chan->max = j;
-              tablesize += chan->max - chan->min;
-            }
-            ed->resolved = 1;
-          }
-        }
+    else {
+      pdata = (char *)reservememadr(pThis,local_38,0x10);
+      if (pdata != (char *)0x0) {
+        bVar1 = true;
+        FILE_readsync(local_40,local_3c,(intptr_t)pdata,local_38,0x64);   /* oracle 0x8007c0c8: a0=h a1=off a2=pdata a3=size stk=0x64 */
+        iVar17 = AudioCmn_AddBank((char *)pThis,local_38,pdata,player);
+        pAVar3->bhandle = (char)gSndBnk[player].bnkID;
       }
     }
-    {
-      AudioEng_tChanAttr *chanbase;
-      int c;
-
-      current = g->tables =
-          (char *)reservememadr("Engine Tables",tablesize,0);
-      c = 0;
-      chanbase = g->chan;
-      for (; c < 2; c++) {
-        AudioEng_tDef *ed;
-
-        if (c != 0) {
-          ed = loaddef;
+LAB_8007c190: ;   /* empty stmt: gcc2.7.2 rejects label before '}' */
+  }
+  FILE_closesync(local_40,100);   /* oracle 0x8007c198/c1a0: a0=handle a1=0x64 (both were dropped) */
+  purgememadr(pcVar9);
+LAB_8007c1ac:
+  if (!bVar1) {
+    return iVar17;
+  }
+  if (local_30[0] == (AudioEng_tDef *)0x0) {
+    return iVar17;
+  }
+  iVar15 = 0;
+  if (local_34 == (AudioEng_tDef *)0x0) {
+    return iVar17;
+  }
+  do {
+    if (1 < iVar15) {
+      dest = (u_char *)reservememadr("Engine Tables",name,0)
+      ;
+      pAVar3->tables = (char *)dest;
+      for (iVar15 = 0; iVar15 < 2; iVar15 = iVar15 + 1) {
+        iVar4 = 0;
+        pAVar11 = local_30[0];
+        if (iVar15 != 0) {
+          pAVar11 = local_34;
         }
-        else {
-          ed = cruisedef;
-        }
-        for (i = 0; i < 8; i++) {
-          AudioEng_tChanAttr *chan;
-
-          chan = chanbase + i;
-          if (c != 0) {
-            chan += 8;
+        iVar12 = 0;
+        for (; iVar4 < 8; iVar4 = iVar4 + 1) {
+          psVar5 = (short *)((int)&pAVar3->chan[0].min + iVar12);
+          if (iVar15 != 0) {
+            psVar5 = psVar5 + 0x30;
           }
-          if (chan->max != chan->min) {
-            int size;
-
-            size = chan->max - chan->min;
-            chan->xlate = current;
-            memcpy(current,ed->pvoltable[i]->xlate + chan->min,size);
-            current += size;
+          iVar13 = (int)*psVar5;
+          puVar16 = dest;
+          if (psVar5[1] != iVar13) {
+            iVar14 = psVar5[1] - iVar13;
+            *(u_char **)(psVar5 + 2) = dest;
+            puVar16 = dest + iVar14;
+            memcpy(dest,(u_char *)(pAVar11->pvoltable[0]->xlate + iVar13),iVar14);
           }
+          pAVar11 = (AudioEng_tDef *)&pAVar11->ver;
+          iVar12 = iVar12 + 0xc;
+          dest = puVar16;
         }
       }
+      purgememadr(local_34);
+      purgememadr(local_30[0]);
+      return iVar17;
     }
-    purgememadr(loaddef);
-    purgememadr(cruisedef);
-  }
-  return spu;
+    pAVar11 = local_30[0];
+    if (iVar15 != 0) {
+      pAVar11 = local_34;
+    }
+    iVar4 = 0;
+    if (pAVar11->resolved == '\0') {
+      iVar14 = 0;
+      iVar13 = 0x148;
+      iVar12 = 0x128;
+      pAVar10 = pAVar11;
+      for (; iVar4 < 8; iVar4 = iVar4 + 1) {
+        if (-1 < pAVar11->patchnum[iVar4]) {
+          psVar5 = (short *)((int)&pAVar3->chan[0].min + iVar14);
+          pAVar10->pvoltable[0] =
+               (AudioEng_tTable *)
+               (pAVar10->pvoltable[0]->xlate + (int)(pAVar11->patchnum + iVar12 + -0x20));
+          pAVar10->pbendtable[0] =
+               (AudioEng_tTable *)
+               (pAVar10->pbendtable[0]->xlate + (int)(pAVar11->patchnum + iVar13 + -0x20));
+          if (iVar15 != 0) {
+            psVar5 = psVar5 + 0x30;
+          }
+          *(char *)(psVar5 + 4) = pAVar11->patchnum[iVar4];
+          iVar7 = 0;
+          if (pAVar10->pvoltable[0]->xlate[0] == '\0') {
+            iVar2 = 1;
+            do {
+              iVar7 = iVar2;
+              bVar1 = iVar7 < 0x200;
+              if (!bVar1) goto LAB_8007c2c4;
+              iVar2 = iVar7 + 1;
+            } while (pAVar10->pvoltable[0]->xlate[iVar7] == '\0');
+          }
+          bVar1 = iVar7 < 0x200;
+LAB_8007c2c4:
+          *psVar5 = (short)iVar7;
+          if (bVar1) {
+            do {
+              if (pAVar10->pvoltable[0]->xlate[iVar7] == '\0') break;
+              iVar7 = iVar7 + 1;
+            } while (iVar7 < 0x200);
+          }
+          psVar5[1] = (short)iVar7;
+          name = name + ((int)(short)iVar7 - (int)*psVar5);
+        }
+        pAVar11->resolved = '\x01';
+        pAVar10 = (AudioEng_tDef *)&pAVar10->ver;
+        iVar14 = iVar14 + 0xc;
+        iVar13 = iVar13 + 4;
+        iVar12 = iVar12 + 4;
+      }
+    }
+    iVar15 = iVar15 + 1;
+  } while( true );
 }
 
 /* ---- AudioEng_StartServer__Fv  [@0x8007c434] ---- */
 void AudioEng_StartServer(void)
 {
-  iSNDserveradd100hzclient((int)AudioEng_Update /* @0x8007b824 100Hz server callback */);
+  iSNDserveradd100hzclient(AudioEng_Update /* @0x8007b824 100Hz server callback */);
   return;
 }
 
 /* ---- AudioEng_StopServer__Fv  [@0x8007c458] ---- */
 void AudioEng_StopServer(void)
 {
-  iSNDserverremove100hzclient((int)AudioEng_Update /* @0x8007b824 100Hz server callback */);
+  iSNDserverremove100hzclient(AudioEng_Update /* @0x8007b824 100Hz server callback */);
   return;
 }
 
@@ -583,22 +615,28 @@ void AudioEng_StopServer(void)
 void AudioEng_Pause(void)
 {
   int player;
-
-  for (player = 0; player < 2; player++) {
-    AudioEng_t *g = AudioEng_g[player];
-    AudioEng_tState *s;
-
-    if (g == (AudioEng_t *)0x0) break;
-    if ((g->plypos == '\x0f') && ((g->setpos + 1U & 1) != 0)) break;
-    s = g->queue + (u_char)g->setpos;
-    s->vol = 0;
-    s->esp = 0;
-    s->dop = 0x1000;
-    s->gas = '\0';
-    s->exh = '\0';
-    s->sep = 0;
-    s->azi = 0;
-    g->setpos = g->setpos + 1U & 0xf;
+  AudioEng_t*g;
+  AudioEng_tState*s;
+  AudioEng_tState *pAVar1;
+  AudioEng_t *pAVar2;
+  AudioEng_t **ppAVar3;
+  int iVar4;
+  
+  iVar4 = 0;
+  ppAVar3 = AudioEng_g;
+  while (((iVar4 < 2 && (pAVar2 = *ppAVar3, pAVar2 != (AudioEng_t *)0x0)) &&
+         ((pAVar2->plypos != '\x0f' || ((pAVar2->setpos + 1U & 1) == 0))))) {
+    ppAVar3 = ppAVar3 + 1;
+    pAVar1 = pAVar2->queue + (u_char)pAVar2->setpos;
+    pAVar1->vol = 0;
+    pAVar1->esp = 0;
+    pAVar1->dop = 0x1000;
+    pAVar1->gas = '\0';
+    pAVar1->exh = '\0';
+    pAVar1->sep = 0;
+    pAVar1->azi = 0;
+    iVar4 = iVar4 + 1;
+    pAVar2->setpos = pAVar2->setpos + 1U & 0xf;
   }
   return;
 }
@@ -612,43 +650,53 @@ void AudioEng_Resume(void)
 /* ---- AudioEng_CleanUp__Fv  [@0x8007c534] ---- */
 void AudioEng_CleanUp(void)
 {
-  /* SLD exposes only g=$s2 and i=$s1. Keeping the outer table as an array
-     reference and indexing left/right from g reproduces retail's s5 base,
-     s3 cursor, and s0=g anchor; the remaining four prologue diffs are the
-     address-materialization scheduling choice (v0->s5 versus direct s5). */
-  u_int noHandle;
-  AudioEng_t *(&base)[2] = AudioEng_g;
-  AudioEng_t **current;
-
-  noHandle = 0xffffffff;
-  current = base;
-  while (true) {
-    AudioEng_t *g;
-
-    if ((int)(base + 2) <= (int)current) {
+  AudioEng_t*g;
+  int j;
+  AudioEng_tChanAttr *chan;
+  u_int uVar1;
+  int c;
+  char *pdata;
+  AudioEng_t *pAVar2;
+  int i;
+  int iVar3;
+  u_short leftazim;
+  AudioEng_t *ptr;
+  char *current;
+  char *header;
+  int tablesize;
+  AudioEng_t **ppAVar4;
+  int bankloaded;
+  SNDPLAYOPTS playopts;
+  AudioEng_tDef *loaddef;
+  AudioEng_tDef *cruisedef;
+  
+  ppAVar4 = AudioEng_g;
+  while( true ) {
+    if (AudioEng_g + 2 <= ppAVar4) {
       return;
     }
-    g = *current;
-    if (g == (AudioEng_t *)0x0) {
-      break;
-    }
-    {
-      int i;
-
-      for (i = 0; i < 0x10; i++) {
-        if (g->left[i].handle != noHandle) {
-          SNDstop(g->left[i].handle);
-          if (g->right[i].handle != noHandle) {
-            SNDstop(g->right[i].handle);
-          }
-          g->left[i].handle = noHandle;
-          g->right[i].handle = noHandle;
+    ptr = *ppAVar4;
+    iVar3 = 0;
+    pAVar2 = ptr;
+    if (ptr == (AudioEng_t *)0x0) break;
+    do {
+      uVar1 = pAVar2->left[0].handle;
+      if (uVar1 != 0xffffffff) {
+        SNDstop(uVar1);
+        uVar1 = pAVar2->right[0].handle;
+        if (uVar1 != 0xffffffff) {
+          SNDstop(uVar1);
         }
+        pAVar2->left[0].handle = -1;
+        pAVar2->right[0].handle = -1;
       }
-    }
-    purgememadr(g->tables);
-    purgememadr(g);
-    *current = (AudioEng_t *)0x0;
-    current++;
+      iVar3 = iVar3 + 1;
+      pAVar2 = (AudioEng_t *)pAVar2->vol;
+    } while (iVar3 < 0x10);
+    purgememadr(ptr->tables);
+    purgememadr(ptr);
+    *ppAVar4 = (AudioEng_t *)0x0;
+    ppAVar4 = ppAVar4 + 1;
   }
+  return;
 }

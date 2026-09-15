@@ -2,7 +2,8 @@
 #ifndef _GAME_PSX_SFX_EXTERNS_H_
 #define _GAME_PSX_SFX_EXTERNS_H_
 
-#include "../../lib/psx_gte.h"
+#include "../../nfs4_types.h"
+#include "../../lib/libfns.h"
 
 /* ---- module / render globals ---- */
 extern matrixtdef    gWorldMat;        /* 0x8010ee40  world->camera matrix (set per facet) */
@@ -15,22 +16,51 @@ extern Draw_tPixMap *gGravelPalette;   /* 0x8013d20c */
 extern Draw_tPixMap *gGrassPalette;    /* 0x8013d210 */
 extern Draw_tPixMap *gSnowPalette;     /* 0x8013d214 */
 extern Draw_tPixMap *gLeafPixmap;      /* 0x8013d218 */
-extern int           Draw_gViewOtSize; /* 0x8013d7b0  ordering-table size */
-extern int Sfx_GameSetupWords[] asm("GameSetup_gData");
+extern "C" int           Draw_gViewOtSize; /* 0x8013d7b0  ordering-table size */
+extern "C" u_char       *&Render_gPacketPtr;   /* GPU packet write cursor (scratchpad) */
+extern "C" u_char       *&Render_gPalettePtr;  /* OT palette cursor (scratchpad) */
+extern "C" u_char       *&Render_gPacketEnd;   /* end of current primitive arena */
+extern "C" extern "C" GameSetup_tData GameSetup_gData;   /* 0x801131ec */
 
 /* ---- eaclib / math / gpu helpers ---- */
 extern void  TrsProj_SetPsxMatrix(matrixtdef *m, coorddef *trans);
 extern void  Math_NormalizeVector(coorddef *v);
 extern void  ChangeTPage(u_short *tpage, int abr);
-extern "C" int fastintcos(...);
-extern "C" int fastintsin(...);
-extern "C" int fixedmult(...);
-extern "C" int intatan(...);
-extern "C" int random(...);
 
-/* ---- GTE (COP2) macros: the real canonical PsyQ inline-asm forms come from psx_gte.h
- *      (included above). The former no-op stubs here SHADOWED them and made every GTE
- *      stream a far-miss — removed so the cop2 instructions actually emit. ---- */
+/* ---- GTE (COP2) macros ---------------------------------------------------- */
+#ifdef AP_WIN
+extern void gte_rtps(void);
+extern void gte_rtpt(void);
+extern void gte_lwc2(int,int);
+extern void gte_swc2(int,void *);
+extern void nfs4_gte_set_rot_matrix(const void *);
+extern void nfs4_gte_rt(void);
+extern void nfs4_gte_avsz4(void);
+#define gte_SetRotMatrix(m)   nfs4_gte_set_rot_matrix(m)
+#define gte_ldv0(v)           do { gte_lwc2(0,*(int *)(v)); gte_lwc2(1,*(short *)((char *)(v)+4)); } while(0)
+#define gte_ldv3(a,b,c)       do { gte_ldv0(a); gte_lwc2(2,*(int *)(b)); gte_lwc2(3,*(short *)((char *)(b)+4)); gte_lwc2(4,*(int *)(c)); gte_lwc2(5,*(short *)((char *)(c)+4)); } while(0)
+#define gte_mvmva(...)    nfs4_gte_rt()
+#define gte_avsz4()           nfs4_gte_avsz4()
+#define gte_stlvnl(p)         do { gte_swc2(25,(p)); gte_swc2(26,(char *)(p)+4); gte_swc2(27,(char *)(p)+8); } while(0)
+#define gte_stsxy(p)          gte_swc2(14,(p))
+#define gte_stsxy3(a,b,c)     do { gte_swc2(12,(a)); gte_swc2(13,(b)); gte_swc2(14,(c)); } while(0)
+#define gte_stsz(p)           gte_swc2(7,(p))
+#else
+#define gte_SetRotMatrix(m)   ((void)(m))
+#define gte_ldv0(v)           ((void)(v))
+#define gte_ldv3(v0,v1,v2)    ((void)0)
+#define gte_lwc2(r,v)         ((void)0)
+#define gte_swc2(r,p)         ((void)0)
+#define gte_mvmva(...)        ((void)0)
+#define gte_rtps()            ((void)0)
+#define gte_rtpt()            ((void)0)
+#define gte_avsz4()           ((void)0)
+#define gte_stlvnl(p)         ((void)(p))
+#define gte_stsxy(p)          ((void)(p))
+#define gte_stsxy3(a,b,c)     ((void)0)
+#define gte_stsz(p)           ((void)(p))
+#define gte_ctc2(v,r)         ((void)0)
+#endif
 
 /* ---- this module (forward decls for intra-TU calls) ---- */
 extern void Sfx_Transform(coorddef *worldpt, SVECTOR *campt, coorddef *t);

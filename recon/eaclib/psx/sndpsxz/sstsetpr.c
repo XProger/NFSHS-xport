@@ -1,4 +1,4 @@
-/* eaclib/psx/sndpsxz/sstsetpr.cpp -- RECONSTRUCTED from nfs4-f.exe. NOT original source.
+/* eaclib/psx/sndpsxz/sstsetpr.c -- RECONSTRUCTED from nfs4-f.exe. NOT original source.
  *   Source obj : nfs4\eaclib\psx\sstsetpr.obj (SNDPSXZ.LIB).  1 fn @0x800E6CF0 : SNDSTRM_setpriority.
  *   FULL reconstruction (disasm-v3 MIPS); NOT a stub.  EA SND streaming-audio (SNDSTRM_*) layer.
  *
@@ -8,17 +8,16 @@
  */
 #include "../../../lib/snd.h"
 
-extern void *iSNDstreamgetstreamptr(int streamid);          /* @0x800E8C48 (sst.obj) */
-extern int   STREAM_setpriority(int handle, int prio, int a3); /* @0x800FD1F8 platform */
+extern "C" SndStreamState *iSNDstreamgetstreamptr(int streamid); /* @0x800E8C48 */
+extern "C" void STREAM_setpriority(intptr_t handle, int prio, int a3); /* @0x800FD1F8 */
 
-extern int SNDSTRM_setpriority(int streamid, int prio, int a3)   /* @0x800E6CF0 */
+extern "C" int SNDSTRM_setpriority(int streamid, int prio, int a3)   /* @0x800E6CF0 */
 {
-    char * strm;
     if (SND->enabled == 0)
         return -10;
-    strm = (char *)iSNDstreamgetstreamptr(streamid);
+    SndStreamState *strm = iSNDstreamgetstreamptr(streamid);
     if (strm == 0)
         return -8;
-    STREAM_setpriority(*(int *)(strm + 4), prio, a3);
+    STREAM_setpriority(strm->streamHandle, prio, a3);
     return 0;
 }

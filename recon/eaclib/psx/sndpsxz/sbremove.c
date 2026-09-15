@@ -4,95 +4,67 @@
  *   bank table.  Ghidra nfs4-f.exe.c (sbremove) + IDA sigs (`this` is the bank id).
  */
 
-struct SNDGlobals {
-    char pad0[0x0c];
-    unsigned short bank_count;
-    char pad0e[3];
-    unsigned char channel_count;
-    char pad12[0x2a];
-    signed char initialized;
-    char pad3d[0x57];
-    int play_records;
-    int bank_table;
-};
-extern struct SNDGlobals sndgs;
-extern int  iSNDvalidbank(int bankId);                 /* sbvalid  */
-extern int  SNDstop(unsigned int tag);                 /* sstop    */
-extern void iSNDbankremovepat(int bank, int idx, int *scratch);  /* sbirmpat */
-extern void iSNDplatformfree(void *p);                 /* sdata    */
+extern "C" int sndgs[];
+extern "C" int  iSNDvalidbank(int bankId);                 /* sbvalid  */
+extern "C" int  SNDstop(unsigned int tag);                 /* sstop    */
+extern "C" void iSNDbankremovepat(int bank, int idx, int *scratch);  /* sbirmpat */
+extern "C" void iSNDplatformfree(void *p);                 /* sdata    */
 
-extern int  iSNDremovepatches(int bank, int count);    /* @0x800E65F8 */
-extern void SNDbankremove(int bankId);                 /* @0x800E6674 */
-extern int  cSNDbankremove(int bankId, int recurse);   /* @0x800E6694 ; a1 always 0 at every call */
+extern "C" int  iSNDremovepatches(int bank, int count);    /* @0x800E65F8 */
+extern "C" void SNDbankremove(int bankId);                 /* @0x800E6674 */
+extern "C" void cSNDbankremove(int bankId);                /* @0x800E6694 */
 
 /* iSNDremovepatches @0x800E65F8 : release each of a bank's `count` resolved patches (de-dup via a local
  *   scratch table seeded to -1). */
-extern int iSNDremovepatches(int bank, int count)
+extern "C" int iSNDremovepatches(int bank, int count)
 {
     int scratch[512];
-    int *p;
     int i;
-    int neg1 = -1;
-    i = 0xFF;
-    p = &scratch[510];
-    do {                                 /* seed the {id} slots to -1, back to front */
-        *p = neg1;
-        i--;
-        p -= 2;
-    } while (i >= 0);
+    for (i = 0; i < 512; i += 2)         /* seed the {id} slots to -1 */
+        scratch[i] = -1;
     for (i = 0; i < count; i++)
         iSNDbankremovepat(bank, i, scratch);
     return 0;
 }
 
-/* SNDbankremove @0x800E6674 : the exit-time hook (sndgs[0x1f]); unloads bank `bankId`. */
-extern void SNDbankremove(int bankId)
-{
-    cSNDbankremove(bankId, 0);
-}
-
 /* cSNDbankremove @0x800E6694 : unload bank `bankId` (or all banks when bankId == -1) -- stop its playing
  *   voices, free its patches/SPU data, and clear its bank-table entry. */
-extern int cSNDbankremove(int bankId, int recurse)
+extern "C" void cSNDbankremove(int bankId)
 {
-    struct SNDGlobals *base = &sndgs;
-    int i;
-
-    if (base->initialized == 0)
-        return -10;
+    if ((char)sndgs[0xf] == 0)
+        return;
     if (bankId == -1) {                  /* unload every bank */
-        for (i = 0; i < (int)(unsigned)base->bank_count; i++)
-            cSNDbankremove(i, 0);
-        return 0;
+        int b;
+        for (b = 0; b < (int)(unsigned)(unsigned short)sndgs[3]; b++)
+            cSNDbankremove(b);
+        return;
     }
-    if (iSNDvalidbank(bankId) != 0)
-        return -8;
-    {
-        int data = *(int *)(bankId * 0xc + base->bank_table);
-        int off;
-        unsigned char *entry;
-        struct SNDGlobals *base2;
-        i = 0;
-        if (base->channel_count != 0) {     /* stop voices owned by this bank */
-            struct SNDGlobals *loopbase = base;
+    if (iSNDvalidbank(bankId) == 0) {
+        int data = *(int *)(bankId * 0xc + sndgs[0x26]);
+        int i = 0, off, e;
+        if (((unsigned char *)sndgs)[0x11] != 0) {     /* stop voices owned by this bank */
             off = 0;
             do {
-                if ((int)*(signed char *)(loopbase->play_records + off + 10) == bankId)
-                    SNDstop(*(unsigned int *)(loopbase->play_records + off));
+                if ((int)*(char *)(sndgs[0x25] + off + 10) == bankId)
+                    SNDstop(*(unsigned int *)(sndgs[0x25] + off));
+                i++;
                 off += 100;
-            } while ((int)(unsigned)loopbase->channel_count > ++i);
+            } while (i < (int)(unsigned)((unsigned char *)sndgs)[0x11]);
         }
-        base2 = &sndgs;
-        entry = (unsigned char *)(bankId * 0xc +
-            *(volatile int *)&base2->bank_table);
-        if (*(signed char *)(entry + 9) != 0) {
-            iSNDplatformfree(*(void **)(entry + 4));
-            *(unsigned char *)(bankId * 0xc + sndgs.bank_table + 9) = 0;
-        } else
+        e = bankId * 0xc + sndgs[0x26];
+        if (*(char *)(e + 9) == 0)
             iSNDremovepatches(bankId, (int)(unsigned)*(unsigned short *)(data + 6));
-        *(int *)(bankId * 0xc + sndgs.bank_table) = 0;
-        *(unsigned char *)(bankId * 0xc + sndgs.bank_table + 8) = 0;
+        else {
+            iSNDplatformfree(*(void **)(e + 4));
+            *(unsigned char *)(bankId * 0xc + sndgs[0x26] + 9) = 0;
+        }
+        *(int *)(bankId * 0xc + sndgs[0x26]) = 0;
+        *(unsigned char *)(bankId * 0xc + sndgs[0x26] + 8) = 0;
     }
-    return 0;
 }
 
+/* SNDbankremove @0x800E6674 : the exit-time hook (sndgs[0x1f]); unloads bank `bankId`. */
+extern "C" void SNDbankremove(int bankId)
+{
+    cSNDbankremove(bankId);
+}

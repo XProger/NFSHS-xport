@@ -1,47 +1,56 @@
 /* game/psx/simplemem.cpp -- RECONSTRUCTED (NFS4 PSX SimpleMem allocator class; C++ TU)
- *   3 SimpleMem methods [Alloc, FeignAlloc, ResizeToFit] as real members -> oracle
- *   method mangling __9SimpleMem...; this lands in $a0 like the old explicit pThis. GTE-free.
+ *   3 fns: SimpleMem::Alloc/FeignAlloc/ResizeToFit (explicit-this free-fn forms).
+ *   GTE-free. Full SYM-locals applied.
  */
-#include "simplemem_types.h"
+#include "../../nfs4_types.h"
 #include "simplemem_externs.h"
 
+/* ---- intra-TU forward declarations (auto-emitted, signature-exact) ---- */
+void * Alloc(SimpleMem *pThis,int len,int feign);
+extern "C" { void * FeignAlloc(SimpleMem *pThis,int len); }
+void ResizeToFit(SimpleMem *pThis);
 
-/* ---- Alloc__9SimpleMemii  [SIMPLEMEM.CPP:10-40] SLD-VERIFIED ---- */
-void * SimpleMem::Alloc(int len,int feign)
+
+/* ---- Alloc  [SIMPLEMEM.CPP:10-40] SLD-VERIFIED ---- */
+void * Alloc(SimpleMem *pThis,int len,int feign)
+
 {
+  u_int uVar1;
   void *ret;
-
-  len = len + 3;
-  len = len & ~3;
-  if (this->freeMemSize < len) {
-    return (void *)0x0;
+  
+  uVar1 = len + 3U & 0xfffffffc;
+  if ((int)uVar1 <= pThis->freeMemSize) {
+    ret = pThis->freeMem;
+    if (feign == 0) {
+      pThis->freeMem = (u_char *)ret + uVar1;
+      pThis->freeMemSize = pThis->freeMemSize - uVar1;
+    }
+    return ret;
   }
-  ret = this->freeMem;
-  if (feign == 0) {
-    this->freeMem = (u_char *)((int)ret + len);
-    this->freeMemSize = this->freeMemSize - len;
-  }
-  return ret;
+  return (void *)0x0;
 }
 
-/* ---- FeignAlloc__9SimpleMemi  [SIMPLEMEM.CPP:45-46] SLD-VERIFIED ---- */
-void * SimpleMem::FeignAlloc(int len)
+/* ---- FeignAlloc  [SIMPLEMEM.CPP:45-46] SLD-VERIFIED ---- */
+extern "C" void * FeignAlloc(SimpleMem *pThis,int len)
+
 {
   void *pvVar1;
-
-  pvVar1 = this->Alloc(len,1);
+  
+  pvVar1 = Alloc(pThis,len,1);
   return pvVar1;
 }
 
-/* ---- ResizeToFit__9SimpleMem  [SIMPLEMEM.CPP:57-64] SLD-VERIFIED ---- */
-void SimpleMem::ResizeToFit()
-{
-  long newSize;
+/* ---- ResizeToFit  [SIMPLEMEM.CPP:57-64] SLD-VERIFIED ---- */
+void ResizeToFit(SimpleMem *pThis)
 
-  newSize = (int)this->freeMem;
-  newSize -= (int)this->heap;
-  this->freeMem = (u_char *)0x0;
-  resizememadr(this->heap,newSize);
+{
+  void *tp1;
+  long newSize;
+  void *ret;
+  
+  tp1 = pThis->freeMem;
+  pThis->freeMem = (u_char *)0x0;
+  resizememadr(pThis->heap,(int)((u_char *)tp1 - (u_char *)pThis->heap));
   return;
 }
 

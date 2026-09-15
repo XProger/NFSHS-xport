@@ -1,4 +1,4 @@
-/* eaclib/psx/sndpsxz/span.cpp -- RECONSTRUCTED from nfs4-f.exe. NOT original source.  *** 1/1 PASS ***
+/* eaclib/psx/sndpsxz/span.c -- RECONSTRUCTED from nfs4-f.exe. NOT original source.
  *   Source obj : nfs4\eaclib\psx\span.obj (SNDPSXZ.LIB).  1 fn @0x800E6884 : SNDpan.
  *   FULL reconstruction (disasm-v3 MIPS); NOT a stub.  Uses the shared SND types in lib/snd.h.
  *
@@ -9,36 +9,30 @@
  */
 #include "../../../lib/snd.h"
 
-extern int SNDpan(int handle, int pan)   /* @0x800E6884 */
+extern "C" int SNDpan(int handle, int pan)   /* @0x800E6884 */
 {
-    int chan;
     if (SND->enabled == 0)
         return -10;
 
     iSNDenteraudio();
-    chan = iSNDgetchan(handle);
+    int chan = iSNDgetchan(handle);
     if (chan >= 0) {
         int iter = -1;
         while (iSNDpatchkey(chan, &iter)) {
-            int voiceIndex;
-            int angle;
-            int p;
             SndVoice *v = &SND->voices[iter];
-            if (v->pan_cur == pan)
+            if (v->pan_cur == (signed char)pan)
                 break;                                   /* already at target -> done */
-            v->pan_cur = (signed char)pan;
-            p = pan;
+            int p = pan;
             if (v->f33 != 1) {
+                v->pan_cur = (signed char)pan;
                 p = (pan - 0x40) * v->f33 + 0x40;        /* scale about centre */
             }
             p = v->pan + p - 0x40;
             if (p >= 0x80) p = 0x7F;
-            else if (p < 0) p = 0;
+            if (p < 0)     p = 0;
             if (v->pancurve != 0)
                 p = ((signed char *)v->pancurve)[p];     /* pan curve remap */
-            angle = ((p - 0x40) << 8) & 0xFF00;
-            voiceIndex = *(volatile int *)&iter;
-            iSNDplatform3dpos(voiceIndex, angle, 0);
+            iSNDplatform3dpos(iter, ((p - 0x40) << 8) & 0xFF00, 0);
         }
     }
     iSNDleaveaudio();

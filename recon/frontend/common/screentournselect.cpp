@@ -13,8 +13,9 @@
 tScreenTournSelect::tScreenTournSelect()
 
 {
-
-  this->_vf = (__vtbl_ptr_type (*)[10])tScreenTournSelect_vtable;
+  
+  tScreen_ctor(&this->_base_tScreen);
+  (this->_base_tScreen)._vf = (__vtbl_ptr_type (*)[10])tScreenTournSelect_vtable;
   return;
 }
 
@@ -24,9 +25,8 @@ tScreenTournSelect::tScreenTournSelect()
 tScreenTournSelect::~tScreenTournSelect()
 
 {
-  /* MATCH: no manual tScreen_dtor — declared base dtor auto-fires (vptr store
-     lands in its jal delay slot; __in_chrg forwarded in $a1). */
-  this->_vf = (__vtbl_ptr_type (*)[10])tScreenTournSelect_vtable;
+  (this->_base_tScreen)._vf = (__vtbl_ptr_type (*)[10])tScreenTournSelect_vtable;
+  (((tScreen*)(&this->_base_tScreen))->~tScreen(), (tScreen*)(&this->_base_tScreen));
   return;
 }
 
@@ -37,43 +37,23 @@ void tScreenTournSelect::GetShapeInfo(short &numPermShapes,short &numSwapShapes,
                char **permFileName,char **swapFileName)
 
 {
-  /* MATCH (W68, 22 -> PASS; SLD 79/81/82/84/86/87): retain the front-end
-     base and precompute the trophy pointer before the output stores.  This
-     preserves numSwapShapes in $t1 and schedules the retail branch delays;
-     gSwapFileName's address remains in $s0 across the call. */
-  /* SYM-CODEGEN-CARRIER: useSpecial -- folding the if/else selection into
-     the tournament index is measured FAIL60 (51/51), changing the entire
-     early allocation and branch schedule. */
   byte useSpecial;
-  /* SYM-CODEGEN-CARRIER: fe -- direct frontEnd member reads are measured
-     FAIL3 (52/51), reloading the base for tier instead of retaining it. */
-  tfrontEnd *fe;
-  /* SYM-CODEGEN-CARRIER: trophyTourn -- folding the tournament lookup into
-     GetTrophyName is measured FAIL19 (50/51), moving output stores across the
-     lookup and losing retail's precomputed pointer web. */
-  tTourneyInfo *trophyTourn;
-
-  /* MATCH: an if/ELSE (both arms load) - the oracle jumps over the else arm;
-     a default+override form emits no `j`. */
-  fe = &frontEnd;
-  if (fe->tier != '\0') {
-    useSpecial = fe->specialevent;
+  byte tournOffset;
+  tTournamentDefinition *def;
+  
+  def = tournamentManager.fDefinition;
+  useSpecial = frontEnd.tournament;
+  if (frontEnd.tier != '\0') {
+    useSpecial = frontEnd.specialevent;
   }
-  else {
-    useSpecial = fe->tournament;
-  }
-  trophyTourn = (tournamentManager.fDefinition)->fTournaments +
-                ((uint)useSpecial +
-                 (uint)(tournamentManager.fDefinition)
-                     ->fTiers[(byte)fe->tier].fTournOffset);
+  tournOffset = (tournamentManager.fDefinition)->fTiers[(byte)frontEnd.tier].fTournOffset;
   numPermShapes = 0x40;
   numSwapShapes = 0x20;
   *permFileName = "ztourn";
-  GetTrophyName(&tournamentManager,trophyTourn,ts_Medium,gSwapFileName,-1);
+  GetTrophyName(&tournamentManager,def->fTournaments + (uint)useSpecial + (uint)tournOffset,ts_Medium,gSwapFileName,-1);
   *swapFileName = gSwapFileName;
   return;
 }
-
 
 
 
@@ -81,25 +61,12 @@ void tScreenTournSelect::GetShapeInfo(short &numPermShapes,short &numSwapShapes,
 void tScreenTournSelect::Initialize()
 
 {
-  /* MATCH (W68, 62 -> PASS): keep the VIDEO_create result full-width by
-     assigning hVideo inside VIDEO_spoolfile's first argument; `i` is only the
-     authenticated short TV-loop counter.  Retail's special/tournament choice
-     is a real if/else and reuses one frontEnd base.  The trophy lookup uses an
-     index-first typed byte address, preserving `addu v0,v0,a0`; fTVTicks reads
-     the full-width ISR counter directly instead of truncating through `i`. */
-  /* SYM-CODEGEN-CARRIER: useSpecial -- folding the if/else into the trophy
-     index is measured FAIL35 with one missing instruction (145/146), changing
-     the selection branch and subsequent index allocation. */
   byte useSpecial;
-  /* SYM-CODEGEN-CARRIER: fe -- direct frontEnd member reads are measured
-     FAIL7 with one extra instruction (147/146), reloading the tier base. */
-  tfrontEnd *fe;
-  /* SYM-CODEGEN-CARRIER: tvIdx -- recomputing `i * 2 + j` at each access is
-     measured FAIL112 with twelve extra instructions (158/146), changing the
-     saved-register set and the whole loop allocation. */
+  ushort flags;
   int tvIdx;
-  short i;
+  short js;
   short j;
+  short i;
   RECT r;
   char moviename [80];
   
@@ -111,44 +78,42 @@ void tScreenTournSelect::Initialize()
   r.h = 0xa0;
   ClearImage(&r,'\0','\0','\0');
   DrawSync(0);
-  this->tScreen::Initialize();
+  this->_base_tScreen.Initialize();
   this->fCurrentMovie = 0;
   this->fPreviousMovie = 0;
   sprintf(moviename,"%szzzTRN.dct",Paths_Paths[0x29]);
-  VIDEO_spoolfile(this->hVideo = VIDEO_create(0x50,0x50,0xf0000,0x25800,0x10),
-                  moviename);
+  this->hVideo = VIDEO_create(0x50,0x50,0xf0000,0x25800,0x10);
+  VIDEO_spoolfile(this->hVideo,moviename);
   i = 0;
   VIDEO_startplayback(this->hVideo);
   this->fFrame = 0;
   do {
     j = 0;
     do {
-      tvIdx = i * 2 + j;
-      InitTV(this->trophyTV + tvIdx,this->fPermShapes.fShapes,0);
-      this->trophyTV[tvIdx].y = j * 0x25 + 0x8e;
+      js = (short)j;
+      tvIdx = (short)i * 2 + (int)js;
+      InitTV(this->trophyTV + tvIdx,(this->_base_tScreen).fPermShapes.fShapes,0);
       j = j + 1;
+      this->trophyTV[tvIdx].y = js * 0x25 + 0x8e;
       this->trophyTV[tvIdx].w = 0x4c;
-      this->trophyTV[tvIdx].x = i * 0x4c + 0xa5;
+      flags = this->trophyTV[tvIdx].flags;
+      this->trophyTV[tvIdx].x = (short)i * 0x4c + 0xa5;
       this->trophyTV[tvIdx].h = 0x25;
-      this->trophyTV[tvIdx].flags |= 0x30;
-    } while (j < 2);
+      this->trophyTV[tvIdx].flags = flags | 0x30;
+    } while (j * 0x10000 >> 0x10 < 2);
     i = i + 1;
-  } while (i < 2);
-  fe = &frontEnd;
-  if (fe->tier != '\0') {
-    useSpecial = fe->specialevent;
-  }
-  else {
-    useSpecial = fe->tournament;
+  } while (i * 0x10000 >> 0x10 < 2);
+  useSpecial = frontEnd.tournament;
+  if (frontEnd.tier != '\0') {
+    useSpecial = frontEnd.specialevent;
   }
   this->fPreviousTrophy =
-       ((tTourneyInfo *)
-        (((uint)useSpecial +
-          (uint)(tournamentManager.fDefinition)->fTiers[(byte)fe->tier].fTournOffset) *
-             sizeof(tTourneyInfo) +
-         (int)(tournamentManager.fDefinition)->fTournaments))->fTrophyID;
+       (tournamentManager.fDefinition)->fTournaments
+       [(uint)useSpecial +
+        (uint)(tournamentManager.fDefinition)->fTiers[(byte)frontEnd.tier].fTournOffset].fTrophyID;
+  i = ticks;
   this->fTransitionDirection = 1;
-  this->fTVTicks = ticks;
+  this->fTVTicks = i;
   return;
 }
 
@@ -161,7 +126,7 @@ void tScreenTournSelect::Cleanup()
   
   VIDEO_destroy(this->hVideo);
   purgememadr((void *)this->hVideo);
-  this->tScreen::Cleanup();
+  this->_base_tScreen.Cleanup();
   return;
 }
 
@@ -171,14 +136,19 @@ void tScreenTournSelect::Cleanup()
 void tScreenTournSelect::UpdateVideoWall(tTourneyInfo *tourn)
 
 {
-  if (tourn->fTrophyID != (signed char)this->fPreviousTrophy) {
+  int now;
+  char *fileName;
+  
+  if ((uint)tourn->fTrophyID != (int)this->fPreviousTrophy) {
+    fileName = gSwapFileName;
     GetTrophyName(&tournamentManager,tourn,ts_Medium,gSwapFileName,-1);
-    ::AsyncLoadSwapShapeFile((tScreen *)this,gSwapFileName);
+    AsyncLoadSwapShapeFile(&this->_base_tScreen,fileName);
     this->fTVsInitialized = 0;
     this->fPreviousTrophy = tourn->fTrophyID;
+    now = ticks;
     if (-1 < this->fTransitionDirection) {
       this->fTransitionDirection = -1;
-      this->fTVTicks = ticks;
+      this->fTVTicks = now;
     }
   }
   return;
@@ -187,69 +157,69 @@ void tScreenTournSelect::UpdateVideoWall(tTourneyInfo *tourn)
 
 
 /* ---- tScreenTournSelect::DrawVideoWall  [SCREENTOURNSELECT.CPP:168-229] ---- */
-/* MATCH W62: retail falls through the positive-direction TurnOn arm and branches
-   to the nonpositive TurnOff/reset arm.  SYM has no `onState` local; both arms
-   are bounded directly by transition count and four TVs.  Reusing only SYM's
-   `long i`/`long j` across the phases, delaying the first loop initializer until
-   after DrawBackgroundImage, and spelling the final walk as `trophyTV[j]`
-   restores retail's complete lifetime/address shape: 101 diffs to PASS. */
 void tScreenTournSelect::DrawVideoWall()
 
 {
-  long i;
+  bool onState;
   long j;
+  long i;
+  uint transCount;
   tDrawShapeExtended drawFlags;
-
-  drawFlags.custom_shapes = this->fSwapShapes.fShapes;
-  ::DrawBackgroundImage((tScreen *)this,0,0x22,this->fPermShapes.fShapes,0);
+  
   i = 0xf4;
-  /* W55-A2 BUGFIX: the x/y args were transcribed as phantom `transX/transY` zeros and the
-     loop counter `i` was never passed. Oracle 8003FC18: a1=$s1(=i), a2=0x29. */
+  drawFlags.custom_shapes = (this->_base_tScreen).fSwapShapes.fShapes;
+  DrawBackgroundImage(&this->_base_tScreen,0,0x22,(this->_base_tScreen).fPermShapes.fShapes,0);
   do {
     PSXDrawTransSquare(0x202020,i,0x29,2,0x61,1);
     i = i + 0x50;
   } while (i < 0x1e5);
   i = 0x59;
-  /* Oracle 8003FC50: a1=0xA5, a2=$s1(=i). */
   do {
     PSXDrawTransSquare(0x141414,0xa5,i,0x141,1,1);
     i = i + 0x30;
   } while (i < 0x89);
-  /* W55-A2 BUGFIX: retail passes literal 2 (oracle 8003FC7C delay slot `addiu a0,zero,2`);
-     the recon passed the stale coordinate 0xA5 via a phantom `abr`. */
   FeDraw_SetABRMode(2);
-  i = ticks - this->fTVTicks >> 2;
-  if (this->fTransitionDirection > 0) {
-    for (j = 0; (j < i) && (j < 4); j++) {
-      if (this->trophyTV[trophyTVOrder[j]].state == tv_StateOff) {
-        TurnOnTV(this->trophyTV + trophyTVOrder[j]);
-      }
+  transCount = ticks - this->fTVTicks >> 2;
+  if (this->fTransitionDirection < 1) {
+    i = 0;
+    if (transCount != 0) {
+      onState = true;
+      do {
+        if (!onState) break;
+        if (this->trophyTV[trophyTVOrder[i]].state == tv_StateOn) {
+          TurnOffTV(this->trophyTV + trophyTVOrder[i]);
+        }
+        i = i + 1;
+        onState = i < 4;
+      } while (i < (int)transCount);
     }
-  }
-  else {
-    for (j = 0; (j < i) && (j < 4); j++) {
-      if (this->trophyTV[trophyTVOrder[j]].state == tv_StateOn) {
-        TurnOffTV(this->trophyTV + trophyTVOrder[j]);
-      }
-    }
-    if (3 < i) {
+    if (3 < transCount) {
       this->fTransitionDirection = 0;
     }
   }
-  /* Oracle 8003FD84 / 8003FDAC: the two closing squares' x/y are literals, not phantom zeros. */
+  else {
+    i = 0;
+    if (transCount != 0) {
+      onState = true;
+      do {
+        if (!onState) break;
+        if (this->trophyTV[trophyTVOrder[i]].state == tv_StateOff) {
+          TurnOnTV(this->trophyTV + trophyTVOrder[i]);
+        }
+        i = i + 1;
+        onState = i < 4;
+      } while (i < (int)transCount);
+    }
+  }
   PSXDrawTransSquare(0x303030,0xf1,0x8e,2,0x4a,1);
   PSXDrawTransSquare(0x202020,0xa5,0xb3,0x98,1,1);
-  /* W55-A2 BUGFIX: retail passes literal 2 (oracle 8003FDCC delay slot); recon passed 0xA5. */
   FeDraw_SetABRMode(2);
   i = 0;
-  j = 0;
   do {
-    DrawTV(this->trophyTV + j);
+    DrawTV(this->trophyTV + i);
     i = i + 1;
-    j = j + 1;
   } while (i < 4);
-  /* Oracle 8003FDF4-8003FE34: a0 = (ticks >> 4) % 0x20, then 0x600,0xB6,0x93,0,0,&drawFlags. */
-  ScaleShapeExtended(((int)ticks >> 4) % 0x20,0x600,0xb6,0x93,0,0,&drawFlags);
+  ScaleShapeExtended((ticks >> 4) % 0x20,0x600,0xb6,0x93,0,0,&drawFlags);
   return;
 }
 
@@ -259,166 +229,157 @@ void tScreenTournSelect::DrawVideoWall()
 void tScreenTournSelect::DrawBackground()
 
 {
-  short y;
-  char buffer [64];
-  short i;
-  short j;
-  /* SYM-CODEGEN-CARRIER: tvIdx -- repeating `j + i * 4` at each field is
-     FAIL 54 at 413/415 and rotates every invariant/coordinate value web. */
-  short tvIdx;
-  RECT r;
-  tTourneyInfo *tourn;
+  byte tb1;
+  long number;
+  ushort tu2;
   int YellowCol;
+  int row, col, tvIdx;
   int DarkGreyCol;
   int GreyCol;
-  /* SYM-CODEGEN-CARRIER: number -- direct fMoney use is FAIL 9 at 414/415;
-     retail keeps the early value in `$s1` across the label-render call. */
-  long number;
-  /* SYM-CODEGEN-CARRIER: word -- a conditional TextValue call embedded in
-     WordWrapFade is FAIL 15 at 414/415 and changes both call-arm delay slots. */
-  int word;
-  /* SYM-CODEGEN-CARRIER: descriptionText -- deriving the pointer back from
-     `j` is FAIL 9 at 416/415 and destroys retail's delay-slot subtraction. */
-  char *descriptionText;
+  int ti6;
+  int ti7;
+  char *tstr8;
+  tListIteratorTournament *tp9;
   short shapeY;
-  /* SYM-CODEGEN-CARRIER: shapeX -- repeating literal 0x200 is FAIL 43 at
-     410/415; retail retains the signed-short coordinate in `$s6`. */
-  short shapeX;
+  short j;
+  short i;
+  int ti10;
+  short y;
+  tTourneyInfo *tourn;
+  char buffer [64];
+  RECT r;
   char moviename [80];
   u_long movieRGB;
-  /* SYM-CODEGEN-CARRIER: tournament -- embedding the tier selection into
-     the definition index is count-exact FAIL 60 and reshapes the prologue
-     plus every early tournament-definition value web. */
-  byte tournament;
-  /* SYM-CODEGEN-CARRIER: fe -- direct `frontEnd` member spellings are FAIL 3
-     at 416/415 and materialize a redundant address high half. */
-  tfrontEnd *fe = &frontEnd;
-
-  if (fe->tier != 0) {
-    tournament = fe->specialevent;
+  
+  tb1 = frontEnd.tournament;
+  if (frontEnd.tier != '\0') {
+    tb1 = frontEnd.specialevent;
   }
-  else {
-    tournament = fe->tournament;
-  }
-  tourn = &tournamentManager.fDefinition->fTournaments
-            [tournament +
-             tournamentManager.fDefinition->fTiers[(byte)fe->tier].fTournOffset];
-  YellowCol = CalcFadeVal(0xbebe,this->fScreenFadeVal);
-  DarkGreyCol = CalcFadeVal(0x232323,this->fScreenFadeVal);
-  GreyCol = CalcFadeVal(0x505050,this->fScreenFadeVal);
+  ti10 = 0;
+  tourn = (tournamentManager.fDefinition)->fTournaments +
+             (uint)tb1 +
+             (uint)(tournamentManager.fDefinition)->fTiers[(byte)frontEnd.tier].fTournOffset;
+  YellowCol = CalcFadeVal(0xbebe,(int)(this->_base_tScreen).fScreenFadeVal);
+  DarkGreyCol = CalcFadeVal(0x232323,(int)(this->_base_tScreen).fScreenFadeVal);
+  GreyCol = CalcFadeVal(0x505050,(int)(this->_base_tScreen).fScreenFadeVal);
   number = tournamentManager.fMoney;
-  FETextRender_MenuTextFade((int)this->fScreenFadeVal,0x7b,textState_Selected,textType_ScreenInfo);
-  DrawMoney(TextSys_WordX(0x7b) + 0x8c,TextSys_WordY(0x7b) + 9,6,
-            number,YellowCol,DarkGreyCol);
-  FETextRender_MenuTextFade((int)this->fScreenFadeVal,0x99,textState_Selected,textType_Default);
-  DrawMoney(TextSys_WordX(0x99) + 0x8c,TextSys_WordY(0x99) + 9,6,
-            tourn->fEntranceFee,YellowCol,DarkGreyCol);
-  FETextRender_MenuTextFade((int)this->fScreenFadeVal,0x9a,textState_Selected,textType_Default);
-  y = TextSys_WordY(0x9a) + 9;
-  i = 0;
+  FETextRender_MenuTextFade((int)(this->_base_tScreen).fScreenFadeVal,0x7b,textState_Selected,textType_ScreenInfo);
+  ti6 = TextSys_WordX(0x7b);
+  ti7 = TextSys_WordY(0x7b);
+  DrawMoney(ti6 + 0x8c,ti7 + 9,6,number,YellowCol,DarkGreyCol);
+  FETextRender_MenuTextFade((int)(this->_base_tScreen).fScreenFadeVal,0x99,textState_Selected,textType_Default);
+  ti6 = TextSys_WordX(0x99);
+  ti7 = TextSys_WordY(0x99);
+  DrawMoney(ti6 + 0x8c,ti7 + 9,6,tourn->fEntranceFee,YellowCol,DarkGreyCol);
+  FETextRender_MenuTextFade((int)(this->_base_tScreen).fScreenFadeVal,0x9a,textState_Selected,textType_Default);
+  ti6 = TextSys_WordY(0x9a);
   do {
-    FETextRender_FullTextRGB(TextSys_Word(i + 0x2d4),TextSys_WordX(0x9a),
-                             y,GreyCol,'\0',0);
-    DrawMoney(TextSys_WordX(0x99) + 0x8c,y,6,tourn->fPrize[i],
-              YellowCol,DarkGreyCol);
-    y += 9;
-    i++;
-  } while (i < 3);
+    ti6 = ti6 + 9;
+    tstr8 = TextSys_Word((short)ti10 + 0x2d4);
+    ti7 = TextSys_WordX(0x9a);
+    FETextRender_FullTextRGB(tstr8,(short)ti7,(short)((uint)(ti6 * 0x10000) >> 0x10),GreyCol,'\0',0);
+    ti7 = TextSys_WordX(0x99);
+    DrawMoney(ti7 + 0x8c,ti6 * 0x10000 >> 0x10,6,tourn->fPrize[(short)ti10],YellowCol,DarkGreyCol);
+    ti10 = ti10 + 1;
+  } while (ti10 * 0x10000 >> 0x10 < 3);
   this->UpdateVideoWall(tourn);
-  ::IsShapeFileLoaded((tScreen *)this,&this->fSwapShapes);
-  if ((this->fSwapShapes.fFile != (char *)0x0) && (-1 < this->fTransitionDirection)) {
-    ::UploadSwapShapes((tScreen *)this,0x20);
+  IsShapeFileLoaded(&this->_base_tScreen,&(this->_base_tScreen).fSwapShapes);
+  if (((this->_base_tScreen).fSwapShapes.fFile != (char *)0x0) && (-1 < this->fTransitionDirection)) {
+    UploadSwapShapes(&this->_base_tScreen,0x20);
+    ti6 = ticks;
     this->fTransitionDirection = 1;
-    this->fTVTicks = ticks;
+    this->fTVTicks = ti6;
   }
   this->DrawVideoWall();
-  shapeY = 0;
+  ti6 = 0;
   if ((this->fFrame & 1U) == 0) {
-    shapeY = 0x50;
+    ti6 = 0x50;
   }
-  shapeX = 0x200;
-  movieRGB = 0x2c1e1e;
-  i = 0;
+  row = 0;
   do {
-    j = 0;
+    col = 0;
     do {
-      tvIdx = (short)(j + i * 4);
-      this->tvConfigs[tvIdx].x = j * 0x50 + 0xa5;
+      tvIdx = (col + (short)row * 4) * 0x10000 >> 0x10;
+      this->tvConfigs[tvIdx].x = (short)col * 0x50 + 0xa5;
       this->tvConfigs[tvIdx].w = 0x50;
       this->tvConfigs[tvIdx].h = 0x30;
-      this->tvConfigs[tvIdx].y = i * 0x30 + 0x29;
-      this->tvConfigs[tvIdx].u = j * 0x14;
-      this->tvConfigs[tvIdx].uw = 0x14;
-      this->tvConfigs[tvIdx].v = i * 0x28;
-      this->tvConfigs[tvIdx].vh = 0x28;
-      this->tvConfigs[tvIdx].tpage = GetTPage(2,0,shapeX,shapeY);
+      this->tvConfigs[tvIdx].uw = '\x14';
+      this->tvConfigs[tvIdx].y = (short)row * 0x30 + 0x29;
+      this->tvConfigs[tvIdx].u = (char)col * '\x14';
+      this->tvConfigs[tvIdx].v = (char)row * '(';
+      this->tvConfigs[tvIdx].vh = '(';
+      tu2 = GetTPage(2,0,0x200,(int)(short)ti6);
+      col = col + 1;
+      this->tvConfigs[tvIdx].tpage = tu2;
       this->tvConfigs[tvIdx].state = tv_StateOn;
       this->tvConfigs[tvIdx].clut = 0;
       this->tvConfigs[tvIdx].flags = 0x22;
-      this->tvConfigs[tvIdx].tint = movieRGB;
+      this->tvConfigs[tvIdx].tint = 0x2c1e1e;
       this->tvConfigs[tvIdx].destBrightness = 0x80;
       this->tvConfigs[tvIdx].transition = 0x80;
-      j++;
-    } while (j < 4);
-    i++;
-  } while (i < 2);
-  if (VIDEO_state(this->hVideo) != 0) {
-    if (VIDEO_updateframexy(this->hVideo,shapeX,shapeY) != 0) {
-      this->fFrame++;
-    }
-  }
-  else {
+    } while (col * 0x10000 >> 0x10 < 4);
+    row = row + 1;
+  } while (row * 0x10000 >> 0x10 < 2);
+  row = VIDEO_state(this->hVideo);
+  if (row == 0) {
     this->fCurrentMovie = 0;
     sprintf(moviename,"%szzzTRN.dct",Paths_Paths[0x29]);
     VIDEO_spoolfile(this->hVideo,moviename);
     VIDEO_startplayback(this->hVideo);
   }
-  i = 0;
+  else {
+    ti6 = VIDEO_updateframexy(this->hVideo,0x200,ti6);
+    if (ti6 != 0) {
+      this->fFrame = this->fFrame + 1;
+    }
+  }
+  ti6 = 0;
   do {
-    DrawTVLines(&this->tvConfigs[i]);
-    i++;
-  } while (i < 8);
+    DrawTVLines(this->tvConfigs + (short)ti6);
+    ti6 = ti6 + 1;
+  } while (ti6 * 0x10000 >> 0x10 < 8);
   r.x = 0x145;
   r.y = 0x2b;
   r.w = 0x13a;
   r.h = 10;
-  if (frontEnd.tier != '\0') {
-    word = TextValue(&menuDefs->iteratorSpecialEvent,kPlayerBoth);
+  if (frontEnd.tier == '\0') {
+    tp9 = &menuDefs->iteratorTournament;
   }
   else {
-    word = TextValue(&menuDefs->iteratorTournament,kPlayerBoth);
+    tp9 = &menuDefs->iteratorSpecialEvent;
   }
-  FETextRender_WordWrapFade((int)this->fScreenFadeVal,(short)word,&r,textState_Hilighted,
+  ti6 = TextValue(tp9,kPlayerBoth);
+  FETextRender_WordWrapFade((int)(this->_base_tScreen).fScreenFadeVal,(short)ti6,&r,textState_Hilighted,
              textType_VideoWall);
   r.x = 0xaa;
   r.w = r.w + -10;
-  if (frontEnd.tier != '\0') {
-    i = TextValue(&menuDefs->iteratorSpecialEvent,kPlayerBoth);
+  if (frontEnd.tier == '\0') {
+    tp9 = &menuDefs->iteratorTournament;
   }
   else {
-    i = TextValue(&menuDefs->iteratorTournament,kPlayerBoth);
+    tp9 = &menuDefs->iteratorSpecialEvent;
   }
-  i += 0x26;
-  if ((i != this->fPrevi) || (this->PreCalculatedTournamentY == -1)) {
-    this->fPrevi = i;
-    this->PreCalculatedTournamentY =
-      0x75 - FETextRender_WordWrapHeight(r.w,TextSys_Word(i));
+  ti6 = TextValue(tp9,kPlayerBoth);
+  row = (ti6 + 0x26) * 0x10000 >> 0x10;
+  if ((row != this->fPrevi) || (this->PreCalculatedTournamentY == -1)) {
+    this->fPrevi = row;
+    tstr8 = TextSys_Word(row);
+    row = FETextRender_WordWrapHeight(r.w,tstr8);
+    this->PreCalculatedTournamentY = 0x75 - row;
   }
   r.y = (short)this->PreCalculatedTournamentY;
-  j = i - 0x367;
-  descriptionText = TextSys_Word(i);
-  i = 0;
-  FETextRender_WordWrapTextRGB(descriptionText,r,
-                               CalcFadeVal(0x505050,this->fScreenFadeVal));
-  FETextRender_MenuTextPositionedJustifyFade((int)this->fScreenFadeVal,0x3db,0xaa,0x75,0,textState_Selected,
+  col = 0;
+  tstr8 = TextSys_Word((int)(short)(ti6 + 0x26));
+  row = CalcFadeVal(0x505050,(int)(this->_base_tScreen).fScreenFadeVal);
+  FETextRender_WordWrapTextRGB(tstr8,&r,row);
+  FETextRender_MenuTextPositionedJustifyFade((int)(this->_base_tScreen).fScreenFadeVal,0x3db,0xaa,0x75,0,textState_Selected,
              textType_ScreenInfo);
-  j += 0x37a;
-  FETextRender_MenuTextPositionedJustifyFade((int)this->fScreenFadeVal,j,
+  FETextRender_MenuTextPositionedJustifyFade((int)(this->_base_tScreen).fScreenFadeVal,(short)((uint)((ti6 + 0x39) * 0x10000) >> 0x10),
              0xaa,0x7d,0,textState_Hilighted,textType_ScreenInfo);
   do {
-    DrawTV(&this->tvConfigs[i]);
-    i++;
-  } while (i < 8);
+    DrawTV(this->tvConfigs + (short)col);
+    col = col + 1;
+  } while (col * 0x10000 >> 0x10 < 8);
   return;
 }
 
@@ -428,10 +389,17 @@ void tScreenTournSelect::DrawBackground()
 void tScreenTournSelect::DrawForeground()
 
 {
-  /* MATCH: SLD records no locals; the decompiler's unused buffer, RECT,
-     colors, and draw-flags aggregate inflated the frame from 48 to 144. */
-  PSXDrawBrightEndLine(0x232323,0xa7,0x29,0x13c,1,3,(int)this->fScreenFadeVal,0x14);
-  PSXDrawBrightEndLine(0x232323,0xa7,0x4a,0x13c,1,2,(int)this->fScreenFadeVal,0x14);
+  short shapeY;
+  short y;
+  int DarkGreyCol;
+  int YellowCol;
+  char buffer [64];
+  RECT r;
+  uint movieRGB;
+  tDrawShapeExtended drawFlags;
+  
+  PSXDrawBrightEndLine(0x232323,0xa7,0x29,0x13c,1,3,(int)(this->_base_tScreen).fScreenFadeVal,0x14);
+  PSXDrawBrightEndLine(0x232323,0xa7,0x4a,0x13c,1,2,(int)(this->_base_tScreen).fScreenFadeVal,0x14);
   return;
 }
 

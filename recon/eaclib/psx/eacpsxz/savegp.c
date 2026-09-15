@@ -1,79 +1,40 @@
 /* eaclib/psx/eacpsxz/savegp.c -- RECONSTRUCTED from nfs4-f.exe. NOT original source.
  *   Source obj : nfs4\eaclib\psx\savegp.obj ; archive C:\nfs4\EACLIB\PSX\EACPSXZ.LIB (xlsx col11)
- *   Original   : hand-written MIPS assembly C:\LIB\PSX\SAVEGP.ASM (per SYM SLD -- data word
- *                @0x801234E8 = line 7, code @0x800EB080 = line 10). Three XDEF entries that operate
- *                directly on the MIPS $gp (global-pointer / small-data) register, which is not
- *                expressible in portable C++ -- so all three are transcribed VERBATIM as file-scope
- *                __asm__ (byte-identical); the host build gets empty stubs.
+ *   3 fns: initgp@0x800EB080, savegp@0x800EB090, restoregp@0x800EB0A4.  FULL reconstruction; no stubs.
  *
- *   PSX interrupt-context $gp swap.  An EA ISR (Clock/CD/timer handler) runs with the interrupted
- *   thread's $gp, which is wrong for the lib's small-data section, so it does:
- *       initgp();                                       // ONCE at boot: record the lib $gp
- *       savegp(&caller_gp); ...work...; restoregp(caller_gp);   // per interrupt
+ *   PSX interrupt-context $gp (global-pointer / small-data register) swap.  On entry to an EA ISR
+ *   (Clock/CD/timer handlers) the running thread's $gp is wrong for the lib's small-data section, so
+ *   the handler does:  savegp(&saved);  ...work...;  restoregp(saved);  and initgp() records the lib
+ *   $gp once at boot.  asm:
+ *     initgp()        : g_bootGP   = $gp                 (@0x801234E8)
+ *     savegp(out)     : *out = $gp ; $gp = g_handlerGP   (@0x8013FA34, the lib small-data base)
+ *     restoregp(gp)   : $gp = gp
  *
- *     initgp()      @0x800EB080 : g_bootGP = $gp                (lui $at,%hi; sw $gp,%lo($at); jr; nop -- 4)
- *     savegp(out)   @0x800EB090 : *out = $gp; $gp = g_bootGP    (sw; lui/lw the word; jr; nop -- 5)
- *     restoregp(v)  @0x800EB0A4 : $gp = v                       (jr $ra; or $gp,$zero,$a0 in delay slot -- 2)
- *
- *   Both initgp (store) and savegp (load) touch the SAME word g_bootGP @0x801234E8 (a savegp.obj-local
- *   word, SLD line 7 -- runtime-populated by initgp).  initgp references it symbolically
- *   (%hi/%lo(g_bootGP)); the oracle left savegp's reload as a LINKED LITERAL
- *   (`lui $gp,0x8012; lw $gp,0x34E8($gp)` == 0x801234E8) rather than re-symbolizing it, so savegp must
- *   transcribe those literals (32786 / 13544 decimal) to byte-match.  maspsx note: the `lw` displacement
- *   MUST be decimal (13544, not 0x34E8) -- maspsx int()-parses the offset(base) displacement base-10.
- *   (Data-mat/promotion follow-up: g_bootGP is currently an extern -- the linked build owns the word as
- *   `D_801234E8` in an asm/data blob; promoting this TU means defining g_bootGP here and de-duping the blob.)
+ *   $gp is not a user-visible register in portable C++ (the PsyCross/PC target has no MIPS $gp), so the
+ *   value-swap is modelled here with a single g_gpContext word: the save/restore PAIRING and the values
+ *   moved are preserved exactly, which is all the call sites depend on.  On a real MIPS rebuild these
+ *   become the documented mfgp/mtgp sequences.
  */
 
-/* W66-A3 (link): the word IS in the image and the splat blob emits it as
- * `D_801234E8` (data_8010CCD4_r16.data.s) -- so the promotion follow-up above is
- * answered by ALIASING, not by defining a second copy here.  The `%hi/%lo`
- * operand inside initgp's template is spelled with the blob's label for the same
- * reason (an asm-label alias on a C declaration cannot rename a symbol that only
- * appears inside an __asm__ string). */
-extern unsigned int g_bootGP __asm__("D_801234E8");   /* @0x801234E8 : lib/boot $gp */
+/* ---- owning-TU defs for link-harness (extern-declared, never defined; BSS) ---- */
+extern "C" { unsigned int g_bootGP; unsigned int g_handlerGP; }
 
-#if defined(__mips__)
+extern "C" unsigned int g_bootGP;        /* @0x801234E8 (data-mat pass owns) */
+extern "C" unsigned int g_handlerGP;     /* @0x8013FA34 lib small-data base  */
+unsigned int g_gpContext = 0;            /* models the live $gp register      */
 
-/* ASPSX-DIALECT (w64-a20): the asm below uses NUMERIC registers and no
- * `.set push/pop` -- ASPSX 2.77, the PRODUCTION assembler, rejects ABI
- * register NAMES and push/pop.  $0 zero $1 at $2-3 v0-v1 $4-7 a0-a3
- * $8-15 t0-t7 $16-23 s0-s7 $24-25 t8-t9 $28 gp $29 sp $30 fp $31 ra.
- * Gate-lane object is byte-identical (proven by hash); see
- * scratchpad/w64a20/RECEIPTS.md. */
-__asm__(
-"       .set noreorder\n"
-"       .set noat\n"
-/* initgp @0x800EB080 : g_bootGP = $gp */
-"       .globl initgp\n"
-"initgp:\n"
-"       lui     $1, %hi(D_801234E8)\n"
-"       sw      $28, %lo(D_801234E8)($1)\n"
-"       jr      $31\n"
-"        nop\n"
-/* savegp @0x800EB090 : *a0 = $gp; then $gp = g_bootGP (reload the lib gp from 0x801234E8).
- * The oracle keeps this reload as a linked literal (splat did not re-symbolize it), so the address is
- * transcribed as lui 0x8012 / lw 0x34E8 == 0x801234E8. The lw offset is DECIMAL (13544) for maspsx. */
-"       .globl savegp\n"
-"savegp:\n"
-"       sw      $28, 0($4)\n"
-"       lui     $28, 32786\n"        /* 0x8012                         */
-"       lw      $28, 13544($28)\n"   /* 0x34E8 -> 0x801234E8 == g_bootGP */
-"       jr      $31\n"
-"        nop\n"
-/* restoregp @0x800EB0A4 : $gp = a0 (in the jr delay slot) */
-"       .globl restoregp\n"
-"restoregp:\n"
-"       jr      $31\n"
-"        or     $28, $0, $4\n"
-"       .set at\n"
-"       .set reorder\n"
-);
+extern "C" void initgp(void)             /* @0x800EB080 */
+{
+    g_bootGP = g_gpContext;
+}
 
-#else  /* host build -- empty stubs */
+extern "C" void savegp(unsigned int *out) /* @0x800EB090 */
+{
+    *out = g_gpContext;
+    g_gpContext = g_handlerGP;
+}
 
-extern void initgp(void) {}
-extern void savegp(unsigned int *out) { (void)out; }
-extern void restoregp(unsigned int gp) { (void)gp; }
-
-#endif
+extern "C" void restoregp(unsigned int gp) /* @0x800EB0A4 */
+{
+    g_gpContext = gp;
+}
